@@ -1,0 +1,29 @@
+# See https://pre-commit.com for more information
+# See https://pre-commit.com/hooks.html for more hooks
+fail_fast: true
+repos:
+  -   repo: https://github.com/pre-commit/pre-commit-hooks
+      rev: v4.0.1
+      hooks:
+        -   id: check-yaml
+        -   id: check-added-large-files
+        -   id: check-toml
+        -   id: check-json
+        -   id: end-of-file-fixer
+        -   id: trailing-whitespace
+        -   id: detect-private-key
+
+  -   repo: local
+      hooks:
+        -   id: run-cargo-formatter
+            name: Run Cargo formatter
+            entry: cargo fmt
+            language: script
+            files: \.x$
+            always_run: true
+        -   id: run-cargo-clippy
+            name: Run Cargo clippy
+            entry: cargo clippy --no-deps -- -D warnings
+            language: script
+            files: \.x$
+            always_run: true
