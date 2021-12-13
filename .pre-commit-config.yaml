@@ -17,13 +17,13 @@ repos:
       hooks:
         -   id: run-cargo-formatter
             name: Run Cargo formatter
-            entry: cargo fmt
+            entry: scripts/cargo-formatter.sh
             language: script
             files: \.x$
             always_run: true
         -   id: run-cargo-clippy
             name: Run Cargo clippy
-            entry: cargo clippy --no-deps -- -D warnings
+            entry: scripts/cargo-clippy.sh
             language: script
             files: \.x$
             always_run: true
