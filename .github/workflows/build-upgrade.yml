@@ -1,0 +1,42 @@
+name: Rust build and code style checks
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    container:
+      image: us-central1-docker.pkg.dev/dfx-server/dfx-containers/ci
+      credentials:
+        username: _json_key
+        password: ${{ secrets.GCP_DOCKER_KEY }}
+
+    steps:
+      - name: Checkout repository and submodules
+        uses: actions/checkout@v2
+        with:
+          submodules: recursive
+          token: ${{ secrets.PAT_TOKEN }}
+
+      - uses: fusion-engineering/setup-git-credentials@v2
+        with:
+          credentials: ${{secrets.GIT_CREDENTIALS}}
+
+      - name: Checking format
+        run: |
+          cargo fmt -- --check
+
+      - name: Running clippy
+        run: |
+          cargo clippy
+
+      - name: Build canisters
+        run: |
+          ./scripts/build.sh
