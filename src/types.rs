@@ -1,5 +1,8 @@
-use candid::{CandidType, Deserialize, Int, Nat, Principal};
+use candid::{CandidType, Deserialize, Nat, Principal};
 use std::collections::HashMap;
+
+mod tx_record;
+pub use tx_record::*;
 
 #[allow(non_snake_case)]
 #[derive(Deserialize, CandidType, Clone, Debug)]
@@ -31,7 +34,6 @@ pub struct StatsData {
 pub struct TokenInfo {
     pub metadata: Metadata,
     pub feeTo: Principal,
-    // status info
     pub historySize: usize,
     pub deployTime: u64,
     pub holderNumber: usize,
@@ -64,19 +66,6 @@ pub enum TxError {
     Unauthorized,
 }
 pub type TxReceipt = Result<Nat, TxError>;
-
-#[derive(Deserialize, CandidType, Debug, Clone)]
-pub struct TxRecord {
-    pub caller: Option<Principal>,
-    pub index: Nat,
-    pub from: Principal,
-    pub to: Principal,
-    pub amount: Nat,
-    pub fee: Nat,
-    pub timestamp: Int,
-    pub status: TransactionStatus,
-    pub operation: Operation,
-}
 
 #[derive(CandidType, Debug, Clone, Copy, Deserialize)]
 pub enum TransactionStatus {
