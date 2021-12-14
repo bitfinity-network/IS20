@@ -1,5 +1,5 @@
 use crate::state::State;
-use crate::types::{Metadata, Operation, TokenInfo, TransactionStatus, TxReceipt, TxRecord};
+use crate::types::{Metadata, TokenInfo, TxReceipt};
 use candid::{candid_method, Nat, Principal};
 use ic_cdk_macros::*;
 use ic_kit::ic;
@@ -33,20 +33,11 @@ fn init(
     stats.fee = fee;
     stats.fee_to = fee_to;
     stats.deploy_time = ic::time();
+
     let balances = State::get().balances_mut();
-    balances.insert(owner, total_supply);
-    let ledger = State::get().ledger_mut();
-    ledger.push(TxRecord {
-        caller: Some(owner),
-        index: Default::default(),
-        from: owner,
-        to: owner,
-        amount: Default::default(),
-        fee: Nat::from(0),
-        timestamp: Default::default(),
-        status: TransactionStatus::Succeeded,
-        operation: Operation::Approve,
-    });
+    balances.insert(owner, total_supply.clone());
+
+    State::get().ledger_mut().mint(owner, owner, total_supply);
 }
 
 #[cfg(any(target_arch = "wasm32", test))]
