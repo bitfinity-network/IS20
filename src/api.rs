@@ -1,12 +1,9 @@
 use crate::state::State;
-use crate::types::{
-    Metadata, Operation, TokenInfo, TransactionStatus, TxError, TxReceipt, TxRecord,
-};
+use crate::types::{Metadata, TokenInfo, TxError, TxReceipt};
 use candid::{candid_method, Nat};
 use ic_cdk_macros::*;
 use ic_kit::{ic, Principal};
 use std::collections::HashMap;
-use std::convert::Into;
 use std::iter::FromIterator;
 use std::string::String;
 
@@ -44,19 +41,9 @@ async fn transfer(to: Principal, value: Nat) -> TxReceipt {
     _charge_fee(from, stats.fee_to, stats.fee.clone());
     _transfer(from, to, value.clone());
 
-    let ledger = State::get().ledger_mut();
-    let id = ledger.push(TxRecord {
-        caller: Some(from),
-        index: Default::default(),
-        from,
-        to,
-        amount: value,
-        fee: stats.fee.clone(),
-        timestamp: ic_cdk::api::time().into(),
-        status: TransactionStatus::Succeeded,
-        operation: Operation::Transfer,
-    });
-
+    let id = State::get()
+        .ledger_mut()
+        .transfer(from, to, value, stats.fee.clone());
     Ok(id)
 }
 
@@ -97,19 +84,9 @@ async fn transfer_from(from: Principal, to: Principal, value: Nat) -> TxReceipt 
         }
     }
 
-    let ledger = State::get().ledger_mut();
-    let id = ledger.push(TxRecord {
-        caller: Some(owner),
-        index: Default::default(),
-        from,
-        to,
-        amount: value,
-        fee: stats.fee.clone(),
-        timestamp: ic_cdk::api::time().into(),
-        status: TransactionStatus::Succeeded,
-        operation: Operation::TransferFrom,
-    });
-
+    let id = State::get()
+        .ledger_mut()
+        .transfer_from(owner, from, to, value, stats.fee.clone());
     Ok(id)
 }
 
@@ -149,19 +126,9 @@ async fn approve(spender: Principal, value: Nat) -> TxReceipt {
         }
     }
 
-    let ledger = State::get().ledger_mut();
-    let id = ledger.push(TxRecord {
-        caller: Some(owner),
-        index: Default::default(),
-        from: owner,
-        to: spender,
-        amount: value,
-        fee: stats.fee.clone(),
-        timestamp: ic_cdk::api::time().into(),
-        status: TransactionStatus::Succeeded,
-        operation: Operation::Approve,
-    });
-
+    let id = State::get()
+        .ledger_mut()
+        .approve(owner, spender, value, stats.fee.clone());
     Ok(id)
 }
 
@@ -178,19 +145,7 @@ async fn mint(to: Principal, amount: Nat) -> TxReceipt {
     balances.insert(to, to_balance + amount.clone());
     stats.total_supply += amount.clone();
 
-    let ledger = State::get().ledger_mut();
-    let id = ledger.push(TxRecord {
-        caller: Some(caller),
-        index: Default::default(),
-        from: caller,
-        to,
-        amount,
-        fee: stats.fee.clone(),
-        timestamp: ic_cdk::api::time().into(),
-        status: TransactionStatus::Succeeded,
-        operation: Operation::Mint,
-    });
-
+    let id = State::get().ledger_mut().mint(caller, to, amount);
     Ok(id)
 }
 
@@ -207,19 +162,7 @@ async fn burn(amount: Nat) -> TxReceipt {
     balances.insert(caller, caller_balance - amount.clone());
     stats.total_supply -= amount.clone();
 
-    let ledger = State::get().ledger_mut();
-    let id = ledger.push(TxRecord {
-        caller: Some(caller),
-        index: Default::default(),
-        from: caller,
-        to: caller,
-        amount,
-        fee: Nat::from(0),
-        timestamp: ic_cdk::api::time().into(),
-        status: TransactionStatus::Succeeded,
-        operation: Operation::Burn,
-    });
-
+    let id = State::get().ledger_mut().burn(caller, amount);
     Ok(id)
 }
 

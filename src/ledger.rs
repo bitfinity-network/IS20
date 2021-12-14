@@ -1,18 +1,62 @@
 use crate::types::TxRecord;
-use candid::{CandidType, Deserialize, Nat};
+use candid::{CandidType, Deserialize, Nat, Principal};
 
 #[derive(Default, CandidType, Deserialize)]
 pub struct Ledger(Vec<TxRecord>);
 
 impl Ledger {
-    pub fn push(&mut self, entry: TxRecord) -> Nat {
-        let idx = self.0.len();
-        self.0.push(entry);
-
-        Nat::from(idx)
-    }
-
     pub fn len(&self) -> usize {
         self.0.len()
+    }
+
+    pub fn transfer(&mut self, from: Principal, to: Principal, amount: Nat, fee: Nat) -> Nat {
+        let id = Nat::from(self.len());
+        self.0
+            .push(TxRecord::transfer(id.clone(), from, to, amount, fee));
+
+        id
+    }
+
+    pub fn transfer_from(
+        &mut self,
+        caller: Principal,
+        from: Principal,
+        to: Principal,
+        amount: Nat,
+        fee: Nat,
+    ) -> Nat {
+        let id = Nat::from(self.len());
+        self.0.push(TxRecord::transfer_from(
+            id.clone(),
+            caller,
+            from,
+            to,
+            amount,
+            fee,
+        ));
+
+        id
+    }
+
+    pub fn approve(&mut self, from: Principal, to: Principal, amount: Nat, fee: Nat) -> Nat {
+        let id = Nat::from(self.len());
+        self.0
+            .push(TxRecord::approve(id.clone(), from, to, amount, fee));
+
+        id
+    }
+
+    pub fn mint(&mut self, from: Principal, to: Principal, amount: Nat) -> Nat {
+        let id = Nat::from(self.len());
+        self.0.push(TxRecord::mint(id.clone(), from, to, amount));
+
+        id
+    }
+
+    pub fn burn(&mut self, caller: Principal, amount: Nat) -> Nat {
+        let id = Nat::from(self.len());
+        self.0.push(TxRecord::burn(id.clone(), caller, amount));
+
+        id
     }
 }
