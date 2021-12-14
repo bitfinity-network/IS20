@@ -1,8 +1,10 @@
 use crate::state::State;
-use crate::types::{Metadata, TokenInfo, TxReceipt};
 use candid::{candid_method, Nat, Principal};
 use ic_cdk_macros::*;
 use ic_kit::ic;
+
+#[cfg(not(any(target_arch = "wasm32", test)))]
+use crate::types::{Metadata, TokenInfo, TxReceipt};
 
 mod api;
 mod ledger;
@@ -13,7 +15,7 @@ mod types;
 #[candid_method(init)]
 // todo: This should be refactored to use a struct
 #[allow(clippy::too_many_arguments)]
-fn init(
+pub fn init(
     logo: String,
     name: String,
     symbol: String,
