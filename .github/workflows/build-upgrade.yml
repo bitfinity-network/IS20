@@ -37,6 +37,10 @@ jobs:
         run: |
           cargo clippy
 
+      - name: Unit tests
+        run: |
+          cargo test
+
       - name: Build canisters
         run: |
           ./scripts/build.sh
