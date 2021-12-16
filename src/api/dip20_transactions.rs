@@ -4,6 +4,7 @@ use crate::types::{TxError, TxReceipt};
 use candid::{candid_method, Nat};
 use ic_cdk_macros::*;
 use ic_kit::{ic, Principal};
+use num_traits::ToPrimitive;
 use std::collections::HashMap;
 
 #[update(name = "transfer")]
@@ -20,6 +21,11 @@ pub fn transfer(to: Principal, value: Nat) -> TxReceipt {
     let id = State::get()
         .ledger_mut()
         .transfer(from, to, value, stats.fee.clone());
+
+    State::get().notifications_mut().insert(
+        id.0.to_usize()
+            .expect("In the current implementation ids are limited by usize."),
+    );
     Ok(id)
 }
 
