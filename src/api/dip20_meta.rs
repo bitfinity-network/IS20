@@ -1,9 +1,12 @@
 use crate::state::State;
-use crate::types::Metadata;
+use crate::types::{Metadata, TxRecord};
 use candid::{candid_method, Nat};
 use ic_cdk_macros::*;
 use ic_kit::{ic, Principal};
+use num_traits::cast::ToPrimitive;
 use std::string::String;
+
+const MAX_TRANSACTION_QUERY_LEN: usize = 1000;
 
 #[query(name = "name")]
 #[candid_method(query)]
@@ -78,9 +81,41 @@ pub fn history_size() -> usize {
     ledger.len()
 }
 
-// todo: getTransaction
+#[query(name = "getTransaction")]
+#[candid_method(query, rename = "getTransaction")]
+pub fn get_transaction(id: Nat) -> TxRecord {
+    let id =
+        id.0.to_usize()
+            .unwrap_or_else(|| ic::trap("Id is out of bounds"));
+    State::get()
+        .ledger()
+        .0
+        .get(id)
+        .unwrap_or_else(|| ic::trap(&format!("Transaction {} does not exist", id)))
+        .clone()
+}
 
-// todo: getTransactions
+#[query(name = "getTransactions")]
+#[candid_method(query, rename = "getTransactions")]
+pub fn get_transactions(start: Nat, limit: Nat) -> Vec<TxRecord> {
+    let start = start
+        .0
+        .to_usize()
+        .unwrap_or_else(|| ic::trap("Start is out of bounds"));
+    let limit = limit
+        .0
+        .to_usize()
+        .unwrap_or_else(|| ic::trap("Limit is out of bounds"));
+    if limit > MAX_TRANSACTION_QUERY_LEN {
+        ic::trap(&format!(
+            "Limit must be less then {}",
+            MAX_TRANSACTION_QUERY_LEN
+        ));
+    }
+
+    let ledger = State::get().ledger();
+    ledger.0[start..(start + limit).min(ledger.len())].to_vec()
+}
 
 #[query(name = "logo")]
 #[candid_method(query, rename = "logo")]
@@ -107,7 +142,7 @@ fn set_logo(logo: String) {
 
 #[update(name = "setFee")]
 #[candid_method(update, rename = "setFee")]
-fn set_fee(fee: Nat) {
+pub fn set_fee(fee: Nat) {
     let stats = State::get().stats_mut();
     assert_eq!(ic::caller(), stats.owner);
     stats.fee = fee;
@@ -127,4 +162,47 @@ fn set_owner(owner: Principal) {
     let stats = State::get().stats_mut();
     assert_eq!(ic::caller(), stats.owner);
     stats.owner = owner;
+}
+
+// todo: getUserTransactions
+
+// todo: getUserTransactionAmount
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::api::dip20_transactions::transfer;
+    use crate::tests::init_context;
+    use ic_kit::mock_principals::bob;
+
+    #[test]
+    fn get_transactions_test() {
+        init_context();
+        const COUNT: usize = 5;
+        for _ in 0..COUNT {
+            transfer(bob(), Nat::from(10)).unwrap();
+        }
+
+        let txs = get_transactions(Nat::from(0), Nat::from(2));
+        assert_eq!(txs.len(), 2);
+        assert_eq!(txs[1].index, Nat::from(1));
+
+        let txs = get_transactions(Nat::from(COUNT), Nat::from(2));
+        assert_eq!(txs.len(), 1);
+        assert_eq!(txs[0].index, Nat::from(COUNT));
+    }
+
+    #[test]
+    #[should_panic]
+    fn get_transactions_over_limit() {
+        init_context();
+        get_transactions(Nat::from(0), Nat::from(MAX_TRANSACTION_QUERY_LEN + 1));
+    }
+
+    #[test]
+    #[should_panic]
+    fn get_transaction_not_existing() {
+        init_context();
+        get_transaction(Nat::from(2));
+    }
 }

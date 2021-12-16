@@ -67,13 +67,13 @@ pub enum TxError {
 }
 pub type TxReceipt = Result<Nat, TxError>;
 
-#[derive(CandidType, Debug, Clone, Copy, Deserialize)]
+#[derive(CandidType, Debug, Clone, Copy, Deserialize, PartialEq)]
 pub enum TransactionStatus {
     Succeeded,
     Failed,
 }
 
-#[derive(CandidType, Debug, Clone, Copy, Deserialize)]
+#[derive(CandidType, Debug, Clone, Copy, Deserialize, PartialEq)]
 pub enum Operation {
     Approve,
     Mint,
