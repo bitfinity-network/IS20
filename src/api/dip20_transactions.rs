@@ -8,7 +8,7 @@ use std::collections::HashMap;
 
 #[update(name = "transfer")]
 #[candid_method(update)]
-fn transfer(to: Principal, value: Nat) -> TxReceipt {
+pub fn transfer(to: Principal, value: Nat) -> TxReceipt {
     let from = ic::caller();
     let stats = State::get().stats_mut();
     if balance_of(from) < value.clone() + stats.fee.clone() {
@@ -25,7 +25,7 @@ fn transfer(to: Principal, value: Nat) -> TxReceipt {
 
 #[update(name = "transferFrom")]
 #[candid_method(update, rename = "transferFrom")]
-fn transfer_from(from: Principal, to: Principal, value: Nat) -> TxReceipt {
+pub fn transfer_from(from: Principal, to: Principal, value: Nat) -> TxReceipt {
     let owner = ic::caller();
     let from_allowance = allowance(from, owner);
     let stats = State::get().stats_mut();
@@ -68,7 +68,7 @@ fn transfer_from(from: Principal, to: Principal, value: Nat) -> TxReceipt {
 
 #[update(name = "approve")]
 #[candid_method(update)]
-fn approve(spender: Principal, value: Nat) -> TxReceipt {
+pub fn approve(spender: Principal, value: Nat) -> TxReceipt {
     let owner = ic::caller();
     let stats = State::get().stats_mut();
     if balance_of(owner) < stats.fee.clone() {
@@ -110,7 +110,7 @@ fn approve(spender: Principal, value: Nat) -> TxReceipt {
 
 #[update(name = "mint")]
 #[candid_method(update, rename = "mint")]
-fn mint(to: Principal, amount: Nat) -> TxReceipt {
+pub fn mint(to: Principal, amount: Nat) -> TxReceipt {
     let caller = ic::caller();
     let stats = State::get().stats_mut();
     if caller != stats.owner {
@@ -127,7 +127,7 @@ fn mint(to: Principal, amount: Nat) -> TxReceipt {
 
 #[update(name = "burn")]
 #[candid_method(update, rename = "burn")]
-fn burn(amount: Nat) -> TxReceipt {
+pub fn burn(amount: Nat) -> TxReceipt {
     let caller = ic::caller();
     let stats = State::get().stats_mut();
     let caller_balance = balance_of(caller);
@@ -168,28 +168,14 @@ fn _charge_fee(user: Principal, fee_to: Principal, fee: Nat) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::api::dip20_meta::get_metadata;
+    use crate::api::dip20_meta::{get_metadata, get_transaction, history_size, set_fee};
     use crate::api::get_user_approvals;
+    use crate::tests::init_context;
+    use crate::types::{Operation, TransactionStatus};
     use ic_kit::mock_principals::{alice, bob, john};
     use ic_kit::MockContext;
     use std::collections::HashSet;
     use std::iter::FromIterator;
-
-    fn init_context() -> &'static mut MockContext {
-        let context = MockContext::new().with_caller(alice()).inject();
-
-        crate::init(
-            "".into(),
-            "".into(),
-            "".into(),
-            8,
-            Nat::from(1000),
-            alice(),
-            Nat::from(0),
-            alice(),
-        );
-        context
-    }
 
     #[test]
     fn transfer_without_fee() {
@@ -246,6 +232,32 @@ mod tests {
     }
 
     #[test]
+    fn transfer_saved_into_history() {
+        init_context();
+        set_fee(Nat::from(10));
+
+        transfer(bob(), Nat::from(1001)).unwrap_err();
+        assert_eq!(history_size(), 1);
+
+        const COUNT: usize = 5;
+        let mut ts = ic::time().into();
+        for i in 0..COUNT {
+            let id = transfer(bob(), Nat::from(100 + i)).unwrap();
+            assert_eq!(history_size(), 2 + i);
+            let tx = get_transaction(id);
+            assert_eq!(tx.amount, Nat::from(100 + i));
+            assert_eq!(tx.fee, Nat::from(10));
+            assert_eq!(tx.operation, Operation::Transfer);
+            assert_eq!(tx.status, TransactionStatus::Succeeded);
+            assert_eq!(tx.index, i + 1);
+            assert_eq!(tx.from, alice());
+            assert_eq!(tx.to, bob());
+            assert!(ts < tx.timestamp);
+            ts = tx.timestamp;
+        }
+    }
+
+    #[test]
     fn mint_by_owner() {
         init_context();
         assert!(mint(alice(), Nat::from(2000)).is_ok());
@@ -260,6 +272,31 @@ mod tests {
         let context = init_context();
         context.update_caller(bob());
         assert_eq!(mint(alice(), Nat::from(100)), Err(TxError::Unauthorized));
+    }
+
+    #[test]
+    fn mint_saved_into_history() {
+        init_context();
+        set_fee(Nat::from(10));
+
+        assert_eq!(history_size(), 1);
+
+        const COUNT: usize = 5;
+        let mut ts = ic::time().into();
+        for i in 0..COUNT {
+            let id = mint(bob(), Nat::from(100 + i)).unwrap();
+            assert_eq!(history_size(), 2 + i);
+            let tx = get_transaction(id);
+            assert_eq!(tx.amount, Nat::from(100 + i));
+            assert_eq!(tx.fee, Nat::from(0));
+            assert_eq!(tx.operation, Operation::Mint);
+            assert_eq!(tx.status, TransactionStatus::Succeeded);
+            assert_eq!(tx.index, i + 1);
+            assert_eq!(tx.from, alice());
+            assert_eq!(tx.to, bob());
+            assert!(ts < tx.timestamp);
+            ts = tx.timestamp;
+        }
     }
 
     #[test]
@@ -285,6 +322,32 @@ mod tests {
         assert_eq!(burn(Nat::from(100)), Err(TxError::InsufficientBalance));
         assert_eq!(balance_of(alice()), Nat::from(1000));
         assert_eq!(get_metadata().totalSupply, Nat::from(1000));
+    }
+
+    #[test]
+    fn burn_saved_into_history() {
+        init_context();
+        set_fee(Nat::from(10));
+
+        burn(Nat::from(1001)).unwrap_err();
+        assert_eq!(history_size(), 1);
+
+        const COUNT: usize = 5;
+        let mut ts = ic::time().into();
+        for i in 0..COUNT {
+            let id = burn(Nat::from(100 + i)).unwrap();
+            assert_eq!(history_size(), 2 + i);
+            let tx = get_transaction(id);
+            assert_eq!(tx.amount, Nat::from(100 + i));
+            assert_eq!(tx.fee, Nat::from(0));
+            assert_eq!(tx.operation, Operation::Burn);
+            assert_eq!(tx.status, TransactionStatus::Succeeded);
+            assert_eq!(tx.index, i + 1);
+            assert_eq!(tx.from, alice());
+            assert_eq!(tx.to, alice());
+            assert!(ts < tx.timestamp);
+            ts = tx.timestamp;
+        }
     }
 
     #[test]
@@ -328,6 +391,36 @@ mod tests {
         );
         assert_eq!(balance_of(alice()), Nat::from(1000));
         assert_eq!(balance_of(john()), Nat::from(0));
+    }
+
+    #[test]
+    fn transfer_from_saved_into_history() {
+        let context = init_context();
+        set_fee(Nat::from(10));
+
+        transfer_from(bob(), john(), Nat::from(10)).unwrap_err();
+        assert_eq!(history_size(), 1);
+
+        approve(bob(), Nat::from(1000)).unwrap();
+        context.update_caller(bob());
+
+        const COUNT: usize = 5;
+        let mut ts = ic::time().into();
+        for i in 0..COUNT {
+            let id = transfer_from(alice(), john(), Nat::from(100 + i)).unwrap();
+            assert_eq!(history_size(), 3 + i);
+            let tx = get_transaction(id);
+            assert_eq!(tx.caller, Some(bob()));
+            assert_eq!(tx.amount, Nat::from(100 + i));
+            assert_eq!(tx.fee, Nat::from(10));
+            assert_eq!(tx.operation, Operation::TransferFrom);
+            assert_eq!(tx.status, TransactionStatus::Succeeded);
+            assert_eq!(tx.index, i + 2);
+            assert_eq!(tx.from, alice());
+            assert_eq!(tx.to, john());
+            assert!(ts < tx.timestamp);
+            ts = tx.timestamp;
+        }
     }
 
     #[test]
@@ -388,5 +481,29 @@ mod tests {
         assert_eq!(balance_of(bob()), Nat::from(200));
         assert_eq!(balance_of(alice()), Nat::from(500));
         assert_eq!(balance_of(john()), Nat::from(300));
+    }
+
+    #[test]
+    fn approve_saved_into_history() {
+        init_context();
+        assert_eq!(history_size(), 1);
+        set_fee(Nat::from(10));
+
+        const COUNT: usize = 5;
+        let mut ts = ic::time().into();
+        for i in 0..COUNT {
+            let id = approve(bob(), Nat::from(100 + i)).unwrap();
+            assert_eq!(history_size(), 2 + i);
+            let tx = get_transaction(id);
+            assert_eq!(tx.amount, Nat::from(100 + i));
+            assert_eq!(tx.fee, Nat::from(10));
+            assert_eq!(tx.operation, Operation::Approve);
+            assert_eq!(tx.status, TransactionStatus::Succeeded);
+            assert_eq!(tx.index, i + 1);
+            assert_eq!(tx.from, alice());
+            assert_eq!(tx.to, bob());
+            assert!(ts < tx.timestamp);
+            ts = tx.timestamp;
+        }
     }
 }

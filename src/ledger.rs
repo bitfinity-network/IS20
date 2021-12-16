@@ -2,7 +2,7 @@ use crate::types::TxRecord;
 use candid::{CandidType, Deserialize, Nat, Principal};
 
 #[derive(Default, CandidType, Deserialize)]
-pub struct Ledger(Vec<TxRecord>);
+pub struct Ledger(pub Vec<TxRecord>);
 
 impl Ledger {
     pub fn len(&self) -> usize {
