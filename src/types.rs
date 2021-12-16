@@ -1,5 +1,5 @@
 use candid::{CandidType, Deserialize, Nat, Principal};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 mod tx_record;
 pub use tx_record::*;
@@ -58,12 +58,16 @@ impl Default for StatsData {
 
 pub type Balances = HashMap<Principal, Nat>;
 pub type Allowances = HashMap<Principal, HashMap<Principal, Nat>>;
+pub type PendingNotifications = HashSet<usize>;
 
 #[derive(CandidType, Debug, PartialEq)]
 pub enum TxError {
     InsufficientBalance,
     InsufficientAllowance,
     Unauthorized,
+    TransactionDoesNotExist,
+    AlreadyNotified,
+    NotificationFailed,
 }
 pub type TxReceipt = Result<Nat, TxError>;
 
