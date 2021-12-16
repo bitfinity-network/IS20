@@ -11,6 +11,7 @@ serde = "1.0"
 ic-kit = "0.4.3"
 ic-cdk = "0.3.1"
 assert-panic = "1.0.1"
+num-traits = "0.2.14"
 
 [target.'cfg(not(target_family = "wasm"))'.dependencies]
 async-std = { version="1.10.0", features = ["attributes"] }

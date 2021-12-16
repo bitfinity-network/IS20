@@ -4,12 +4,15 @@ use ic_cdk_macros::*;
 use ic_kit::ic;
 
 #[cfg(not(any(target_arch = "wasm32", test)))]
-use crate::types::{Metadata, TokenInfo, TxReceipt};
+use crate::types::{Metadata, TokenInfo, TxReceipt, TxRecord};
 
 mod api;
 mod ledger;
 mod state;
 mod types;
+
+#[cfg(test)]
+pub mod tests;
 
 #[init]
 #[candid_method(init)]
