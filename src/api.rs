@@ -8,14 +8,9 @@ use std::iter::FromIterator;
 
 mod dip20_meta;
 mod dip20_transactions;
-
-// todo: halt
+mod ic20_management;
 
 // todo: stats?
-
-// todo: getUserTransactions
-
-// todo: getUserTransactionAmount
 
 // todo: transferAndNotify and notification tracking mechanism
 
@@ -23,7 +18,7 @@ mod dip20_transactions;
 
 // todo: setFeeRatio and bidding mechanism
 
-// ******* Methods not from standard *******
+// ******* Methods not from any standard *******
 
 #[query(name = "owner")]
 #[candid_method(query)]
