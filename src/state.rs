@@ -1,5 +1,5 @@
 use crate::ledger::Ledger;
-use crate::types::{Allowances, Balances, StatsData};
+use crate::types::{Allowances, Balances, PendingNotifications, StatsData};
 use candid::{CandidType, Deserialize};
 
 #[derive(Default, CandidType, Deserialize)]
@@ -8,6 +8,7 @@ pub struct State {
     balances: Balances,
     allowances: Allowances,
     ledger: Ledger,
+    notifications: PendingNotifications,
 }
 
 impl State {
@@ -45,6 +46,10 @@ impl State {
 
     pub fn ledger_mut(&mut self) -> &mut Ledger {
         &mut self.ledger
+    }
+
+    pub fn notifications_mut(&mut self) -> &mut PendingNotifications {
+        &mut self.notifications
     }
 
     pub fn store(&self) {

@@ -9,6 +9,7 @@ use std::iter::FromIterator;
 mod dip20_meta;
 mod dip20_transactions;
 mod ic20_management;
+mod ic20_notify;
 
 // todo: stats?
 

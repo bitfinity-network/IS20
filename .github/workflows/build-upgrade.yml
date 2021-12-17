@@ -25,10 +25,6 @@ jobs:
           submodules: recursive
           token: ${{ secrets.PAT_TOKEN }}
 
-      - uses: fusion-engineering/setup-git-credentials@v2
-        with:
-          credentials: ${{secrets.GIT_CREDENTIALS}}
-
       - name: Checking format
         run: |
           cargo fmt -- --check
@@ -36,6 +32,10 @@ jobs:
       - name: Running clippy
         run: |
           cargo clippy
+
+      - name: Unit tests
+        run: |
+          cargo test
 
       - name: Build canisters
         run: |
