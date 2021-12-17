@@ -1,3 +1,4 @@
+use crate::common::check_caller_is_owner;
 use crate::state::State;
 use crate::types::{Metadata, TxRecord};
 use candid::{candid_method, Nat};
@@ -127,40 +128,40 @@ fn get_logo() -> String {
 #[update(name = "setName")]
 #[candid_method(update, rename = "setName")]
 fn set_name(name: String) {
+    check_caller_is_owner().unwrap();
     let stats = State::get().stats_mut();
-    assert_eq!(ic::caller(), stats.owner);
     stats.name = name;
 }
 
 #[update(name = "setLogo")]
 #[candid_method(update, rename = "setLogo")]
 fn set_logo(logo: String) {
+    check_caller_is_owner().unwrap();
     let stats = State::get().stats_mut();
-    assert_eq!(ic::caller(), stats.owner);
     stats.logo = logo;
 }
 
 #[update(name = "setFee")]
 #[candid_method(update, rename = "setFee")]
 pub fn set_fee(fee: Nat) {
+    check_caller_is_owner().unwrap();
     let stats = State::get().stats_mut();
-    assert_eq!(ic::caller(), stats.owner);
     stats.fee = fee;
 }
 
 #[update(name = "setFeeTo")]
 #[candid_method(update, rename = "setFeeTo")]
 fn set_fee_to(fee_to: Principal) {
+    check_caller_is_owner().unwrap();
     let stats = State::get().stats_mut();
-    assert_eq!(ic::caller(), stats.owner);
     stats.fee_to = fee_to;
 }
 
 #[update(name = "setOwner")]
 #[candid_method(update, rename = "setOwner")]
 fn set_owner(owner: Principal) {
+    check_caller_is_owner().unwrap();
     let stats = State::get().stats_mut();
-    assert_eq!(ic::caller(), stats.owner);
     stats.owner = owner;
 }
 
