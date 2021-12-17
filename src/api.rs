@@ -14,10 +14,6 @@ mod is20_notify;
 
 // todo: stats?
 
-// todo: guard against cycle depletion
-
-// todo: setFeeRatio and bidding mechanism
-
 // ******* Methods not from any standard *******
 
 #[query(name = "owner")]
