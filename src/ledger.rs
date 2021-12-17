@@ -59,4 +59,9 @@ impl Ledger {
 
         id
     }
+
+    pub fn auction(&mut self, to: Principal, amount: Nat) {
+        let id = Nat::from(self.len());
+        self.0.push(TxRecord::auction(id, to, amount))
+    }
 }
