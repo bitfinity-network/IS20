@@ -92,4 +92,18 @@ impl TxRecord {
             operation: Operation::Burn,
         }
     }
+
+    pub fn auction(index: Nat, to: Principal, amount: Nat) -> Self {
+        Self {
+            caller: Some(to),
+            index,
+            from: to,
+            to,
+            amount,
+            fee: Nat::from(0),
+            timestamp: ic::time().into(),
+            status: TransactionStatus::Succeeded,
+            operation: Operation::Auction,
+        }
+    }
 }

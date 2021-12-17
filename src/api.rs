@@ -8,12 +8,11 @@ use std::iter::FromIterator;
 
 mod dip20_meta;
 mod dip20_transactions;
-mod ic20_management;
-mod ic20_notify;
+pub mod is20_auction;
+mod is20_management;
+mod is20_notify;
 
 // todo: stats?
-
-// todo: transferAndNotify and notification tracking mechanism
 
 // todo: guard against cycle depletion
 
