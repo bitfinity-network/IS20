@@ -4,6 +4,8 @@ use std::collections::{HashMap, HashSet};
 mod tx_record;
 pub use tx_record::*;
 
+pub type Timestamp = u64;
+
 #[allow(non_snake_case)]
 #[derive(Deserialize, CandidType, Clone, Debug)]
 pub struct Metadata {
@@ -27,6 +29,7 @@ pub struct StatsData {
     pub fee: Nat,
     pub fee_to: Principal,
     pub deploy_time: u64,
+    pub min_cycles: u64,
 }
 
 #[allow(non_snake_case)]
@@ -35,7 +38,7 @@ pub struct TokenInfo {
     pub metadata: Metadata,
     pub feeTo: Principal,
     pub historySize: usize,
-    pub deployTime: u64,
+    pub deployTime: Timestamp,
     pub holderNumber: usize,
     pub cycles: u64,
 }
@@ -52,6 +55,7 @@ impl Default for StatsData {
             fee: Nat::from(0),
             fee_to: Principal::anonymous(),
             deploy_time: 0,
+            min_cycles: 0,
         }
     }
 }
@@ -59,6 +63,7 @@ impl Default for StatsData {
 pub type Balances = HashMap<Principal, Nat>;
 pub type Allowances = HashMap<Principal, HashMap<Principal, Nat>>;
 pub type PendingNotifications = HashSet<usize>;
+pub type AuctionHistory = Vec<AuctionInfo>;
 
 #[derive(CandidType, Debug, PartialEq)]
 pub enum TxError {
@@ -84,4 +89,25 @@ pub enum Operation {
     Transfer,
     TransferFrom,
     Burn,
+    Auction,
+}
+
+#[derive(CandidType, Default, Debug, Clone, Deserialize)]
+pub struct BiddingState {
+    pub fee_ratio: f64,
+    pub last_auction: Timestamp,
+    pub auction_period: Timestamp,
+    pub cycles_since_auction: u64,
+    pub bids: HashMap<Principal, u64>,
+}
+
+#[derive(CandidType, Debug, Clone, Deserialize, PartialEq)]
+pub struct AuctionInfo {
+    pub auction_id: usize,
+    pub auction_time: Timestamp,
+    pub tokens_distributed: Nat,
+    pub cycles_collected: u64,
+    pub fee_ratio: f64,
+    pub first_transaction_id: Nat,
+    pub last_transaction_id: Nat,
 }

@@ -167,7 +167,7 @@ mod tests {
         assert_eq!(response, Err(TxError::NotificationFailed));
 
         context.clear_handlers();
-        context.use_handler(RawHandler::new::<_, (), _>(|_, (): (), _, _| Ok(())));
+        context.use_handler(RawHandler::new(|_, (): (), _, _| Ok(())));
         let response = notify(id.clone()).await;
         assert!(response.is_ok())
     }
