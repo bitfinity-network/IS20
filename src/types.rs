@@ -16,6 +16,7 @@ pub struct Metadata {
     pub totalSupply: Nat,
     pub owner: Principal,
     pub fee: Nat,
+    pub feeTo: Principal,
 }
 
 #[derive(Deserialize, CandidType, Clone, Debug)]

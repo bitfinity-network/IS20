@@ -72,6 +72,7 @@ pub fn get_metadata() -> Metadata {
         totalSupply: s.total_supply.clone(),
         owner: s.owner,
         fee: s.fee.clone(),
+        feeTo: s.fee_to,
     }
 }
 
