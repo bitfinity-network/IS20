@@ -71,6 +71,7 @@ pub enum TxError {
     InsufficientBalance,
     InsufficientAllowance,
     Unauthorized,
+    AmountTooSmall,
     TransactionDoesNotExist,
     AlreadyNotified,
     NotificationFailed,

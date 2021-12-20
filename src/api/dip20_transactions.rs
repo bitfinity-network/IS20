@@ -14,11 +14,17 @@ use std::collections::HashMap;
 pub fn transfer(to: Principal, value: Nat) -> TxReceipt {
     let from = ic::caller();
     let stats = State::get().stats_mut();
-    if balance_of(from) < value.clone() + stats.fee.clone() {
+
+    if value <= stats.fee {
+        return Err(TxError::AmountTooSmall);
+    }
+
+    if balance_of(from) < value {
         return Err(TxError::InsufficientBalance);
     }
+
     _charge_fee(from, stats.fee_to, stats.fee.clone());
-    _transfer(from, to, value.clone());
+    _transfer(from, to, value.clone() - stats.fee.clone());
 
     let id = State::get()
         .ledger_mut()
@@ -37,22 +43,30 @@ pub fn transfer_from(from: Principal, to: Principal, value: Nat) -> TxReceipt {
     let owner = ic::caller();
     let from_allowance = allowance(from, owner);
     let stats = State::get().stats_mut();
-    if from_allowance < value.clone() + stats.fee.clone() {
+
+    if value < stats.fee {
+        return Err(TxError::AmountTooSmall);
+    }
+
+    if from_allowance < value {
         return Err(TxError::InsufficientAllowance);
     }
+
     let from_balance = balance_of(from);
-    if from_balance < value.clone() + stats.fee.clone() {
+    if from_balance < value {
         return Err(TxError::InsufficientBalance);
     }
+
     _charge_fee(from, stats.fee_to, stats.fee.clone());
-    _transfer(from, to, value.clone());
+    _transfer(from, to, value.clone() - stats.fee.clone());
+
     let allowances = State::get().allowances_mut();
     match allowances.get(&from) {
         Some(inner) => {
             let result = inner.get(&owner).unwrap().clone();
             let mut temp = inner.clone();
-            if result.clone() - value.clone() - stats.fee.clone() != 0 {
-                temp.insert(owner, result - value.clone() - stats.fee.clone());
+            if result.clone() - value.clone() != 0 {
+                temp.insert(owner, result - value.clone());
                 allowances.insert(from, temp);
             } else {
                 temp.remove(&owner);
@@ -215,7 +229,7 @@ mod tests {
             feeTo: john(),
         });
 
-        assert!(transfer(bob(), Nat::from(100)).is_ok());
+        assert!(transfer(bob(), Nat::from(200)).is_ok());
         assert_eq!(balance_of(bob()), Nat::from(100));
         assert_eq!(balance_of(alice()), Nat::from(800));
         assert_eq!(balance_of(john()), Nat::from(100));
@@ -232,16 +246,16 @@ mod tests {
             decimals: 8,
             totalSupply: Nat::from(1000),
             owner: alice(),
-            fee: Nat::from(100),
+            fee: Nat::from(50),
             feeTo: john(),
         });
 
         State::get().bidding_state_mut().fee_ratio = 0.5;
         transfer(bob(), Nat::from(100)).unwrap();
-        assert_eq!(balance_of(bob()), Nat::from(100));
-        assert_eq!(balance_of(alice()), Nat::from(800));
-        assert_eq!(balance_of(john()), Nat::from(50));
-        assert_eq!(balance_of(auction_principal()), Nat::from(50));
+        assert_eq!(balance_of(bob()), Nat::from(50));
+        assert_eq!(balance_of(alice()), Nat::from(900));
+        assert_eq!(balance_of(john()), Nat::from(25));
+        assert_eq!(balance_of(auction_principal()), Nat::from(25));
     }
 
     #[test]
@@ -515,8 +529,8 @@ mod tests {
 
         assert!(transfer_from(alice(), john(), Nat::from(300)).is_ok());
         assert_eq!(balance_of(bob()), Nat::from(200));
-        assert_eq!(balance_of(alice()), Nat::from(500));
-        assert_eq!(balance_of(john()), Nat::from(300));
+        assert_eq!(balance_of(alice()), Nat::from(600));
+        assert_eq!(balance_of(john()), Nat::from(200));
     }
 
     #[test]
