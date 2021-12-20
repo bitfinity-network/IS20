@@ -184,7 +184,7 @@ mod tests {
     use crate::api::dip20_meta::{get_metadata, get_transaction, history_size, set_fee};
     use crate::api::get_user_approvals;
     use crate::tests::init_context;
-    use crate::types::{Operation, TransactionStatus};
+    use crate::types::{Metadata, Operation, TransactionStatus};
     use ic_kit::mock_principals::{alice, bob, john};
     use ic_kit::MockContext;
     use std::collections::HashSet;
@@ -204,16 +204,16 @@ mod tests {
     fn transfer_with_fee() {
         MockContext::new().with_caller(alice()).inject();
 
-        crate::init(
-            "".into(),
-            "".into(),
-            "".into(),
-            8,
-            Nat::from(1000),
-            alice(),
-            Nat::from(100),
-            john(),
-        );
+        crate::init(Metadata {
+            logo: "".to_string(),
+            name: "".to_string(),
+            symbol: "".to_string(),
+            decimals: 8,
+            totalSupply: Nat::from(1000),
+            owner: alice(),
+            fee: Nat::from(100),
+            feeTo: john(),
+        });
 
         assert!(transfer(bob(), Nat::from(100)).is_ok());
         assert_eq!(balance_of(bob()), Nat::from(100));
@@ -225,16 +225,16 @@ mod tests {
     fn fees_with_auction_enabled() {
         MockContext::new().with_caller(alice()).inject();
 
-        crate::init(
-            "".into(),
-            "".into(),
-            "".into(),
-            8,
-            Nat::from(1000),
-            alice(),
-            Nat::from(100),
-            john(),
-        );
+        crate::init(Metadata {
+            logo: "".to_string(),
+            name: "".to_string(),
+            symbol: "".to_string(),
+            decimals: 8,
+            totalSupply: Nat::from(1000),
+            owner: alice(),
+            fee: Nat::from(100),
+            feeTo: john(),
+        });
 
         State::get().bidding_state_mut().fee_ratio = 0.5;
         transfer(bob(), Nat::from(100)).unwrap();
@@ -499,16 +499,16 @@ mod tests {
     fn transfer_from_with_fee() {
         let context = MockContext::new().with_caller(alice()).inject();
 
-        crate::init(
-            "".into(),
-            "".into(),
-            "".into(),
-            8,
-            Nat::from(1000),
-            alice(),
-            Nat::from(100),
-            bob(),
-        );
+        crate::init(Metadata {
+            logo: "".to_string(),
+            name: "".to_string(),
+            symbol: "".to_string(),
+            decimals: 8,
+            totalSupply: Nat::from(1000),
+            owner: alice(),
+            fee: Nat::from(100),
+            feeTo: bob(),
+        });
         assert!(approve(bob(), Nat::from(1500)).is_ok());
         assert_eq!(balance_of(bob()), Nat::from(100));
         context.update_caller(bob());
