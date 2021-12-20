@@ -47,10 +47,10 @@ pub enum AuctionError {
     NoBids,
 
     /// Auction with the given ID is not found.
-    NotFound,
+    AuctionNotFound,
 
     /// The specified period between the auctions is not passed yet.
-    TooEarly,
+    TooEarlyToBeginAuction,
 }
 
 /// Bid cycles for the next cycle auction.
@@ -98,15 +98,15 @@ fn bidding_info() -> BiddingInfo {
 ///
 /// The auction will distribute the accumulated fees in proportion to the user cycle bids, and
 /// then will update the fee ratio until the next auction.
-#[update(name = "startAuction")]
-#[candid_method(update, rename = "startAuction")]
-fn start_auction() -> Result<AuctionInfo, AuctionError> {
+#[update(name = "runAuction")]
+#[candid_method(update, rename = "runAuction")]
+fn run_auction() -> Result<AuctionInfo, AuctionError> {
     let state = State::get().bidding_state_mut();
 
     let curr_time = ic::time();
     let next_auction = state.last_auction + state.auction_period;
     if curr_time < next_auction {
-        return Err(AuctionError::TooEarly);
+        return Err(AuctionError::TooEarlyToBeginAuction);
     }
 
     let result = perform_auction(state);
@@ -123,7 +123,7 @@ fn auction_info(id: usize) -> Result<AuctionInfo, AuctionError> {
         .auction_history()
         .get(id)
         .cloned()
-        .ok_or(AuctionError::NotFound)
+        .ok_or(AuctionError::AuctionNotFound)
 }
 
 /// Returns the minimum cycles set for the canister.
@@ -304,7 +304,7 @@ mod tests {
             .balances_mut()
             .insert(auction_principal(), Nat::from(6_000));
 
-        let result = start_auction().unwrap();
+        let result = run_auction().unwrap();
         assert_eq!(result.cycles_collected, 6_000_000);
         assert_eq!(result.first_transaction_id, Nat::from(1));
         assert_eq!(result.last_transaction_id, Nat::from(2));
@@ -318,7 +318,7 @@ mod tests {
     #[test]
     fn auction_without_bids() {
         init_context();
-        assert_eq!(start_auction(), Err(AuctionError::NoBids));
+        assert_eq!(run_auction(), Err(AuctionError::NoBids));
     }
 
     #[test]
@@ -331,7 +331,7 @@ mod tests {
         state.last_auction = ic::time() - 100_000;
         state.auction_period = 1_000_000_000;
 
-        assert_eq!(start_auction(), Err(AuctionError::TooEarly));
+        assert_eq!(run_auction(), Err(AuctionError::TooEarlyToBeginAuction));
     }
 
     #[test]
@@ -340,7 +340,7 @@ mod tests {
         context.update_balance(1_000_000_000);
 
         State::get().stats_mut().min_cycles = 1_000_000;
-        start_auction().unwrap_err();
+        run_auction().unwrap_err();
 
         assert_eq!(State::get().bidding_state().fee_ratio, 0.125);
     }
