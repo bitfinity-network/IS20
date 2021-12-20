@@ -12,20 +12,8 @@ pub mod is20_auction;
 mod is20_management;
 mod is20_notify;
 
-// todo: stats?
-
-// todo: guard against cycle depletion
-
-// todo: setFeeRatio and bidding mechanism
-
-// ******* Methods not from any standard *******
-
-#[query(name = "owner")]
-#[candid_method(query)]
-fn owner() -> Principal {
-    let stats = State::get().stats();
-    stats.owner
-}
+// This methods are not part of the standard and are added for convenience. They may be removed
+// in future.
 
 #[query(name = "getTokenInfo")]
 #[candid_method(query, rename = "getTokenInfo")]
