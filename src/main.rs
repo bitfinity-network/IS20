@@ -1,13 +1,15 @@
 use crate::state::State;
-use crate::types::Timestamp;
-use candid::{candid_method, Nat, Principal};
+use crate::types::{Metadata, Timestamp};
+use candid::candid_method;
 use ic_cdk_macros::*;
 use ic_kit::ic;
 
 #[cfg(not(any(target_arch = "wasm32", test)))]
 use crate::api::is20_auction::{AuctionError, BiddingInfo};
 #[cfg(not(any(target_arch = "wasm32", test)))]
-use crate::types::{AuctionInfo, Metadata, TokenInfo, TxError, TxReceipt, TxRecord};
+use crate::types::{AuctionInfo, TokenInfo, TxError, TxReceipt, TxRecord};
+#[cfg(not(any(target_arch = "wasm32", test)))]
+use candid::{Nat, Principal};
 
 mod api;
 mod common;
