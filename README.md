@@ -1,9 +1,8 @@
+![IS20 banner](https://user-images.githubusercontent.com/6412426/146728389-42384977-0ed3-43a6-83d3-ce16db609c09.png)
+
 IS20 is an Internet Computer token standard proposed by Infinity Swap.
 
-This repo contains the standard spec (in development) as well as default implementation.
-
-It builds upon the [DIP20 standard](https://github.com/Psychedelic/DIP20/blob/main/spec.md), making it
-backwards compatible with it. Additional functionality will be described later.
+You can find the standard spec at [spec/IS20.md]() and the default implementation in the `src` directory.
 
 # Development
 

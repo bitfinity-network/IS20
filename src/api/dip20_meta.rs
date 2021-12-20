@@ -72,6 +72,7 @@ pub fn get_metadata() -> Metadata {
         totalSupply: s.total_supply.clone(),
         owner: s.owner,
         fee: s.fee.clone(),
+        feeTo: s.fee_to,
     }
 }
 
@@ -165,9 +166,47 @@ fn set_owner(owner: Principal) {
     stats.owner = owner;
 }
 
-// todo: getUserTransactions
+/// Returns an array of transaction records in range [start, start + limit) related to user `who`.
+/// Unlike `getTransactions` function, the range [start, start + limit) for `getUserTransactions`
+/// is not the global range of all transactions. The range [start, start + limit) here pertains to
+/// the transactions of user who. Implementations are allowed to return less TxRecords than
+/// requested to fend off DoS attacks.
+#[query(name = "getUserTransactions")]
+#[candid_method(query, rename = "getUserTransactions")]
+fn get_user_transactions(who: Principal, start: Nat, limit: Nat) -> Vec<TxRecord> {
+    let mut transactions = vec![];
 
-// todo: getUserTransactionAmount
+    let start = start.0.to_usize().unwrap_or(usize::MAX);
+    let limit = limit.0.to_usize().unwrap_or(usize::MAX);
+    if limit > MAX_TRANSACTION_QUERY_LEN {
+        ic::trap(&format!(
+            "Limit must be less then {}",
+            MAX_TRANSACTION_QUERY_LEN
+        ));
+    }
+
+    for tx in State::get().ledger().0.iter().skip(start).take(limit) {
+        if tx.from == who || tx.to == who || tx.caller == Some(who) {
+            transactions.push(tx.clone());
+        }
+    }
+
+    transactions
+}
+
+/// Returns total number of transactions related to the user `who`.
+#[query(name = "getUserTransactionAmount")]
+#[candid_method(query, rename = "getUserTransactionAmount")]
+fn get_user_transaction_amount(who: Principal) -> Nat {
+    let mut amount = Nat::from(0);
+    for tx in &State::get().ledger().0 {
+        if tx.from == who || tx.to == who || tx.caller == Some(who) {
+            amount += tx.amount.clone();
+        }
+    }
+
+    amount
+}
 
 #[cfg(test)]
 mod tests {
