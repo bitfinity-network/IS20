@@ -1,4 +1,4 @@
-IC20 is an Internet Computer token standard proposed by Infinity Swap.
+![IS20 banner](https://user-images.githubusercontent.com/6412426/146728389-42384977-0ed3-43a6-83d3-ce16db609c09.png)
 
 IS20 is an Internet Computer token standard proposed by Infinity Swap.
 
