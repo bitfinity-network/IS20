@@ -27,19 +27,20 @@ const DEFAULT_AUCTION_PERIOD: Timestamp = 24 * 60 * 60 * 1_000_000;
 
 #[init]
 #[candid_method(init)]
-// todo: This should be refactored to use a struct
 #[allow(clippy::too_many_arguments)]
-pub fn init(
-    logo: String,
-    name: String,
-    symbol: String,
-    decimals: u8,
-    total_supply: Nat,
-    owner: Principal,
-    fee: Nat,
-    fee_to: Principal,
-) {
+pub fn init(info: Metadata) {
+    let Metadata {
+        logo,
+        name,
+        symbol,
+        decimals,
+        totalSupply: total_supply,
+        owner,
+        fee,
+        feeTo: fee_to,
+    } = info;
     let stats = State::get().stats_mut();
+
     stats.logo = logo;
     stats.name = name;
     stats.symbol = symbol;
