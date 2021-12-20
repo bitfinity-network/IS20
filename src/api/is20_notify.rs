@@ -1,4 +1,4 @@
-//! API methods related to transaction notification mechanism.
+//! API methods of IS20 standard related to transaction notification mechanism.
 
 use crate::api::dip20_transactions::transfer;
 use crate::state::State;
