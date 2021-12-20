@@ -1,4 +1,6 @@
 use crate::api::dip20_meta::{allowance, balance_of};
+use crate::api::is20_auction::auction_principal;
+use crate::common::check_caller_is_owner;
 use crate::state::State;
 use crate::types::{TxError, TxReceipt};
 use candid::{candid_method, Nat};
@@ -117,11 +119,10 @@ pub fn approve(spender: Principal, value: Nat) -> TxReceipt {
 #[update(name = "mint")]
 #[candid_method(update, rename = "mint")]
 pub fn mint(to: Principal, amount: Nat) -> TxReceipt {
+    check_caller_is_owner()?;
+
     let caller = ic::caller();
     let stats = State::get().stats_mut();
-    if caller != stats.owner {
-        return Err(TxError::Unauthorized);
-    }
     let to_balance = balance_of(to);
     let balances = State::get().balances_mut();
     balances.insert(to, to_balance + amount.clone());
@@ -148,7 +149,7 @@ pub fn burn(amount: Nat) -> TxReceipt {
     Ok(id)
 }
 
-fn _transfer(from: Principal, to: Principal, value: Nat) {
+pub fn _transfer(from: Principal, to: Principal, value: Nat) {
     let balances = State::get().balances_mut();
     let from_balance = balance_of(from);
     let from_balance_new = from_balance - value.clone();
@@ -167,7 +168,13 @@ fn _transfer(from: Principal, to: Principal, value: Nat) {
 fn _charge_fee(user: Principal, fee_to: Principal, fee: Nat) {
     let stats = State::get().stats();
     if stats.fee > 0u32 {
-        _transfer(user, fee_to, fee);
+        let fee_ratio = State::get().bidding_state().fee_ratio;
+        const INT_CONVERSION_K: u64 = 1_000_000_000_000;
+        let auction_fee_amount =
+            fee.clone() * (fee_ratio * INT_CONVERSION_K as f64) as u64 / INT_CONVERSION_K;
+        let owner_fee_amount = fee - auction_fee_amount.clone();
+        _transfer(user, fee_to, owner_fee_amount);
+        _transfer(user, auction_principal(), auction_fee_amount);
     }
 }
 
@@ -212,6 +219,29 @@ mod tests {
         assert_eq!(balance_of(bob()), Nat::from(100));
         assert_eq!(balance_of(alice()), Nat::from(800));
         assert_eq!(balance_of(john()), Nat::from(100));
+    }
+
+    #[test]
+    fn fees_with_auction_enabled() {
+        MockContext::new().with_caller(alice()).inject();
+
+        crate::init(
+            "".into(),
+            "".into(),
+            "".into(),
+            8,
+            Nat::from(1000),
+            alice(),
+            Nat::from(100),
+            john(),
+        );
+
+        State::get().bidding_state_mut().fee_ratio = 0.5;
+        transfer(bob(), Nat::from(100)).unwrap();
+        assert_eq!(balance_of(bob()), Nat::from(100));
+        assert_eq!(balance_of(alice()), Nat::from(800));
+        assert_eq!(balance_of(john()), Nat::from(50));
+        assert_eq!(balance_of(auction_principal()), Nat::from(50));
     }
 
     #[test]
