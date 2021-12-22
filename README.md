@@ -16,7 +16,7 @@ Use build script to build the release version of the token canister, use the bui
 
 ## Running tests
 
-At the moment only unit tests are written for this crate. So running them is simple as
+In order to run tests:
 
 ```shell
 cargo test
@@ -29,4 +29,21 @@ Before committing to this repo, install and activate the `pre-commit` tool.
 ```shell
 pip install pre-commit
 pre-commit install
+```
+
+## Local Run
+
+```bash
+dfx start --background
+dfx deploy
+dfx stop
+```
+
+## Candid Files
+
+In order to generate candid files, run the following command:
+
+```bash
+cargo run -p factory > src/candid/factory.did
+cargo run -p token > src/candid/token.did
 ```
