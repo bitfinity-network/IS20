@@ -1,23 +1,11 @@
 use candid::{CandidType, Deserialize, Nat, Principal};
+use common::types::Metadata;
 use std::collections::{HashMap, HashSet};
 
 mod tx_record;
 pub use tx_record::*;
 
 pub type Timestamp = u64;
-
-#[allow(non_snake_case)]
-#[derive(Deserialize, CandidType, Clone, Debug)]
-pub struct Metadata {
-    pub logo: String,
-    pub name: String,
-    pub symbol: String,
-    pub decimals: u8,
-    pub totalSupply: Nat,
-    pub owner: Principal,
-    pub fee: Nat,
-    pub feeTo: Principal,
-}
 
 #[derive(Deserialize, CandidType, Clone, Debug)]
 pub struct StatsData {

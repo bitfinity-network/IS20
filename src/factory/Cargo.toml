@@ -1,0 +1,12 @@
+[package]
+edition = "2021"
+name = "factory"
+version = "0.1.0"
+
+[dependencies]
+candid = "0.7"
+common = {path = "../common"}
+ic-cdk = "0.3"
+ic-cdk-macros = "0.3"
+ic-helpers = {git = "https://github.com/infinity-swap/ic-helpers.git", package = "canisters"}
+serde = "1.0"

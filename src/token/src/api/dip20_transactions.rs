@@ -1,8 +1,8 @@
 use crate::api::dip20_meta::{allowance, balance_of};
 use crate::api::is20_auction::auction_principal;
-use crate::common::check_caller_is_owner;
 use crate::state::State;
 use crate::types::{TxError, TxReceipt};
+use crate::utils::check_caller_is_owner;
 use candid::{candid_method, Nat};
 use ic_cdk_macros::*;
 use ic_kit::{ic, Principal};
@@ -198,7 +198,8 @@ mod tests {
     use crate::api::dip20_meta::{get_metadata, get_transaction, history_size, set_fee};
     use crate::api::get_user_approvals;
     use crate::tests::init_context;
-    use crate::types::{Metadata, Operation, TransactionStatus};
+    use crate::types::{Operation, TransactionStatus};
+    use common::types::Metadata;
     use ic_kit::mock_principals::{alice, bob, john};
     use ic_kit::MockContext;
     use std::collections::HashSet;
@@ -218,7 +219,7 @@ mod tests {
     fn transfer_with_fee() {
         MockContext::new().with_caller(alice()).inject();
 
-        crate::init(Metadata {
+        crate::api::init(Metadata {
             logo: "".to_string(),
             name: "".to_string(),
             symbol: "".to_string(),
@@ -239,7 +240,7 @@ mod tests {
     fn fees_with_auction_enabled() {
         MockContext::new().with_caller(alice()).inject();
 
-        crate::init(Metadata {
+        crate::api::init(Metadata {
             logo: "".to_string(),
             name: "".to_string(),
             symbol: "".to_string(),
@@ -513,7 +514,7 @@ mod tests {
     fn transfer_from_with_fee() {
         let context = MockContext::new().with_caller(alice()).inject();
 
-        crate::init(Metadata {
+        crate::api::init(Metadata {
             logo: "".to_string(),
             name: "".to_string(),
             symbol: "".to_string(),
