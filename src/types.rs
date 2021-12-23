@@ -61,10 +61,8 @@ impl Default for StatsData {
     }
 }
 
-pub type Balances = HashMap<Principal, Nat>;
 pub type Allowances = HashMap<Principal, HashMap<Principal, Nat>>;
 pub type PendingNotifications = HashSet<usize>;
-pub type AuctionHistory = Vec<AuctionInfo>;
 
 #[derive(CandidType, Debug, PartialEq)]
 pub enum TxError {
@@ -92,15 +90,6 @@ pub enum Operation {
     TransferFrom,
     Burn,
     Auction,
-}
-
-#[derive(CandidType, Default, Debug, Clone, Deserialize)]
-pub struct BiddingState {
-    pub fee_ratio: f64,
-    pub last_auction: Timestamp,
-    pub auction_period: Timestamp,
-    pub cycles_since_auction: u64,
-    pub bids: HashMap<Principal, u64>,
 }
 
 #[derive(CandidType, Debug, Clone, Deserialize, PartialEq)]

@@ -1,39 +1,46 @@
 use crate::ledger::Ledger;
-use crate::types::{
-    Allowances, AuctionHistory, Balances, BiddingState, PendingNotifications, StatsData,
-};
-use candid::{CandidType, Deserialize};
+use crate::types::{Allowances, AuctionInfo, PendingNotifications, StatsData, Timestamp};
+use candid::{CandidType, Deserialize, Nat, Principal};
+use ic_storage::IcStorage;
+use std::collections::HashMap;
 
-#[derive(Default, CandidType, Deserialize)]
+#[derive(Default, CandidType, Deserialize, IcStorage)]
 pub struct State {
     stats: StatsData,
-    balances: Balances,
     allowances: Allowances,
     ledger: Ledger,
     notifications: PendingNotifications,
-    bidding_state: BiddingState,
     auction_history: AuctionHistory,
 }
 
-impl State {
-    pub fn get() -> &'static mut Self {
-        ic_kit::ic::get_mut()
-    }
+#[derive(Default, IcStorage, CandidType, Deserialize)]
+pub struct Balances(pub HashMap<Principal, Nat>);
 
+impl Balances {
+    pub fn balance_of(&self, who: &Principal) -> Nat {
+        self.0.get(who).cloned().unwrap_or_else(|| Nat::from(0))
+    }
+}
+
+#[derive(CandidType, Default, Debug, Clone, Deserialize, IcStorage)]
+pub struct BiddingState {
+    pub fee_ratio: f64,
+    pub last_auction: Timestamp,
+    pub auction_period: Timestamp,
+    pub cycles_since_auction: u64,
+    pub bids: HashMap<Principal, u64>,
+}
+
+#[derive(Default, IcStorage, CandidType, Deserialize)]
+pub struct AuctionHistory(pub Vec<AuctionInfo>);
+
+impl State {
     pub fn stats(&self) -> &StatsData {
         &self.stats
     }
 
     pub fn stats_mut(&mut self) -> &mut StatsData {
         &mut self.stats
-    }
-
-    pub fn balances(&self) -> &Balances {
-        &self.balances
-    }
-
-    pub fn balances_mut(&mut self) -> &mut Balances {
-        &mut self.balances
     }
 
     pub fn allowances(&self) -> &Allowances {
@@ -54,30 +61,5 @@ impl State {
 
     pub fn notifications_mut(&mut self) -> &mut PendingNotifications {
         &mut self.notifications
-    }
-
-    pub fn bidding_state(&self) -> &BiddingState {
-        &self.bidding_state
-    }
-
-    pub fn bidding_state_mut(&mut self) -> &mut BiddingState {
-        &mut self.bidding_state
-    }
-
-    pub fn auction_history(&self) -> &AuctionHistory {
-        &self.auction_history
-    }
-
-    pub fn auction_history_mut(&mut self) -> &mut AuctionHistory {
-        &mut self.auction_history
-    }
-
-    pub fn store(&self) {
-        ic_cdk::storage::stable_save((&self,)).unwrap();
-    }
-
-    pub fn load() {
-        let (state,) = ic_cdk::storage::stable_restore().unwrap();
-        *State::get() = state;
     }
 }
