@@ -21,7 +21,7 @@ async fn get_token(name: String, symbol: String) -> Option<Principal> {
 #[update(name = "create_token")]
 #[candid_method(update, rename = "create_token")]
 pub async fn create_token(info: Metadata) -> Option<Principal> {
-    if info.name.is_empty() == info.symbol.is_empty() {
+    if info.name.is_empty() && info.symbol.is_empty() {
         return None;
     }
 
