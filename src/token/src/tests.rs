@@ -1,12 +1,12 @@
 //! This module contains common methods, used in different modules' unit tests.
 
-use crate::types::Metadata;
 use candid::Nat;
+use common::types::Metadata;
 use ic_kit::mock_principals::alice;
 use ic_kit::MockContext;
 
 pub fn default_canister_init() {
-    crate::init(Metadata {
+    crate::api::init(Metadata {
         logo: "".to_string(),
         name: "".to_string(),
         symbol: "".to_string(),
