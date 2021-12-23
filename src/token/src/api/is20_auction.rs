@@ -1,9 +1,9 @@
 //! This module contains APIs from IS20 standard providing cycle auction related functionality.
 
 use crate::api::dip20_transactions::_transfer;
-use crate::common::check_caller_is_owner;
 use crate::state::State;
 use crate::types::{AuctionInfo, BiddingState, Timestamp, TxError};
+use crate::utils::check_caller_is_owner;
 use candid::{candid_method, CandidType, Deserialize, Nat, Principal};
 use ic_cdk_macros::*;
 use ic_kit::ic;
