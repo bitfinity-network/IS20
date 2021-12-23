@@ -5,6 +5,7 @@ use crate::state::State;
 use crate::types::{TxError, TxReceipt, TxRecord};
 use candid::{candid_method, CandidType, Deserialize, Nat, Principal};
 use ic_cdk_macros::*;
+use ic_storage::IcStorage;
 use num_traits::ToPrimitive;
 
 /// Notifies the transaction receiver about a previously performed transaction.
@@ -22,26 +23,34 @@ use num_traits::ToPrimitive;
 #[candid_method(update, rename = "notify")]
 async fn notify(transaction_id: Nat) -> TxReceipt {
     let state = State::get();
-    let transaction_id = transaction_id
-        .0
-        .to_usize()
-        .ok_or(TxError::TransactionDoesNotExist)?;
-    let tx = state
-        .ledger()
-        .0
-        .get(transaction_id)
-        .ok_or(TxError::TransactionDoesNotExist)?
-        .clone();
+    let (tx, transaction_id) = {
+        let mut state = state.borrow_mut();
+        let transaction_id = transaction_id
+            .0
+            .to_usize()
+            .ok_or(TxError::TransactionDoesNotExist)?;
+        let tx = state
+            .ledger()
+            .0
+            .get(transaction_id)
+            .ok_or(TxError::TransactionDoesNotExist)?
+            .clone();
 
-    // We remove the notification here to prevent a concurrent call from being able to send the
-    // notification again (while this call is await'ing). If the notification fails, we add the id
-    // backed into the pending notifications list.
-    if !state.notifications_mut().remove(&transaction_id) {
-        return Err(TxError::AlreadyNotified);
-    }
+        // We remove the notification here to prevent a concurrent call from being able to send the
+        // notification again (while this call is await'ing). If the notification fails, we add the id
+        // backed into the pending notifications list.
+        if !state.notifications_mut().remove(&transaction_id) {
+            return Err(TxError::AlreadyNotified);
+        }
+
+        (tx, transaction_id)
+    };
 
     if send_notification(&tx).await.is_err() {
-        State::get().notifications_mut().insert(transaction_id);
+        state
+            .borrow_mut()
+            .notifications_mut()
+            .insert(transaction_id);
         return Err(TxError::NotificationFailed);
     }
 

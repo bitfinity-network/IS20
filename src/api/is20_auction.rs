@@ -2,11 +2,12 @@
 
 use crate::api::dip20_transactions::_transfer;
 use crate::common::check_caller_is_owner;
-use crate::state::State;
-use crate::types::{AuctionInfo, BiddingState, Timestamp, TxError};
+use crate::state::{AuctionHistory, Balances, BiddingState, State};
+use crate::types::{AuctionInfo, Timestamp, TxError};
 use candid::{candid_method, CandidType, Deserialize, Nat, Principal};
 use ic_cdk_macros::*;
 use ic_kit::ic;
+use ic_storage::IcStorage;
 use std::collections::HashMap;
 
 // Minimum bidding amount is required, for every update call costs cycles, and we want bidding
@@ -69,7 +70,8 @@ fn bid_cycles() -> Result<u64, AuctionError> {
     }
 
     let caller = ic::caller();
-    let state = State::get().bidding_state_mut();
+    let state = BiddingState::get();
+    let mut state = state.borrow_mut();
 
     let amount_accepted = ic::msg_cycles_accept(amount);
     state.cycles_since_auction += amount_accepted;
@@ -82,7 +84,8 @@ fn bid_cycles() -> Result<u64, AuctionError> {
 #[query(name = "biddingInfo")]
 #[candid_method(query, rename = "biddingInfo")]
 fn bidding_info() -> BiddingInfo {
-    let state = State::get().bidding_state();
+    let state = BiddingState::get();
+    let state = state.borrow();
     BiddingInfo {
         fee_ratio: state.fee_ratio,
         last_auction: state.last_auction,
@@ -103,7 +106,8 @@ fn bidding_info() -> BiddingInfo {
 #[update(name = "runAuction")]
 #[candid_method(update, rename = "runAuction")]
 fn run_auction() -> Result<AuctionInfo, AuctionError> {
-    let state = State::get().bidding_state_mut();
+    let state = BiddingState::get();
+    let mut state = state.borrow_mut();
 
     let curr_time = ic::time();
     let next_auction = state.last_auction + state.auction_period;
@@ -111,8 +115,8 @@ fn run_auction() -> Result<AuctionInfo, AuctionError> {
         return Err(AuctionError::TooEarlyToBeginAuction);
     }
 
-    let result = perform_auction(state);
-    reset_bidding_state(state);
+    let result = perform_auction(&mut *state);
+    reset_bidding_state(&mut *state);
 
     result
 }
@@ -121,8 +125,10 @@ fn run_auction() -> Result<AuctionInfo, AuctionError> {
 #[query(name = "auctionInfo")]
 #[candid_method(query, rename = "auctionInfo")]
 fn auction_info(id: usize) -> Result<AuctionInfo, AuctionError> {
-    State::get()
-        .auction_history()
+    let auction_history = AuctionHistory::get();
+    let auction_history = auction_history.borrow();
+    auction_history
+        .0
         .get(id)
         .cloned()
         .ok_or(AuctionError::AuctionNotFound)
@@ -136,7 +142,9 @@ fn auction_info(id: usize) -> Result<AuctionInfo, AuctionError> {
 #[query(name = getMinCycles)]
 #[candid_method(query, rename = "getMinCycles")]
 fn get_min_cycles() -> u64 {
-    State::get().stats().min_cycles
+    let state = State::get();
+    let state = state.borrow();
+    state.stats().min_cycles
 }
 
 /// Sets the minimum cycles for the canister. For more information about this value, read [get_min_cycles].
@@ -147,7 +155,9 @@ fn get_min_cycles() -> u64 {
 fn set_min_cycles(min_cycles: u64) -> Result<(), TxError> {
     check_caller_is_owner()?;
 
-    State::get().stats_mut().min_cycles = min_cycles;
+    let state = State::get();
+    let mut state = state.borrow_mut();
+    state.stats_mut().min_cycles = min_cycles;
     Ok(())
 }
 
@@ -159,8 +169,9 @@ fn set_min_cycles(min_cycles: u64) -> Result<(), TxError> {
 fn set_auction_period(period_sec: u64) -> Result<(), TxError> {
     check_caller_is_owner()?;
 
+    let bidding_state = BiddingState::get();
     // IC timestamp is in nanoseconds, thus multiplying
-    State::get().bidding_state_mut().auction_period = period_sec * 1_000_000;
+    bidding_state.borrow_mut().auction_period = period_sec * 1_000_000;
     Ok(())
 }
 
@@ -172,7 +183,10 @@ fn perform_auction(bidding_state: &mut BiddingState) -> Result<AuctionInfo, Auct
     let total_amount = accumulated_fees();
     let mut transferred_amount = Nat::from(0);
     let total_cycles = bidding_state.cycles_since_auction;
-    let ledger = State::get().ledger_mut();
+
+    let state = State::get();
+    let mut state = state.borrow_mut();
+    let ledger = state.ledger_mut();
 
     let first_id = ledger.len();
 
@@ -184,10 +198,11 @@ fn perform_auction(bidding_state: &mut BiddingState) -> Result<AuctionInfo, Auct
     }
 
     let last_id = ledger.len() - 1;
-    let auction_history = State::get().auction_history_mut();
+    let auction_history = AuctionHistory::get();
+    let mut auction_history = auction_history.borrow_mut();
 
     let result = AuctionInfo {
-        auction_id: auction_history.len(),
+        auction_id: auction_history.0.len(),
         auction_time: ic::time(),
         tokens_distributed: transferred_amount,
         cycles_collected: total_cycles,
@@ -196,16 +211,17 @@ fn perform_auction(bidding_state: &mut BiddingState) -> Result<AuctionInfo, Auct
         last_transaction_id: Nat::from(last_id),
     };
 
-    auction_history.push(result.clone());
+    auction_history.0.push(result.clone());
 
     Ok(result)
 }
 
-fn reset_bidding_state(state: &mut BiddingState) {
-    state.fee_ratio = get_fee_ratio(State::get().stats().min_cycles, ic::balance());
-    state.cycles_since_auction = 0;
-    state.last_auction = ic::time();
-    state.bids = HashMap::new();
+fn reset_bidding_state(bidding_state: &mut BiddingState) {
+    let state = State::get();
+    bidding_state.fee_ratio = get_fee_ratio(state.borrow().stats().min_cycles, ic::balance());
+    bidding_state.cycles_since_auction = 0;
+    bidding_state.last_auction = ic::time();
+    bidding_state.bids = HashMap::new();
 }
 
 fn get_fee_ratio(min_cycles: u64, current_cycles: u64) -> f64 {
@@ -232,8 +248,10 @@ pub fn auction_principal() -> Principal {
 }
 
 pub fn accumulated_fees() -> Nat {
-    State::get()
-        .balances()
+    let balances = Balances::get();
+    let balances = balances.borrow_mut();
+    balances
+        .0
         .get(&auction_principal())
         .cloned()
         .unwrap_or_else(|| Nat::from(0))
@@ -302,8 +320,10 @@ mod tests {
         context.update_caller(bob());
         bid_cycles().unwrap();
 
-        State::get()
-            .balances_mut()
+        let balances = Balances::get();
+        balances
+            .borrow_mut()
+            .0
             .insert(auction_principal(), Nat::from(6_000));
 
         let result = run_auction().unwrap();
@@ -311,7 +331,9 @@ mod tests {
         assert_eq!(result.first_transaction_id, Nat::from(1));
         assert_eq!(result.last_transaction_id, Nat::from(2));
         assert_eq!(result.tokens_distributed, Nat::from(6_000));
-        assert_eq!(State::get().balances()[&bob()], 4_000);
+
+        let balances = Balances::get();
+        assert_eq!(balances.borrow().0[&bob()], 4_000);
 
         let retrieved_result = auction_info(result.auction_id).unwrap();
         assert_eq!(retrieved_result, result);
@@ -329,9 +351,9 @@ mod tests {
         context.update_msg_cycles(2_000_000);
         bid_cycles().unwrap();
 
-        let state = State::get().bidding_state_mut();
-        state.last_auction = ic::time() - 100_000;
-        state.auction_period = 1_000_000_000;
+        let state = BiddingState::get();
+        state.borrow_mut().last_auction = ic::time() - 100_000;
+        state.borrow_mut().auction_period = 1_000_000_000;
 
         assert_eq!(run_auction(), Err(AuctionError::TooEarlyToBeginAuction));
     }
@@ -341,10 +363,12 @@ mod tests {
         let context = init_context();
         context.update_balance(1_000_000_000);
 
-        State::get().stats_mut().min_cycles = 1_000_000;
+        let state = State::get();
+        state.borrow_mut().stats_mut().min_cycles = 1_000_000;
         run_auction().unwrap_err();
 
-        assert_eq!(State::get().bidding_state().fee_ratio, 0.125);
+        let bidding_state = BiddingState::get();
+        assert_eq!(bidding_state.borrow().fee_ratio, 0.125);
     }
 
     #[test]

@@ -1,8 +1,9 @@
-use crate::state::State;
+use crate::state::{AuctionHistory, Balances, BiddingState, State};
 use crate::types::{Metadata, Timestamp};
 use candid::candid_method;
 use ic_cdk_macros::*;
 use ic_kit::ic;
+use ic_storage::IcStorage;
 
 #[cfg(not(any(target_arch = "wasm32", test)))]
 use crate::api::is20_auction::{AuctionError, BiddingInfo};
@@ -41,7 +42,9 @@ pub fn init(info: Metadata) {
         fee,
         feeTo: fee_to,
     } = info;
-    let stats = State::get().stats_mut();
+    let state = State::get();
+    let mut state = state.borrow_mut();
+    let stats = state.stats_mut();
 
     stats.logo = logo;
     stats.name = name;
@@ -54,12 +57,13 @@ pub fn init(info: Metadata) {
     stats.deploy_time = ic::time();
     stats.min_cycles = DEFAULT_MIN_CYCLES;
 
-    State::get().bidding_state_mut().auction_period = DEFAULT_AUCTION_PERIOD;
+    let bidding_state = BiddingState::get();
+    bidding_state.borrow_mut().auction_period = DEFAULT_AUCTION_PERIOD;
 
-    let balances = State::get().balances_mut();
-    balances.insert(owner, total_supply.clone());
+    let balances = Balances::get();
+    balances.borrow_mut().0.insert(owner, total_supply.clone());
 
-    State::get().ledger_mut().mint(owner, owner, total_supply);
+    state.ledger_mut().mint(owner, owner, total_supply);
 }
 
 #[cfg(any(target_arch = "wasm32", test))]
@@ -73,10 +77,26 @@ fn main() {
 
 #[pre_upgrade]
 fn pre_upgrade() {
-    State::get().store();
+    let state = State::get();
+    let balances = Balances::get();
+    let bidding_state = BiddingState::get();
+    let auction_history = AuctionHistory::get();
+
+    ic_cdk::storage::stable_save((
+        &*state.borrow(),
+        &*balances.borrow(),
+        &*bidding_state.borrow(),
+        &*auction_history.borrow(),
+    ))
+    .unwrap();
 }
 
 #[post_upgrade]
 fn post_upgrade() {
-    State::load();
+    let (state, balances, bidding_state, auction_history) =
+        ic_cdk::storage::stable_restore().unwrap();
+    *State::get().borrow_mut() = state;
+    *Balances::get().borrow_mut() = balances;
+    *BiddingState::get().borrow_mut() = bidding_state;
+    *AuctionHistory::get().borrow_mut() = auction_history;
 }

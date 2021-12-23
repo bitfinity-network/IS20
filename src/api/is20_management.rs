@@ -4,10 +4,12 @@
 use crate::state::State;
 use candid::{candid_method, Principal};
 use ic_cdk_macros::query;
+use ic_storage::IcStorage;
 
 #[query(name = "owner")]
 #[candid_method(query, rename = "owner")]
 fn owner() -> Principal {
-    let stats = State::get().stats();
-    stats.owner
+    let state = State::get();
+    let state = state.borrow();
+    state.stats().owner
 }
