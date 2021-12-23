@@ -1,7 +1,8 @@
-use crate::common::check_caller_is_owner;
 use crate::state::{Balances, State};
-use crate::types::{Metadata, TxRecord};
+use crate::types::TxRecord;
+use crate::utils::check_caller_is_owner;
 use candid::{candid_method, Nat};
+use common::types::Metadata;
 use ic_cdk_macros::*;
 use ic_kit::{ic, Principal};
 use ic_storage::IcStorage;

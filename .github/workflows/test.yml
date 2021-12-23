@@ -1,4 +1,4 @@
-name: Rust build and code style checks
+name: Test
 
 on:
   push:
@@ -29,14 +29,14 @@ jobs:
         run: |
           cargo fmt -- --check
 
+      - name: Build canisters
+        run: |
+          ./scripts/build.sh
+
       - name: Running clippy
         run: |
-          cargo clippy
+          cargo clippy -j`nproc || printf 1`
 
       - name: Unit tests
         run: |
           cargo test
-
-      - name: Build canisters
-        run: |
-          ./scripts/build.sh
