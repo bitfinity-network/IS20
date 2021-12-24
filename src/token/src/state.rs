@@ -1,5 +1,5 @@
 use crate::ledger::Ledger;
-use crate::types::{Allowances, AuctionInfo, PendingNotifications, StatsData, Timestamp};
+use crate::types::{Allowances, AuctionInfo, StatsData, Timestamp};
 use candid::{CandidType, Deserialize, Nat, Principal};
 use ic_storage::IcStorage;
 use std::collections::HashMap;
@@ -9,7 +9,6 @@ pub struct State {
     stats: StatsData,
     allowances: Allowances,
     ledger: Ledger,
-    notifications: PendingNotifications,
     auction_history: AuctionHistory,
 }
 
@@ -57,13 +56,5 @@ impl State {
 
     pub fn ledger_mut(&mut self) -> &mut Ledger {
         &mut self.ledger
-    }
-
-    pub fn notifications(&self) -> &PendingNotifications {
-        &self.notifications
-    }
-
-    pub fn notifications_mut(&mut self) -> &mut PendingNotifications {
-        &mut self.notifications
     }
 }
