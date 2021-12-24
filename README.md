@@ -123,6 +123,6 @@ dfx stop
 In order to generate candid files, run the following command:
 
 ```bash
-cargo run -p factory > src/candid/factory.did
+cargo run -p factory > src/candid/token-factory.did
 cargo run -p token > src/candid/token.did
 ```
