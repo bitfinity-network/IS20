@@ -6,7 +6,6 @@ use common::types::Metadata;
 use ic_cdk_macros::*;
 use ic_kit::{ic, Principal};
 use ic_storage::IcStorage;
-use num_traits::ToPrimitive;
 use std::iter::FromIterator;
 
 mod dip20_meta;
@@ -163,9 +162,7 @@ fn inspect_message() {
             let notifications = state.notifications();
             let (tx_id,) = ic_cdk::api::call::arg_data::<(Nat,)>();
 
-            // Unwrapping here is fine, for if this method panics, the call
-            // will be rejected, which is exactly what we need.
-            if notifications.contains(&tx_id.0.to_usize().unwrap()) {
+            if notifications.contains(&tx_id) {
                 ic_cdk::api::call::accept_message();
             } else {
                 ic_cdk::println!("No pending notification with the given id. Rejecting.");

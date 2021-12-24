@@ -85,7 +85,7 @@ pub fn get_metadata() -> Metadata {
 
 #[query(name = "historySize")]
 #[candid_method(query, rename = "historySize")]
-pub fn history_size() -> usize {
+pub fn history_size() -> Nat {
     let state = State::get();
     let state = state.borrow();
     state.ledger().len()
@@ -96,28 +96,15 @@ pub fn history_size() -> usize {
 pub fn get_transaction(id: Nat) -> TxRecord {
     let state = State::get();
     let state = state.borrow();
-    let id =
-        id.0.to_usize()
-            .unwrap_or_else(|| ic::trap("Id is out of bounds"));
     state
         .ledger()
-        .0
-        .get(id)
+        .get(&id)
         .unwrap_or_else(|| ic::trap(&format!("Transaction {} does not exist", id)))
-        .clone()
 }
 
 #[query(name = "getTransactions")]
 #[candid_method(query, rename = "getTransactions")]
 pub fn get_transactions(start: Nat, limit: Nat) -> Vec<TxRecord> {
-    let start = start
-        .0
-        .to_usize()
-        .unwrap_or_else(|| ic::trap("Start is out of bounds"));
-    let limit = limit
-        .0
-        .to_usize()
-        .unwrap_or_else(|| ic::trap("Limit is out of bounds"));
     if limit > MAX_TRANSACTION_QUERY_LEN {
         ic::trap(&format!(
             "Limit must be less then {}",
@@ -128,7 +115,7 @@ pub fn get_transactions(start: Nat, limit: Nat) -> Vec<TxRecord> {
     let state = State::get();
     let state = state.borrow();
     let ledger = state.ledger();
-    ledger.0[start..(start + limit).min(ledger.len())].to_vec()
+    ledger.get_range(&start, &limit).to_vec()
 }
 
 #[query(name = "logo")]
@@ -189,9 +176,8 @@ fn set_owner(owner: Principal) {
 fn get_user_transactions(who: Principal, start: Nat, limit: Nat) -> Vec<TxRecord> {
     let mut transactions = vec![];
 
-    let start = start.0.to_usize().unwrap_or(usize::MAX);
-    let limit = limit.0.to_usize().unwrap_or(usize::MAX);
-    if limit > MAX_TRANSACTION_QUERY_LEN {
+    let limit_usize = limit.0.to_usize().unwrap_or(usize::MAX);
+    if limit_usize > MAX_TRANSACTION_QUERY_LEN {
         ic::trap(&format!(
             "Limit must be less then {}",
             MAX_TRANSACTION_QUERY_LEN
@@ -199,7 +185,7 @@ fn get_user_transactions(who: Principal, start: Nat, limit: Nat) -> Vec<TxRecord
     }
 
     let state = State::get();
-    for tx in state.borrow().ledger().0.iter().skip(start).take(limit) {
+    for tx in state.borrow().ledger().get_range(&start, &limit) {
         if tx.from == who || tx.to == who || tx.caller == Some(who) {
             transactions.push(tx.clone());
         }
@@ -214,7 +200,7 @@ fn get_user_transactions(who: Principal, start: Nat, limit: Nat) -> Vec<TxRecord
 fn get_user_transaction_amount(who: Principal) -> Nat {
     let mut amount = Nat::from(0);
     let state = State::get();
-    for tx in &state.borrow().ledger().0 {
+    for tx in state.borrow().ledger().iter() {
         if tx.from == who || tx.to == who || tx.caller == Some(who) {
             amount += tx.amount.clone();
         }
