@@ -7,7 +7,6 @@ use candid::{candid_method, Nat};
 use ic_cdk_macros::*;
 use ic_kit::{ic, Principal};
 use ic_storage::IcStorage;
-use num_traits::ToPrimitive;
 use std::collections::HashMap;
 
 #[update(name = "transfer")]
@@ -34,10 +33,7 @@ pub fn transfer(to: Principal, value: Nat) -> TxReceipt {
 
     let id = state.ledger_mut().transfer(from, to, value, fee);
 
-    state.notifications_mut().insert(
-        id.0.to_usize()
-            .expect("In the current implementation ids are limited by usize."),
-    );
+    state.notifications_mut().insert(id.clone());
     Ok(id)
 }
 

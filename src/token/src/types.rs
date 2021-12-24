@@ -26,7 +26,7 @@ pub struct StatsData {
 pub struct TokenInfo {
     pub metadata: Metadata,
     pub feeTo: Principal,
-    pub historySize: usize,
+    pub historySize: Nat,
     pub deployTime: Timestamp,
     pub holderNumber: usize,
     pub cycles: u64,
@@ -50,7 +50,7 @@ impl Default for StatsData {
 }
 
 pub type Allowances = HashMap<Principal, HashMap<Principal, Nat>>;
-pub type PendingNotifications = HashSet<usize>;
+pub type PendingNotifications = HashSet<Nat>;
 
 #[derive(CandidType, Debug, PartialEq)]
 pub enum TxError {
