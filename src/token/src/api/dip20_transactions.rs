@@ -1,21 +1,26 @@
 use crate::api::dip20_meta::{allowance, balance_of};
 use crate::api::is20_auction::auction_principal;
-use crate::state::State;
+use crate::state::{Balances, BiddingState, State};
 use crate::types::{TxError, TxReceipt};
 use crate::utils::check_caller_is_owner;
 use candid::{candid_method, Nat};
 use ic_cdk_macros::*;
 use ic_kit::{ic, Principal};
-use num_traits::ToPrimitive;
+use ic_storage::IcStorage;
 use std::collections::HashMap;
 
 #[update(name = "transfer")]
 #[candid_method(update)]
 pub fn transfer(to: Principal, value: Nat) -> TxReceipt {
     let from = ic::caller();
-    let stats = State::get().stats_mut();
+    let state = State::get();
+    let mut state = state.borrow_mut();
+    let stats = state.stats();
+    let fee = stats.fee.clone();
+    let bidding_state = BiddingState::get();
+    let fee_ratio = bidding_state.borrow().fee_ratio;
 
-    if value <= stats.fee {
+    if value <= fee {
         return Err(TxError::AmountTooSmall);
     }
 
@@ -23,17 +28,10 @@ pub fn transfer(to: Principal, value: Nat) -> TxReceipt {
         return Err(TxError::InsufficientBalance);
     }
 
-    _charge_fee(from, stats.fee_to, stats.fee.clone());
-    _transfer(from, to, value.clone() - stats.fee.clone());
+    _charge_fee(from, stats.fee_to, fee.clone(), fee_ratio);
+    _transfer(from, to, value.clone() - fee.clone());
 
-    let id = State::get()
-        .ledger_mut()
-        .transfer(from, to, value, stats.fee.clone());
-
-    State::get().notifications_mut().insert(
-        id.0.to_usize()
-            .expect("In the current implementation ids are limited by usize."),
-    );
+    let id = state.ledger_mut().transfer(from, to, value, fee);
     Ok(id)
 }
 
@@ -42,9 +40,14 @@ pub fn transfer(to: Principal, value: Nat) -> TxReceipt {
 pub fn transfer_from(from: Principal, to: Principal, value: Nat) -> TxReceipt {
     let owner = ic::caller();
     let from_allowance = allowance(from, owner);
-    let stats = State::get().stats_mut();
+    let state = State::get();
+    let mut state = state.borrow_mut();
+    let stats = state.stats();
+    let fee = stats.fee.clone();
+    let bidding_state = BiddingState::get();
+    let fee_ratio = bidding_state.borrow().fee_ratio;
 
-    if value < stats.fee {
+    if value < fee {
         return Err(TxError::AmountTooSmall);
     }
 
@@ -57,10 +60,10 @@ pub fn transfer_from(from: Principal, to: Principal, value: Nat) -> TxReceipt {
         return Err(TxError::InsufficientBalance);
     }
 
-    _charge_fee(from, stats.fee_to, stats.fee.clone());
-    _transfer(from, to, value.clone() - stats.fee.clone());
+    _charge_fee(from, stats.fee_to, fee.clone(), fee_ratio);
+    _transfer(from, to, value.clone() - fee.clone());
 
-    let allowances = State::get().allowances_mut();
+    let allowances = state.allowances_mut();
     match allowances.get(&from) {
         Some(inner) => {
             let result = inner.get(&owner).unwrap().clone();
@@ -82,9 +85,9 @@ pub fn transfer_from(from: Principal, to: Principal, value: Nat) -> TxReceipt {
         }
     }
 
-    let id = State::get()
+    let id = state
         .ledger_mut()
-        .transfer_from(owner, from, to, value, stats.fee.clone());
+        .transfer_from(owner, from, to, value, fee);
     Ok(id)
 }
 
@@ -92,13 +95,18 @@ pub fn transfer_from(from: Principal, to: Principal, value: Nat) -> TxReceipt {
 #[candid_method(update)]
 pub fn approve(spender: Principal, value: Nat) -> TxReceipt {
     let owner = ic::caller();
-    let stats = State::get().stats_mut();
+    let state = State::get();
+    let mut state = state.borrow_mut();
+    let stats = state.stats();
+    let fee = stats.fee.clone();
+    let bidding_state = BiddingState::get();
+    let fee_ratio = bidding_state.borrow().fee_ratio;
     if balance_of(owner) < stats.fee.clone() {
         return Err(TxError::InsufficientBalance);
     }
-    _charge_fee(owner, stats.fee_to, stats.fee.clone());
-    let v = value.clone() + stats.fee.clone();
-    let allowances = State::get().allowances_mut();
+    _charge_fee(owner, stats.fee_to, fee.clone(), fee_ratio);
+    let v = value.clone() + fee.clone();
+    let allowances = state.allowances_mut();
     match allowances.get(&owner) {
         Some(inner) => {
             let mut temp = inner.clone();
@@ -118,15 +126,13 @@ pub fn approve(spender: Principal, value: Nat) -> TxReceipt {
             if v != 0 {
                 let mut inner = HashMap::new();
                 inner.insert(spender, v);
-                let allowances = State::get().allowances_mut();
+                let allowances = state.allowances_mut();
                 allowances.insert(owner, inner);
             }
         }
     }
 
-    let id = State::get()
-        .ledger_mut()
-        .approve(owner, spender, value, stats.fee.clone());
+    let id = state.ledger_mut().approve(owner, spender, value, fee);
     Ok(id)
 }
 
@@ -136,13 +142,17 @@ pub fn mint(to: Principal, amount: Nat) -> TxReceipt {
     check_caller_is_owner()?;
 
     let caller = ic::caller();
-    let stats = State::get().stats_mut();
+    let state = State::get();
+    let mut state = state.borrow_mut();
+    let stats = state.stats_mut();
     let to_balance = balance_of(to);
-    let balances = State::get().balances_mut();
-    balances.insert(to, to_balance + amount.clone());
+
+    let balances = Balances::get();
+    let mut balances = balances.borrow_mut();
+    balances.0.insert(to, to_balance + amount.clone());
     stats.total_supply += amount.clone();
 
-    let id = State::get().ledger_mut().mint(caller, to, amount);
+    let id = state.ledger_mut().mint(caller, to, amount);
     Ok(id)
 }
 
@@ -150,39 +160,43 @@ pub fn mint(to: Principal, amount: Nat) -> TxReceipt {
 #[candid_method(update, rename = "burn")]
 pub fn burn(amount: Nat) -> TxReceipt {
     let caller = ic::caller();
-    let stats = State::get().stats_mut();
+    let state = State::get();
+    let mut state = state.borrow_mut();
+    let stats = state.stats_mut();
     let caller_balance = balance_of(caller);
     if caller_balance < amount {
         return Err(TxError::InsufficientBalance);
     }
-    let balances = State::get().balances_mut();
-    balances.insert(caller, caller_balance - amount.clone());
+    let balances = Balances::get();
+    balances
+        .borrow_mut()
+        .0
+        .insert(caller, caller_balance - amount.clone());
     stats.total_supply -= amount.clone();
 
-    let id = State::get().ledger_mut().burn(caller, amount);
+    let id = state.ledger_mut().burn(caller, amount);
     Ok(id)
 }
 
 pub fn _transfer(from: Principal, to: Principal, value: Nat) {
-    let balances = State::get().balances_mut();
-    let from_balance = balance_of(from);
+    let balances = Balances::get();
+    let mut balances = balances.borrow_mut();
+    let from_balance = balances.balance_of(&from);
     let from_balance_new = from_balance - value.clone();
     if from_balance_new != 0 {
-        balances.insert(from, from_balance_new);
+        balances.0.insert(from, from_balance_new);
     } else {
-        balances.remove(&from);
+        balances.0.remove(&from);
     }
-    let to_balance = balance_of(to);
+    let to_balance = balances.balance_of(&to);
     let to_balance_new = to_balance + value;
     if to_balance_new != 0 {
-        balances.insert(to, to_balance_new);
+        balances.0.insert(to, to_balance_new);
     }
 }
 
-fn _charge_fee(user: Principal, fee_to: Principal, fee: Nat) {
-    let stats = State::get().stats();
-    if stats.fee > 0u32 {
-        let fee_ratio = State::get().bidding_state().fee_ratio;
+fn _charge_fee(user: Principal, fee_to: Principal, fee: Nat, fee_ratio: f64) {
+    if fee > 0u32 {
         const INT_CONVERSION_K: u64 = 1_000_000_000_000;
         let auction_fee_amount =
             fee.clone() * (fee_ratio * INT_CONVERSION_K as f64) as u64 / INT_CONVERSION_K;
@@ -251,7 +265,8 @@ mod tests {
             feeTo: john(),
         });
 
-        State::get().bidding_state_mut().fee_ratio = 0.5;
+        let bidding_state = BiddingState::get();
+        bidding_state.borrow_mut().fee_ratio = 0.5;
         transfer(bob(), Nat::from(100)).unwrap();
         assert_eq!(balance_of(bob()), Nat::from(50));
         assert_eq!(balance_of(alice()), Nat::from(900));

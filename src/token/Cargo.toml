@@ -12,6 +12,7 @@ ic-cdk-macros = "0.3"
 ic-kit = "0.4.3"
 num-traits = "0.2"
 serde = "1.0"
+ic-storage = { git = "https://github.com/infinity-swap/ic-helpers.git", package = "ic-storage" }
 
 [target.'cfg(not(target_family = "wasm"))'.dependencies]
 async-std = {version = "1.10.0", features = ["attributes"]}
