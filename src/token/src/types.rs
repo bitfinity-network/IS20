@@ -1,6 +1,6 @@
 use candid::{CandidType, Deserialize, Nat, Principal};
 use common::types::Metadata;
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 
 mod tx_record;
 pub use tx_record::*;
@@ -50,7 +50,6 @@ impl Default for StatsData {
 }
 
 pub type Allowances = HashMap<Principal, HashMap<Principal, Nat>>;
-pub type PendingNotifications = HashSet<Nat>;
 
 #[derive(CandidType, Debug, PartialEq)]
 pub enum TxError {
@@ -58,9 +57,6 @@ pub enum TxError {
     InsufficientAllowance,
     Unauthorized,
     AmountTooSmall,
-    TransactionDoesNotExist,
-    AlreadyNotified,
-    NotificationFailed,
 }
 pub type TxReceipt = Result<Nat, TxError>;
 
