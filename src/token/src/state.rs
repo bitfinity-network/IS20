@@ -30,6 +30,14 @@ pub struct BiddingState {
     pub bids: HashMap<Principal, u64>,
 }
 
+impl BiddingState {
+    pub fn is_auction_due(&self) -> bool {
+        let curr_time = ic_kit::ic::time();
+        let next_auction = self.last_auction + self.auction_period;
+        curr_time >= next_auction
+    }
+}
+
 #[derive(Default, IcStorage, CandidType, Deserialize)]
 pub struct AuctionHistory(pub Vec<AuctionInfo>);
 

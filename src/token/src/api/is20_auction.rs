@@ -108,9 +108,7 @@ fn run_auction() -> Result<AuctionInfo, AuctionError> {
     let state = BiddingState::get();
     let mut state = state.borrow_mut();
 
-    let curr_time = ic::time();
-    let next_auction = state.last_auction + state.auction_period;
-    if curr_time < next_auction {
+    if !state.is_auction_due() {
         return Err(AuctionError::TooEarlyToBeginAuction);
     }
 
