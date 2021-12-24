@@ -63,19 +63,18 @@ pub enum AuctionError {
 /// saved for the next auction.
 #[update(name = "bidCycles")]
 #[candid_method(update, rename = "bidCycles")]
-fn bid_cycles() -> Result<u64, AuctionError> {
+fn bid_cycles(bidder: Principal) -> Result<u64, AuctionError> {
     let amount = ic::msg_cycles_available();
     if amount < MIN_BIDDING_AMOUNT {
         return Err(AuctionError::BiddingTooSmall);
     }
 
-    let caller = ic::caller();
     let state = BiddingState::get();
     let mut state = state.borrow_mut();
 
     let amount_accepted = ic::msg_cycles_accept(amount);
     state.cycles_since_auction += amount_accepted;
-    *state.bids.entry(caller).or_insert(0) += amount_accepted;
+    *state.bids.entry(bidder).or_insert(0) += amount_accepted;
 
     Ok(amount_accepted)
 }
@@ -280,7 +279,7 @@ mod tests {
         context.update_caller(bob());
         context.update_msg_cycles(2_000_000);
 
-        bid_cycles().unwrap();
+        bid_cycles(bob()).unwrap();
         let info = bidding_info();
         assert_eq!(info.total_cycles, 2_000_000);
         assert_eq!(info.caller_cycles, 2_000_000);
@@ -295,17 +294,17 @@ mod tests {
     fn bidding_cycles_under_limit() {
         let context = init_context();
         context.update_msg_cycles(MIN_BIDDING_AMOUNT - 1);
-        assert_eq!(bid_cycles(), Err(AuctionError::BiddingTooSmall));
+        assert_eq!(bid_cycles(alice()), Err(AuctionError::BiddingTooSmall));
     }
 
     #[test]
     fn bidding_multiple_times() {
         let context = init_context();
         context.update_msg_cycles(2_000_000);
-        bid_cycles().unwrap();
+        bid_cycles(alice()).unwrap();
 
         context.update_msg_cycles(2_000_000);
-        bid_cycles().unwrap();
+        bid_cycles(alice()).unwrap();
 
         assert_eq!(bidding_info().caller_cycles, 4_000_000);
     }
@@ -314,11 +313,10 @@ mod tests {
     fn auction_test() {
         let context = init_context();
         context.update_msg_cycles(2_000_000);
-        bid_cycles().unwrap();
+        bid_cycles(alice()).unwrap();
 
         context.update_msg_cycles(4_000_000);
-        context.update_caller(bob());
-        bid_cycles().unwrap();
+        bid_cycles(bob()).unwrap();
 
         let balances = Balances::get();
         balances
@@ -349,7 +347,7 @@ mod tests {
     fn auction_not_in_time() {
         let context = init_context();
         context.update_msg_cycles(2_000_000);
-        bid_cycles().unwrap();
+        bid_cycles(alice()).unwrap();
 
         let state = BiddingState::get();
         state.borrow_mut().last_auction = ic::time() - 100_000;
