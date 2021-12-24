@@ -4,6 +4,85 @@ IS20 is an Internet Computer token standard proposed by Infinity Swap.
 
 You can find the standard spec at [spec/IS20.md]() and the default implementation in the `src` directory.
 
+This repository contains two canisters:
+* `factory` is responsible for creating and deploying new token canisters
+* `token` is the default implementation of the IS20 token
+
+# Usage
+
+You can try using the factory and tokens using `dfx` tool. To do so, install and start `dfx`:
+
+```shell
+sh -ci "$(curl -fsSL https://sdk.dfinity.org/install.sh)"
+
+dfx start --background
+```
+
+Then deploy the factory:
+
+```shell
+dfx deploy
+```
+
+After the factory is deployed, you can create a new token using factory api:
+
+```shell
+dfx identity get-principal
+>> y4nw3-upugh-yyv2b-jv6jy-ppfse-4fkfd-uaqv5-woqup-u3cx3-hah2c-yae
+
+// Use the user principal above to set the owner
+dfx canister call factory create_token \
+  'record {
+  logo = "";
+  name = "y";
+  symbol = "y";
+  decimals = 8;
+  totalSupply = 1000000000;
+  owner = principal "y4nw3-upugh-yyv2b-jv6jy-ppfse-4fkfd-uaqv5-woqup-u3cx3-hah2c-yae";
+  fee = 0;
+  feeTo = principal "y4nw3-upugh-yyv2b-jv6jy-ppfse-4fkfd-uaqv5-woqup-u3cx3-hah2c-yae"; }'
+
+>> (opt principal "r7inp-6aaaa-aaaaa-aaabq-cai")
+```
+
+The returned principal id is the token canister principal. You can use this id to make token calls:
+
+```shell
+// Tokens transfer
+dfx canister call r7inp-6aaaa-aaaaa-aaabq-cai transfer '(principal "aaaaa-aa", 1000: nat)'
+>> (variant { 17_724 = 2 : nat })
+
+// Get transaction information
+dfx canister call r7inp-6aaaa-aaaaa-aaabq-cai getTransaction '(1:nat)'
+>> (
+>>   record {
+>>     25_979 = principal "aaaaa-aa";
+>>     5_094_982 = 0 : nat;
+>>     100_394_802 = variant { 2_633_774_657 };
+>>     1_136_829_802 = principal "y4nw3-upugh-yyv2b-jv6jy-ppfse-4fkfd-uaqv5-woqup-u3cx3-hah2c-yae";
+>>     2_688_582_695 = variant { 3_021_957_963 };
+>>     2_781_795_542 = 1_640_332_539_774_695_111 : int;
+>>     3_068_679_307 = opt principal "y4nw3-upugh-yyv2b-jv6jy-ppfse-4fkfd-uaqv5-woqup-u3cx3-hah2c-yae";
+>>     3_189_021_458 = 2 : nat;
+>>     3_573_748_184 = 1_000 : nat;
+>>   },
+>> )
+```
+
+To bid cycles for the cycle auction, you need to provide the cycles with your call. Use cycle wallet
+to do so:
+
+```shell
+dfx identity get-wallet
+>> rwlgt-iiaaa-aaaaa-aaaaa-cai
+
+dfx canister --wallet rwlgt-iiaaa-aaaaa-aaaaa-cai call --with-cycles 100000000 \
+  r7inp-6aaaa-aaaaa-aaabq-cai bidCycles \
+  '(principal "y4nw3-upugh-yyv2b-jv6jy-ppfse-4fkfd-uaqv5-woqup-u3cx3-hah2c-yae")'
+>> (variant { 17_724 = 100_000_000 : nat64 })
+
+```
+
 # Development
 
 ## Building

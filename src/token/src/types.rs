@@ -1,6 +1,6 @@
 use candid::{CandidType, Deserialize, Nat, Principal};
 use common::types::Metadata;
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 
 mod tx_record;
 pub use tx_record::*;
@@ -26,7 +26,7 @@ pub struct StatsData {
 pub struct TokenInfo {
     pub metadata: Metadata,
     pub feeTo: Principal,
-    pub historySize: usize,
+    pub historySize: Nat,
     pub deployTime: Timestamp,
     pub holderNumber: usize,
     pub cycles: u64,
@@ -49,10 +49,7 @@ impl Default for StatsData {
     }
 }
 
-pub type Balances = HashMap<Principal, Nat>;
 pub type Allowances = HashMap<Principal, HashMap<Principal, Nat>>;
-pub type PendingNotifications = HashSet<usize>;
-pub type AuctionHistory = Vec<AuctionInfo>;
 
 #[derive(CandidType, Debug, PartialEq)]
 pub enum TxError {
@@ -60,9 +57,6 @@ pub enum TxError {
     InsufficientAllowance,
     Unauthorized,
     AmountTooSmall,
-    TransactionDoesNotExist,
-    AlreadyNotified,
-    NotificationFailed,
 }
 pub type TxReceipt = Result<Nat, TxError>;
 
@@ -80,15 +74,6 @@ pub enum Operation {
     TransferFrom,
     Burn,
     Auction,
-}
-
-#[derive(CandidType, Default, Debug, Clone, Deserialize)]
-pub struct BiddingState {
-    pub fee_ratio: f64,
-    pub last_auction: Timestamp,
-    pub auction_period: Timestamp,
-    pub cycles_since_auction: u64,
-    pub bids: HashMap<Principal, u64>,
 }
 
 #[derive(CandidType, Debug, Clone, Deserialize, PartialEq)]
