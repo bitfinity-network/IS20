@@ -159,10 +159,12 @@ fn inspect_message() {
             // We allow running auction only to the owner or any of the cycle bidders.
             let bidding_state = BiddingState::get();
             let bidding_state = bidding_state.borrow();
-            if bidding_state.bids.contains_key(&caller) || caller == state.stats().owner {
+            if bidding_state.is_auction_due()
+                && (bidding_state.bids.contains_key(&caller) || caller == state.stats().owner)
+            {
                 ic_cdk::api::call::accept_message();
             } else {
-                ic_cdk::println!("Auction run method is called not by owner or bidder. Rejecting.");
+                ic_cdk::println!("Auction is not due yet or auction run method is called not by owner or bidder. Rejecting.");
             }
         }
         "bidCycles" => {
