@@ -1,10 +1,11 @@
-use crate::state::State;
+use crate::state::{Balances, State};
 use crate::types::TxRecord;
 use crate::utils::check_caller_is_owner;
 use candid::{candid_method, Nat};
 use common::types::Metadata;
 use ic_cdk_macros::*;
 use ic_kit::{ic, Principal};
+use ic_storage::IcStorage;
 use num_traits::cast::ToPrimitive;
 use std::string::String;
 
@@ -13,46 +14,49 @@ const MAX_TRANSACTION_QUERY_LEN: usize = 1000;
 #[query(name = "name")]
 #[candid_method(query)]
 fn name() -> String {
-    let stats = State::get().stats();
-    stats.name.clone()
+    let state = State::get();
+    let state = state.borrow();
+    state.stats().name.clone()
 }
 
 #[query(name = "symbol")]
 #[candid_method(query)]
 fn symbol() -> String {
-    let stats = State::get().stats();
-    stats.symbol.clone()
+    let state = State::get();
+    let state = state.borrow();
+    state.stats().symbol.clone()
 }
 
 #[query(name = "decimals")]
 #[candid_method(query)]
 fn decimals() -> u8 {
-    let stats = State::get().stats();
-    stats.decimals
+    let state = State::get();
+    let state = state.borrow();
+    state.stats().decimals
 }
 
 #[query(name = "totalSupply")]
 #[candid_method(query, rename = "totalSupply")]
 fn total_supply() -> Nat {
-    let stats = State::get().stats();
-    stats.total_supply.clone()
+    let state = State::get();
+    let state = state.borrow();
+    state.stats().total_supply.clone()
 }
 
 #[query(name = "balanceOf")]
 #[candid_method(query, rename = "balanceOf")]
 pub fn balance_of(id: Principal) -> Nat {
-    let balances = State::get().balances();
-    match balances.get(&id) {
-        Some(balance) => balance.clone(),
-        None => Nat::from(0),
-    }
+    let balances = Balances::get();
+    let balances = balances.borrow();
+    balances.balance_of(&id)
 }
 
 #[query(name = "allowance")]
 #[candid_method(query)]
 pub fn allowance(owner: Principal, spender: Principal) -> Nat {
-    let allowances = State::get().allowances();
-    match allowances.get(&owner) {
+    let state = State::get();
+    let state = state.borrow();
+    match state.allowances().get(&owner) {
         Some(inner) => match inner.get(&spender) {
             Some(value) => value.clone(),
             None => Nat::from(0),
@@ -64,7 +68,9 @@ pub fn allowance(owner: Principal, spender: Principal) -> Nat {
 #[query(name = "getMetadata")]
 #[candid_method(query, rename = "getMetadata")]
 pub fn get_metadata() -> Metadata {
-    let s = State::get().stats();
+    let state = State::get();
+    let state = state.borrow();
+    let s = state.stats();
     Metadata {
         logo: s.logo.clone(),
         name: s.name.clone(),
@@ -79,36 +85,26 @@ pub fn get_metadata() -> Metadata {
 
 #[query(name = "historySize")]
 #[candid_method(query, rename = "historySize")]
-pub fn history_size() -> usize {
-    let ledger = State::get().ledger();
-    ledger.len()
+pub fn history_size() -> Nat {
+    let state = State::get();
+    let state = state.borrow();
+    state.ledger().len()
 }
 
 #[query(name = "getTransaction")]
 #[candid_method(query, rename = "getTransaction")]
 pub fn get_transaction(id: Nat) -> TxRecord {
-    let id =
-        id.0.to_usize()
-            .unwrap_or_else(|| ic::trap("Id is out of bounds"));
-    State::get()
+    let state = State::get();
+    let state = state.borrow();
+    state
         .ledger()
-        .0
-        .get(id)
+        .get(&id)
         .unwrap_or_else(|| ic::trap(&format!("Transaction {} does not exist", id)))
-        .clone()
 }
 
 #[query(name = "getTransactions")]
 #[candid_method(query, rename = "getTransactions")]
 pub fn get_transactions(start: Nat, limit: Nat) -> Vec<TxRecord> {
-    let start = start
-        .0
-        .to_usize()
-        .unwrap_or_else(|| ic::trap("Start is out of bounds"));
-    let limit = limit
-        .0
-        .to_usize()
-        .unwrap_or_else(|| ic::trap("Limit is out of bounds"));
     if limit > MAX_TRANSACTION_QUERY_LEN {
         ic::trap(&format!(
             "Limit must be less then {}",
@@ -116,55 +112,58 @@ pub fn get_transactions(start: Nat, limit: Nat) -> Vec<TxRecord> {
         ));
     }
 
-    let ledger = State::get().ledger();
-    ledger.0[start..(start + limit).min(ledger.len())].to_vec()
+    let state = State::get();
+    let state = state.borrow();
+    let ledger = state.ledger();
+    ledger.get_range(&start, &limit).to_vec()
 }
 
 #[query(name = "logo")]
 #[candid_method(query, rename = "logo")]
 fn get_logo() -> String {
-    let stats = State::get().stats();
-    stats.logo.clone()
+    let state = State::get();
+    let state = state.borrow();
+    state.stats().logo.clone()
 }
 
 #[update(name = "setName")]
 #[candid_method(update, rename = "setName")]
 fn set_name(name: String) {
     check_caller_is_owner().unwrap();
-    let stats = State::get().stats_mut();
-    stats.name = name;
+    let state = State::get();
+    state.borrow_mut().stats_mut().name = name;
 }
 
 #[update(name = "setLogo")]
 #[candid_method(update, rename = "setLogo")]
 fn set_logo(logo: String) {
     check_caller_is_owner().unwrap();
-    let stats = State::get().stats_mut();
-    stats.logo = logo;
+    let state = State::get();
+    state.borrow_mut().stats_mut().logo = logo;
 }
 
 #[update(name = "setFee")]
 #[candid_method(update, rename = "setFee")]
 pub fn set_fee(fee: Nat) {
     check_caller_is_owner().unwrap();
-    let stats = State::get().stats_mut();
-    stats.fee = fee;
+    let state = State::get();
+    state.borrow_mut().stats_mut().fee = fee;
 }
 
 #[update(name = "setFeeTo")]
 #[candid_method(update, rename = "setFeeTo")]
 fn set_fee_to(fee_to: Principal) {
     check_caller_is_owner().unwrap();
-    let stats = State::get().stats_mut();
-    stats.fee_to = fee_to;
+    let state = State::get();
+    state.borrow_mut().stats_mut().fee_to = fee_to;
 }
 
 #[update(name = "setOwner")]
 #[candid_method(update, rename = "setOwner")]
 fn set_owner(owner: Principal) {
     check_caller_is_owner().unwrap();
-    let stats = State::get().stats_mut();
-    stats.owner = owner;
+    let state = State::get();
+    state.borrow_mut().stats_mut().owner = owner;
 }
 
 /// Returns an array of transaction records in range [start, start + limit) related to user `who`.
@@ -177,16 +176,16 @@ fn set_owner(owner: Principal) {
 fn get_user_transactions(who: Principal, start: Nat, limit: Nat) -> Vec<TxRecord> {
     let mut transactions = vec![];
 
-    let start = start.0.to_usize().unwrap_or(usize::MAX);
-    let limit = limit.0.to_usize().unwrap_or(usize::MAX);
-    if limit > MAX_TRANSACTION_QUERY_LEN {
+    let limit_usize = limit.0.to_usize().unwrap_or(usize::MAX);
+    if limit_usize > MAX_TRANSACTION_QUERY_LEN {
         ic::trap(&format!(
             "Limit must be less then {}",
             MAX_TRANSACTION_QUERY_LEN
         ));
     }
 
-    for tx in State::get().ledger().0.iter().skip(start).take(limit) {
+    let state = State::get();
+    for tx in state.borrow().ledger().get_range(&start, &limit) {
         if tx.from == who || tx.to == who || tx.caller == Some(who) {
             transactions.push(tx.clone());
         }
@@ -200,7 +199,8 @@ fn get_user_transactions(who: Principal, start: Nat, limit: Nat) -> Vec<TxRecord
 #[candid_method(query, rename = "getUserTransactionAmount")]
 fn get_user_transaction_amount(who: Principal) -> Nat {
     let mut amount = Nat::from(0);
-    for tx in &State::get().ledger().0 {
+    let state = State::get();
+    for tx in state.borrow().ledger().iter() {
         if tx.from == who || tx.to == who || tx.caller == Some(who) {
             amount += tx.amount.clone();
         }

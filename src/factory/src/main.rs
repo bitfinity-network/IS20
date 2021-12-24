@@ -1,6 +1,5 @@
 mod api;
 mod state;
-mod types;
 
 #[cfg(not(any(target_arch = "wasm32", test)))]
 use candid::Principal;

@@ -1,18 +1,18 @@
 use crate::api::dip20_meta::{get_metadata, history_size};
-use crate::state::State;
-use crate::types::Timestamp;
-use crate::types::TokenInfo;
+use crate::state::{AuctionHistory, Balances, BiddingState, State};
+use crate::types::{Timestamp, TokenInfo};
 use candid::{candid_method, Nat};
 use common::types::Metadata;
 use ic_cdk_macros::*;
 use ic_kit::{ic, Principal};
+use ic_storage::IcStorage;
 use std::iter::FromIterator;
 
 mod dip20_meta;
 mod dip20_transactions;
+mod inspect;
 pub mod is20_auction;
 mod is20_management;
-mod is20_notify;
 
 // 10T cycles is an equivalent of approximately $10. This should be enough to last the canister
 // for the default auction cycle, which is 1 day.
@@ -35,7 +35,9 @@ pub fn init(info: Metadata) {
         fee,
         feeTo: fee_to,
     } = info;
-    let stats = State::get().stats_mut();
+    let state = State::get();
+    let mut state = state.borrow_mut();
+    let stats = state.stats_mut();
 
     stats.logo = logo;
     stats.name = name;
@@ -48,26 +50,59 @@ pub fn init(info: Metadata) {
     stats.deploy_time = ic::time();
     stats.min_cycles = DEFAULT_MIN_CYCLES;
 
-    State::get().bidding_state_mut().auction_period = DEFAULT_AUCTION_PERIOD;
+    let bidding_state = BiddingState::get();
+    bidding_state.borrow_mut().auction_period = DEFAULT_AUCTION_PERIOD;
 
-    let balances = State::get().balances_mut();
-    balances.insert(owner, total_supply.clone());
+    let balances = Balances::get();
+    balances.borrow_mut().0.insert(owner, total_supply.clone());
 
-    State::get().ledger_mut().mint(owner, owner, total_supply);
+    state.ledger_mut().mint(owner, owner, total_supply);
 }
+
+#[pre_upgrade]
+fn pre_upgrade() {
+    let state = State::get();
+    let balances = Balances::get();
+    let bidding_state = BiddingState::get();
+    let auction_history = AuctionHistory::get();
+
+    ic_cdk::storage::stable_save((
+        &*state.borrow(),
+        &*balances.borrow(),
+        &*bidding_state.borrow(),
+        &*auction_history.borrow(),
+    ))
+    .unwrap();
+}
+
+#[post_upgrade]
+fn post_upgrade() {
+    let (state, balances, bidding_state, auction_history) =
+        ic_cdk::storage::stable_restore().unwrap();
+    *State::get().borrow_mut() = state;
+    *Balances::get().borrow_mut() = balances;
+    *BiddingState::get().borrow_mut() = bidding_state;
+    *AuctionHistory::get().borrow_mut() = auction_history;
+}
+
+// These methods are not part of the standard and are added for convenience. They may be removed
+// in future.
 
 #[query(name = "getTokenInfo")]
 #[candid_method(query, rename = "getTokenInfo")]
 fn get_token_info() -> TokenInfo {
-    let stats = State::get().stats().clone();
-    let balance = State::get().balances();
+    let state = State::get();
+    let state = state.borrow();
+    let stats = state.stats();
+    let balances = Balances::get();
+    let balances = balances.borrow();
 
     TokenInfo {
         metadata: get_metadata(),
         feeTo: stats.fee_to,
         historySize: history_size(),
         deployTime: stats.deploy_time,
-        holderNumber: balance.len(),
+        holderNumber: balances.0.len(),
         cycles: ic::balance(),
     }
 }
@@ -76,7 +111,9 @@ fn get_token_info() -> TokenInfo {
 #[candid_method(query, rename = "getHolders")]
 fn get_holders(start: usize, limit: usize) -> Vec<(Principal, Nat)> {
     let mut balance = Vec::new();
-    for (k, v) in State::get().balances() {
+    let balances = Balances::get();
+    let balances = balances.borrow();
+    for (k, v) in &balances.0 {
         balance.push((*k, v.clone()));
     }
     balance.sort_by(|a, b| b.1.cmp(&a.1));
@@ -92,7 +129,9 @@ fn get_holders(start: usize, limit: usize) -> Vec<(Principal, Nat)> {
 #[candid_method(query, rename = "getAllowanceSize")]
 fn get_allowance_size() -> usize {
     let mut size = 0;
-    let allowances = State::get().allowances();
+    let state = State::get();
+    let state = state.borrow();
+    let allowances = state.allowances();
     for (_, v) in allowances.iter() {
         size += v.len();
     }
@@ -102,19 +141,11 @@ fn get_allowance_size() -> usize {
 #[query(name = "getUserApprovals")]
 #[candid_method(query, rename = "getUserApprovals")]
 fn get_user_approvals(who: Principal) -> Vec<(Principal, Nat)> {
-    let allowances = State::get().allowances();
+    let state = State::get();
+    let state = state.borrow();
+    let allowances = state.allowances();
     match allowances.get(&who) {
         Some(allow) => Vec::from_iter(allow.clone().into_iter()),
         None => Vec::new(),
     }
-}
-
-#[pre_upgrade]
-fn pre_upgrade() {
-    State::get().store();
-}
-
-#[post_upgrade]
-fn post_upgrade() {
-    State::load();
 }
