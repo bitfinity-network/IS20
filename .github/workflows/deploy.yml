@@ -42,10 +42,10 @@ jobs:
       - name: Build canisters and candid files
         run: |
           bash scripts/build.sh
-          mkdir -p ${UPLOAD_DIR}
-          cp src/candid/token.did src/factory/src/token.wasm ${UPLOAD_DIR}
-          cp src/candid/factory.did ${UPLOAD_DIR}/token-factory.did
-          cp target/wasm32-unknown-unknown/release/factory-opt.wasm ${UPLOAD_DIR}/token-factory.wasm
+          mkdir -p ${UPLOAD_DIR}/wasm ${UPLOAD_DIR}/candid
+          cp src/factory/src/token.wasm ${UPLOAD_DIR}/wasm
+          cp src/candid/token-factory.did src/candid/token.did ${UPLOAD_DIR}/candid/
+          cp target/wasm32-unknown-unknown/release/factory-opt.wasm ${UPLOAD_DIR}/wasm/token-factory.wasm
 
       - id: "auth"
         uses: "google-github-actions/auth@v0"
