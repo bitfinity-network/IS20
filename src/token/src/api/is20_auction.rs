@@ -206,8 +206,8 @@ fn perform_auction(bidding_state: &mut BiddingState) -> Result<AuctionInfo, Auct
         tokens_distributed: transferred_amount,
         cycles_collected: total_cycles,
         fee_ratio: bidding_state.fee_ratio,
-        first_transaction_id: Nat::from(first_id),
-        last_transaction_id: Nat::from(last_id),
+        first_transaction_id: first_id,
+        last_transaction_id: last_id,
     };
 
     auction_history.0.push(result.clone());
