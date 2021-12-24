@@ -59,6 +59,10 @@ impl State {
         &mut self.ledger
     }
 
+    pub fn notifications(&self) -> &PendingNotifications {
+        &self.notifications
+    }
+
     pub fn notifications_mut(&mut self) -> &mut PendingNotifications {
         &mut self.notifications
     }
