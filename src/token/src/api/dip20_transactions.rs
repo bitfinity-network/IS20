@@ -211,7 +211,7 @@ mod tests {
     use super::*;
     use crate::api::dip20_meta::{get_metadata, get_transaction, history_size, set_fee};
     use crate::api::get_user_approvals;
-    use crate::tests::init_context;
+    use crate::tests::{canister_init_with_fee, init_context};
     use crate::types::{Operation, TransactionStatus};
     use common::types::Metadata;
     use ic_kit::mock_principals::{alice, bob, john};
@@ -232,17 +232,7 @@ mod tests {
     #[test]
     fn transfer_with_fee() {
         MockContext::new().with_caller(alice()).inject();
-
-        crate::api::init(Metadata {
-            logo: "".to_string(),
-            name: "".to_string(),
-            symbol: "".to_string(),
-            decimals: 8,
-            totalSupply: Nat::from(1000),
-            owner: alice(),
-            fee: Nat::from(100),
-            feeTo: john(),
-        });
+        canister_init_with_fee();
 
         assert!(transfer(bob(), Nat::from(200)).is_ok());
         assert_eq!(balance_of(bob()), Nat::from(100));
