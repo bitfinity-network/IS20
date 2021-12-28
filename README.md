@@ -7,7 +7,7 @@ IS20 is an Internet Computer token standard proposed by Infinity Swap.
 You can find the standard spec at [spec/IS20.md](spec/IS20.md) and the default implementation in the `src` directory.
 
 This repository contains two canisters:
-* `factory` is responsible for creating and deploying new token canisters
+* `factory` is responsible for creating and deploying  new token canisters
 * `token` is the default implementation of the IS20 token
 
 # Usage
