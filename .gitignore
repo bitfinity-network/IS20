@@ -5,4 +5,5 @@
 Cargo.lock
 token.did
 factory.did
+token-factory.did
 token.wasm
