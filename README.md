@@ -2,7 +2,7 @@
 
 # IS20 - Introduction
 
-IS20 is an Internet Computer token standard proposed by Infinity Swap.
+IS20 is an Internet Computer token standard built by Infinity Swap.
 
 You can find the standard spec at [spec/IS20.md](spec/IS20.md) and the default implementation in the `src` directory.
 
