@@ -11,25 +11,27 @@ use std::collections::HashMap;
 
 #[update(name = "transfer")]
 #[candid_method(update)]
-pub fn transfer(to: Principal, value: Nat) -> TxReceipt {
+pub fn transfer(to: Principal, value: Nat, fee_limit: Option<Nat>) -> TxReceipt {
     let from = ic::caller();
     let state = State::get();
     let mut state = state.borrow_mut();
     let stats = state.stats();
     let fee = stats.fee.clone();
+    if let Some(fee_limit) = fee_limit {
+        if fee > fee_limit {
+            return Err(TxError::FeeExceededLimit);
+        }
+    }
+
     let bidding_state = BiddingState::get();
     let fee_ratio = bidding_state.borrow().fee_ratio;
 
-    if value <= fee {
-        return Err(TxError::AmountTooSmall);
-    }
-
-    if balance_of(from) < value {
+    if balance_of(from) < value.clone() + fee.clone() {
         return Err(TxError::InsufficientBalance);
     }
 
     _charge_fee(from, stats.fee_to, fee.clone(), fee_ratio);
-    _transfer(from, to, value.clone() - fee.clone());
+    _transfer(from, to, value.clone());
 
     let id = state.ledger_mut().transfer(from, to, value, fee);
     Ok(id)
@@ -47,29 +49,26 @@ pub fn transfer_from(from: Principal, to: Principal, value: Nat) -> TxReceipt {
     let bidding_state = BiddingState::get();
     let fee_ratio = bidding_state.borrow().fee_ratio;
 
-    if value < fee {
-        return Err(TxError::AmountTooSmall);
-    }
-
-    if from_allowance < value {
+    let value_with_fee = value.clone() + fee.clone();
+    if from_allowance < value_with_fee {
         return Err(TxError::InsufficientAllowance);
     }
 
     let from_balance = balance_of(from);
-    if from_balance < value {
+    if from_balance < value_with_fee {
         return Err(TxError::InsufficientBalance);
     }
 
     _charge_fee(from, stats.fee_to, fee.clone(), fee_ratio);
-    _transfer(from, to, value.clone() - fee.clone());
+    _transfer(from, to, value.clone());
 
     let allowances = state.allowances_mut();
     match allowances.get(&from) {
         Some(inner) => {
             let result = inner.get(&owner).unwrap().clone();
             let mut temp = inner.clone();
-            if result.clone() - value.clone() != 0 {
-                temp.insert(owner, result - value.clone());
+            if result.clone() - value_with_fee.clone() != 0 {
+                temp.insert(owner, result - value_with_fee);
                 allowances.insert(from, temp);
             } else {
                 temp.remove(&owner);
@@ -195,7 +194,7 @@ pub fn _transfer(from: Principal, to: Principal, value: Nat) {
     }
 }
 
-fn _charge_fee(user: Principal, fee_to: Principal, fee: Nat, fee_ratio: f64) {
+pub fn _charge_fee(user: Principal, fee_to: Principal, fee: Nat, fee_ratio: f64) {
     if fee > 0u32 {
         const INT_CONVERSION_K: u64 = 1_000_000_000_000;
         let auction_fee_amount =
@@ -211,7 +210,7 @@ mod tests {
     use super::*;
     use crate::api::dip20_meta::{get_metadata, get_transaction, history_size, set_fee};
     use crate::api::get_user_approvals;
-    use crate::tests::init_context;
+    use crate::tests::{init_context, init_with_fee};
     use crate::types::{Operation, TransactionStatus};
     use common::types::Metadata;
     use ic_kit::mock_principals::{alice, bob, john};
@@ -224,7 +223,7 @@ mod tests {
         init_context();
         assert_eq!(Nat::from(1000), balance_of(alice()));
 
-        assert!(transfer(bob(), Nat::from(100)).is_ok());
+        assert!(transfer(bob(), Nat::from(100), None).is_ok());
         assert_eq!(balance_of(bob()), Nat::from(100));
         assert_eq!(balance_of(alice()), Nat::from(900));
     }
@@ -232,22 +231,24 @@ mod tests {
     #[test]
     fn transfer_with_fee() {
         MockContext::new().with_caller(alice()).inject();
+        init_with_fee();
 
-        crate::api::init(Metadata {
-            logo: "".to_string(),
-            name: "".to_string(),
-            symbol: "".to_string(),
-            decimals: 8,
-            totalSupply: Nat::from(1000),
-            owner: alice(),
-            fee: Nat::from(100),
-            feeTo: john(),
-        });
-
-        assert!(transfer(bob(), Nat::from(200)).is_ok());
-        assert_eq!(balance_of(bob()), Nat::from(100));
-        assert_eq!(balance_of(alice()), Nat::from(800));
+        assert!(transfer(bob(), Nat::from(200), None).is_ok());
+        assert_eq!(balance_of(bob()), Nat::from(200));
+        assert_eq!(balance_of(alice()), Nat::from(700));
         assert_eq!(balance_of(john()), Nat::from(100));
+    }
+
+    #[test]
+    fn transfer_fee_exceeded() {
+        MockContext::new().with_caller(alice()).inject();
+        init_with_fee();
+
+        assert!(transfer(bob(), Nat::from(200), Some(Nat::from(100))).is_ok());
+        assert_eq!(
+            transfer(bob(), Nat::from(200), Some(Nat::from(50))),
+            Err(TxError::FeeExceededLimit)
+        );
     }
 
     #[test]
@@ -267,9 +268,9 @@ mod tests {
 
         let bidding_state = BiddingState::get();
         bidding_state.borrow_mut().fee_ratio = 0.5;
-        transfer(bob(), Nat::from(100)).unwrap();
-        assert_eq!(balance_of(bob()), Nat::from(50));
-        assert_eq!(balance_of(alice()), Nat::from(900));
+        transfer(bob(), Nat::from(100), None).unwrap();
+        assert_eq!(balance_of(bob()), Nat::from(100));
+        assert_eq!(balance_of(alice()), Nat::from(850));
         assert_eq!(balance_of(john()), Nat::from(25));
         assert_eq!(balance_of(auction_principal()), Nat::from(25));
     }
@@ -278,7 +279,20 @@ mod tests {
     fn transfer_insufficient_balance() {
         init_context();
         assert_eq!(
-            transfer(bob(), Nat::from(1001)),
+            transfer(bob(), Nat::from(1001), None),
+            Err(TxError::InsufficientBalance)
+        );
+        assert_eq!(balance_of(alice()), Nat::from(1000));
+        assert_eq!(balance_of(bob()), Nat::from(0));
+    }
+
+    #[test]
+    fn transfer_with_fee_insufficient_balance() {
+        MockContext::new().with_caller(alice()).inject();
+        init_with_fee();
+
+        assert_eq!(
+            transfer(bob(), Nat::from(950), None),
             Err(TxError::InsufficientBalance)
         );
         assert_eq!(balance_of(alice()), Nat::from(1000));
@@ -290,7 +304,7 @@ mod tests {
         let context = init_context();
         context.update_caller(bob());
         assert_eq!(
-            transfer(bob(), Nat::from(100)),
+            transfer(bob(), Nat::from(100), None),
             Err(TxError::InsufficientBalance)
         );
         assert_eq!(balance_of(alice()), Nat::from(1000));
@@ -302,13 +316,13 @@ mod tests {
         init_context();
         set_fee(Nat::from(10));
 
-        transfer(bob(), Nat::from(1001)).unwrap_err();
+        transfer(bob(), Nat::from(1001), None).unwrap_err();
         assert_eq!(history_size(), 1);
 
         const COUNT: usize = 5;
         let mut ts = ic::time().into();
         for i in 0..COUNT {
-            let id = transfer(bob(), Nat::from(100 + i)).unwrap();
+            let id = transfer(bob(), Nat::from(100 + i), None).unwrap();
             assert_eq!(history_size(), 2 + i);
             let tx = get_transaction(id);
             assert_eq!(tx.amount, Nat::from(100 + i));
@@ -545,8 +559,8 @@ mod tests {
 
         assert!(transfer_from(alice(), john(), Nat::from(300)).is_ok());
         assert_eq!(balance_of(bob()), Nat::from(200));
-        assert_eq!(balance_of(alice()), Nat::from(600));
-        assert_eq!(balance_of(john()), Nat::from(200));
+        assert_eq!(balance_of(alice()), Nat::from(500));
+        assert_eq!(balance_of(john()), Nat::from(300));
     }
 
     #[test]

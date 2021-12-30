@@ -57,6 +57,7 @@ pub enum TxError {
     InsufficientAllowance,
     Unauthorized,
     AmountTooSmall,
+    FeeExceededLimit,
 }
 pub type TxReceipt = Result<Nat, TxError>;
 
