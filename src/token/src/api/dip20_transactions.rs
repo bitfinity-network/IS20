@@ -32,6 +32,7 @@ pub fn transfer(to: Principal, value: Nat) -> TxReceipt {
     _transfer(from, to, value.clone() - fee.clone());
 
     let id = state.ledger_mut().transfer(from, to, value, fee);
+    state.notifications_mut().insert(id.clone());
     Ok(id)
 }
 

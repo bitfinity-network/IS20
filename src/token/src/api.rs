@@ -13,6 +13,7 @@ mod dip20_transactions;
 mod inspect;
 pub mod is20_auction;
 mod is20_management;
+mod is20_notify;
 
 // 10T cycles is an equivalent of approximately $10. This should be enough to last the canister
 // for the default auction cycle, which is 1 day.
