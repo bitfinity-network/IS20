@@ -221,7 +221,7 @@ mod tests {
         init_context();
         const COUNT: usize = 5;
         for _ in 0..COUNT {
-            transfer(bob(), Nat::from(10)).unwrap();
+            transfer(bob(), Nat::from(10), None).unwrap();
         }
 
         let txs = get_transactions(Nat::from(0), Nat::from(2));
