@@ -60,6 +60,7 @@ pub enum TxError {
     NotificationFailed,
     AlreadyNotified,
     TransactionDoesNotExist,
+    FeeExceededLimit,
 }
 
 pub type TxReceipt = Result<Nat, TxError>;
