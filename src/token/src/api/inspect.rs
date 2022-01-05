@@ -1,4 +1,5 @@
 use crate::state::{Balances, BiddingState, State};
+use candid::Nat;
 use ic_cdk_macros::inspect_message;
 use ic_storage::IcStorage;
 
@@ -36,7 +37,7 @@ static OWNER_METHODS: [&str; 8] = [
     "setOwner",
 ];
 
-static TRANSACTION_METHODS: [&str; 3] = ["approve", "burn", "transfer"];
+static TRANSACTION_METHODS: [&str; 4] = ["approve", "burn", "transfer", "transferAndNotify"];
 
 /// This function checks if the canister should accept ingress message or not. We allow query
 /// calls for anyone, but update calls have different checks to see, if it's reasonable to spend
@@ -71,6 +72,18 @@ fn inspect_message() {
                 ic_cdk::api::call::accept_message();
             } else {
                 ic_cdk::println!("Transaction method is called not by a stakeholder. Rejecting.");
+            }
+        }
+        "notify" => {
+            // This method can only be called if the notification id is in the pending notifications
+            // list.
+            let notifications = state.notifications();
+            let (tx_id,) = ic_cdk::api::call::arg_data::<(Nat,)>();
+
+            if notifications.contains(&tx_id) {
+                ic_cdk::api::call::accept_message();
+            } else {
+                ic_cdk::println!("No pending notification with the given id. Rejecting.");
             }
         }
         "runAuction" => {
