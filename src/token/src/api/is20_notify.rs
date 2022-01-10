@@ -32,7 +32,7 @@ async fn notify(transaction_id: Nat) -> TxReceipt {
         // We remove the notification here to prevent a concurrent call from being able to send the
         // notification again (while this call is await'ing). If the notification fails, we add the id
         // backed into the pending notifications list.
-        if !state.notifications_mut().remove(&transaction_id) {
+        if !state.notifications.remove(&transaction_id) {
             return Err(TxError::AlreadyNotified);
         }
 
@@ -40,10 +40,7 @@ async fn notify(transaction_id: Nat) -> TxReceipt {
     };
 
     if send_notification(&tx).await.is_err() {
-        state
-            .borrow_mut()
-            .notifications_mut()
-            .insert(transaction_id);
+        state.borrow_mut().notifications.insert(transaction_id);
         return Err(TxError::NotificationFailed);
     }
 
