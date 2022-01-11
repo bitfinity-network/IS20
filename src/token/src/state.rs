@@ -10,7 +10,7 @@ pub struct State {
     allowances: Allowances,
     ledger: Ledger,
     auction_history: AuctionHistory,
-    notifications: PendingNotifications,
+    pub notifications: PendingNotifications,
 }
 
 #[derive(Default, IcStorage, CandidType, Deserialize)]
@@ -65,9 +65,5 @@ impl State {
 
     pub fn ledger_mut(&mut self) -> &mut Ledger {
         &mut self.ledger
-    }
-
-    pub fn notifications_mut(&mut self) -> &mut PendingNotifications {
-        &mut self.notifications
     }
 }

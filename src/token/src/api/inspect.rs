@@ -1,8 +1,9 @@
 use crate::state::{Balances, BiddingState, State};
+use candid::{Nat, Principal};
 use ic_cdk_macros::inspect_message;
 use ic_storage::IcStorage;
 
-static PUBLIC_METHODS: [&str; 20] = [
+static PUBLIC_METHODS: &[&str] = &[
     "allowance",
     "auctionInfo",
     "balanceOf",
@@ -25,7 +26,7 @@ static PUBLIC_METHODS: [&str; 20] = [
     "totalSupply",
 ];
 
-static OWNER_METHODS: [&str; 8] = [
+static OWNER_METHODS: &[&str] = &[
     "mint",
     "setAuctionPeriod",
     "setFee",
@@ -36,7 +37,13 @@ static OWNER_METHODS: [&str; 8] = [
     "setOwner",
 ];
 
-static TRANSACTION_METHODS: [&str; 3] = ["approve", "burn", "transfer"];
+static TRANSACTION_METHODS: &[&str] = &[
+    "approve",
+    "burn",
+    "transfer",
+    "transferAndNotify",
+    "transferIncludeFee",
+];
 
 /// This function checks if the canister should accept ingress message or not. We allow query
 /// calls for anyone, but update calls have different checks to see, if it's reasonable to spend
@@ -71,6 +78,36 @@ fn inspect_message() {
                 ic_cdk::api::call::accept_message();
             } else {
                 ic_cdk::println!("Transaction method is called not by a stakeholder. Rejecting.");
+            }
+        }
+        "transferFrom" => {
+            // Check if the caller has allowance for this transfer.
+            let allowances = state.allowances();
+            let (from, _, value) = ic_cdk::api::call::arg_data::<(Principal, Principal, Nat)>();
+            if let Some(user_allowances) = allowances.get(&caller) {
+                if let Some(allowance) = user_allowances.get(&from) {
+                    if value <= *allowance {
+                        ic_cdk::api::call::accept_message();
+                    } else {
+                        ic_cdk::println!("Allowance amount is less then the requested transfer amount. Rejecting.");
+                    }
+                } else {
+                    ic_cdk::println!("Caller is not allowed to transfer tokens for the requested principal. Rejecting.");
+                }
+            } else {
+                ic_cdk::println!("Caller is not allowed to transfer tokens for the requested principal. Rejecting.");
+            }
+        }
+        "notify" => {
+            // This method can only be called if the notification id is in the pending notifications
+            // list.
+            let notifications = &state.notifications;
+            let (tx_id,) = ic_cdk::api::call::arg_data::<(Nat,)>();
+
+            if notifications.contains(&tx_id) {
+                ic_cdk::api::call::accept_message();
+            } else {
+                ic_cdk::println!("No pending notification with the given id. Rejecting.");
             }
         }
         "runAuction" => {
