@@ -30,13 +30,19 @@ jobs:
           token: ${{ secrets.PAT_TOKEN }}
 
       - name: setup config for dev net
+        env:
+          DEVNET_IP: ${{ secrets.DEVNET_IP }}
         run: |
           echo "UPLOAD_DIR=devnet" >> $GITHUB_ENV
+          echo "SERVER_IP=$DEVNET_IP" >> $GITHUB_ENV
         if: ${{ endsWith(github.ref_name, '-dev') }}
 
       - name: setup config for test net
+        env:
+          TESTNET_IP: ${{ secrets.TESTNET_IP }}
         run: |
           echo "UPLOAD_DIR=testnet" >> $GITHUB_ENV
+          echo "SERVER_IP=$TESTNET_IP" >> $GITHUB_ENV
         if: ${{ endsWith(github.ref_name, '-test') }}
 
       - name: Build canisters and candid files
@@ -57,3 +63,11 @@ jobs:
         with:
           path: ${{ env.UPLOAD_DIR }}
           destination: ${{ secrets.NET_BUCKET_NAME }}
+
+      - uses: webfactory/ssh-agent@v0.5.4
+        with:
+          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+
+      - name: restart dfx server
+        run: |
+          ansible-playbook /ansible/restart.yaml -i /ansible/inventory.yaml -l "${SERVER_IP}"
