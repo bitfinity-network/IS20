@@ -20,6 +20,12 @@ sh -ci "$(curl -fsSL https://sdk.dfinity.org/install.sh)"
 dfx start --background
 ```
 
+To build the canister you will also need the `ic_cdk_optimizer` tool:
+
+```
+cargo install ic-cdk-optimizer
+```
+
 Then deploy the factory:
 
 ```shell
