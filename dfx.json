@@ -1,6 +1,6 @@
 {
   "canisters": {
-    "factory": {
+    "token_factory": {
       "build": "bash scripts/build.sh",
       "candid": "src/candid/token-factory.did",
       "wasm": "target/wasm32-unknown-unknown/release/factory-opt.wasm",

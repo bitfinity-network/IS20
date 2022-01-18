@@ -1,0 +1,49 @@
+name: Upgrade
+
+on:
+  push:
+    tags:
+      - "v**-test-upgrade"
+      - "v**-dev-upgrade"
+
+env:
+  CONTROLLER_IDENTITY: ${{ secrets.CONTROLLER_IDENTITY }}
+
+jobs:
+  upgrade:
+    runs-on: ubuntu-latest
+    container:
+      image: us-central1-docker.pkg.dev/dfx-server/dfx-containers/ci
+      credentials:
+        username: _json_key
+        password: ${{ secrets.GCP_DOCKER_KEY }}
+
+    steps:
+      - name: Checkout repository and submodules
+        uses: actions/checkout@v2
+        with:
+          submodules: recursive
+          token: ${{ secrets.PAT_TOKEN }}
+
+      - name: setup config for dev net
+        run: |
+          echo "NETWORK=devnet" >> $GITHUB_ENV
+        if: ${{ endsWith(github.ref_name, '-dev-upgrade') }}
+
+      - name: setup config for test net
+        run: |
+          echo "NETWORK=testnet" >> $GITHUB_ENV
+        if: ${{ endsWith(github.ref_name, '-test-upgrade') }}
+
+      - name: Uprade factory canisters
+        run: |
+          mkdir -p $HOME/.config/dfx/identity/max
+          mkdir -p .dfx/https___${NETWORK}_infinityswap_one
+          echo "${CONTROLLER_IDENTITY}" > $HOME/.config/dfx/identity/max/identity.pem
+          export CANISTER=$(curl -s https://${NETWORK}.infinityswap.one/canister_id/token_factory)
+          dfx identity --network https://${NETWORK}.infinityswap.one use max
+          export WALLET=$(curl -s https://${NETWORK}.infinityswap.one/wallet)
+          echo "{\"token_factory\":{\"https___${NETWORK}_infinityswap_one\": \"${CANISTER}\"}}" > .dfx/https___${NETWORK}_infinityswap_one/canister_ids.json
+          dfx identity --network https://${NETWORK}.infinityswap.one set-wallet ${WALLET}
+          dfx deploy --network https://${NETWORK}.infinityswap.one token_factory
+          dfx canister --network https://${NETWORK}.infinityswap.one call token_factory upgrade
