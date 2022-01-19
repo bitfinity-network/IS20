@@ -1,6 +1,15 @@
-use serde::{Deserialize, Serialize};
+use canisters::factory::Factory;
+use ic_cdk::export::candid::CandidType;
+use ic_storage::IcStorage;
+use serde::Deserialize;
 
-ic_helpers::init_state!(State, String, Settings, "token.wasm");
+#[derive(CandidType, Deserialize, IcStorage, Default)]
+pub struct State {
+    pub factory: Factory<String>,
+}
 
-#[derive(Clone, Serialize, Deserialize, Default)]
-pub struct Settings;
+pub fn get_token_bytecode() -> &'static [u8] {
+    include_bytes!("token.wasm")
+}
+
+canisters::impl_factory_state_management!(State, get_token_bytecode());
