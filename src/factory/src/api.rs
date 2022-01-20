@@ -8,7 +8,7 @@ use common::types::Metadata;
 use ic_cdk_macros::*;
 use ic_storage::IcStorage;
 
-canisters::init_factory_api!(State, crate::state::get_token_bytecode());
+ic_helpers::init_factory_api!(State, crate::state::get_token_bytecode());
 
 /// Returns the token, or None if it does not exist.
 #[query(name = "get_token")]
