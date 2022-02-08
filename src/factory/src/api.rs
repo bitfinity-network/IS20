@@ -3,12 +3,21 @@
 //! Stability  : Experimental
 
 use crate::state::{get_token_bytecode, State};
-use candid::{candid_method, Principal};
+use candid::{candid_method, Principal, Nat};
 use common::types::Metadata;
 use ic_cdk_macros::*;
 use ic_storage::IcStorage;
+use ic_helpers::factory::error::FactoryError;
+use ic_helpers::factory::FactoryState;
+use crate::error::TokenFactoryError;
 
 ic_helpers::init_factory_api!(State, crate::state::get_token_bytecode());
+
+#[init]
+#[candid_method(init)]
+fn init(controller: Principal, ledger_principal: Option<Principal>) {
+    State::new(controller, ledger_principal).reset();
+}
 
 /// Returns the token, or None if it does not exist.
 #[query(name = "get_token")]
@@ -18,29 +27,61 @@ async fn get_token(name: String) -> Option<Principal> {
 }
 
 /// Creates a new token.
+///
+/// Creating a token canister with the factory requires one of the following:
+/// * the call must be made through a cycles wallet with enough cycles to cover the canister
+///   expenses. The amount of provided cycles must be greater than `10^12`. Most of the cycles
+///   will be added to the newly created canister balance, while some will be consumed by the
+///   factory
+/// * the caller must transfer some amount of ICP to their subaccount in ICP ledger factory account.
+///   The subaccount id can be calculated like this:
+///
+/// ```ignore
+/// let mut subaccount = [0u8; 32];
+/// let principal_id = caller_id.as_slice();
+/// subaccount[0] = principal_id.len().try_into().unwrap();
+/// subaccount[1..1 + principal_id.len()].copy_from_slice(principal_id);
+/// ```
+///
+/// The amount of provided ICP must be greater than the `icp_fee` factory property. This value
+/// can be obtained by the `get_icp_fee` query method. The ICP fees are transferred to
+/// principal, designated by the factory controller. The canister is created than with some
+/// minimum amount of cycles.
+///
+/// If the provided ICP amount is greater than required by the factory, extra ICP will not be
+/// consumed and can be used to create more canisters, or can be reclaimed by calling `refund_icp`
+/// method.
 #[update(name = "create_token")]
 #[candid_method(update, rename = "create_token")]
-pub async fn create_token(info: Metadata) -> Option<Principal> {
-    if info.name.is_empty() || info.symbol.is_empty() {
-        return None;
+pub async fn create_token(info: Metadata, owner: Option<Principal>) -> Result<Principal, TokenFactoryError> {
+    if info.name.is_empty() {
+        return Err(TokenFactoryError::InvalidConfiguration("name", "cannot be `None`"));
+    }
+
+    if info.symbol.is_empty() {
+        return Err(TokenFactoryError::InvalidConfiguration("symbol", "cannot be `None`"));
     }
 
     let state = State::get();
     let key = info.name.clone();
 
+    let caller = owner.unwrap_or_else(ic_cdk::api::caller);
+    let actor = state.borrow().consume_provided_cycles_or_icp(caller);
+    let cycles = actor.await?;
+
     let create_token = {
         let state = state.borrow();
         let factory = &state.factory;
-        if let Some(existing) = factory.get(&key) {
-            return Some(existing);
+        if factory.get(&key).is_some() {
+            return Err(TokenFactoryError::AlreadyExists);
         }
 
-        factory.create(get_token_bytecode(), (info,))
+        factory.create_with_cycles(get_token_bytecode(), (info,), cycles)
     };
 
-    let canister = create_token.await.ok()?;
+    let canister = create_token.await.map_err(|e| TokenFactoryError::CanisterCreateFailed(e.1))?;
     let principal = canister.identity();
     state.borrow_mut().factory.register(key, canister);
 
-    Some(principal)
+    Ok(principal)
 }
