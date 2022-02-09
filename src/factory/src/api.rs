@@ -65,19 +65,15 @@ pub async fn create_token(info: Metadata, owner: Option<Principal>) -> Result<Pr
     let state = State::get();
     let key = info.name.clone();
 
+    if state.borrow().factory.get(&key).is_some() {
+        return Err(TokenFactoryError::AlreadyExists);
+    }
+
     let caller = owner.unwrap_or_else(ic_cdk::api::caller);
     let actor = state.borrow().consume_provided_cycles_or_icp(caller);
     let cycles = actor.await?;
 
-    let create_token = {
-        let state = state.borrow();
-        let factory = &state.factory;
-        if factory.get(&key).is_some() {
-            return Err(TokenFactoryError::AlreadyExists);
-        }
-
-        factory.create_with_cycles(get_token_bytecode(), (info,), cycles)
-    };
+    let create_token = state.borrow().factory.create_with_cycles(get_token_bytecode(), (info,), cycles);
 
     let canister = create_token.await.map_err(|e| TokenFactoryError::CanisterCreateFailed(e.1))?;
     let principal = canister.identity();
