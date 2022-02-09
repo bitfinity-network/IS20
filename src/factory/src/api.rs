@@ -33,7 +33,7 @@ async fn get_token(name: String) -> Option<Principal> {
 ///   expenses. The amount of provided cycles must be greater than `10^12`. Most of the cycles
 ///   will be added to the newly created canister balance, while some will be consumed by the
 ///   factory
-/// * the caller must transfer some amount of ICP to their subaccount in ICP ledger factory account.
+/// * the caller must transfer some amount of ICP to their subaccount into the ICP ledger factory account.
 ///   The subaccount id can be calculated like this:
 ///
 /// ```ignore
@@ -44,8 +44,8 @@ async fn get_token(name: String) -> Option<Principal> {
 /// ```
 ///
 /// The amount of provided ICP must be greater than the `icp_fee` factory property. This value
-/// can be obtained by the `get_icp_fee` query method. The ICP fees are transferred to
-/// principal, designated by the factory controller. The canister is created than with some
+/// can be obtained by the `get_icp_fee` query method. The ICP fees are transferred to the
+/// principal designated by the factory controller. The canister is then created with some
 /// minimum amount of cycles.
 ///
 /// If the provided ICP amount is greater than required by the factory, extra ICP will not be
