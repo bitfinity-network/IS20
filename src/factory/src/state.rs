@@ -17,10 +17,18 @@ pub struct State {
 
 impl State {
     pub fn new(controller: Principal, ledger_principal: Option<Principal>) -> Self {
-        let ledger = ledger_principal.unwrap_or_else(|| Principal::from_text(DEFAULT_LEDGER_PRINCIPAL).expect("Const principal value, never fails."));
+        let ledger = ledger_principal.unwrap_or_else(|| {
+            Principal::from_text(DEFAULT_LEDGER_PRINCIPAL)
+                .expect("Const principal value, never fails.")
+        });
         Self {
             factory: Default::default(),
-            configuration: FactoryConfiguration::new(ledger, DEFAULT_ICP_FEE, controller, controller),
+            configuration: FactoryConfiguration::new(
+                ledger,
+                DEFAULT_ICP_FEE,
+                controller,
+                controller,
+            ),
         }
     }
 }
@@ -31,7 +39,12 @@ impl Default for State {
         // it does not matter, if the state we create is not valid.
         Self {
             factory: Default::default(),
-            configuration: FactoryConfiguration::new(Principal::anonymous(), 0, Principal::anonymous(), Principal::anonymous()),
+            configuration: FactoryConfiguration::new(
+                Principal::anonymous(),
+                0,
+                Principal::anonymous(),
+                Principal::anonymous(),
+            ),
         }
     }
 }

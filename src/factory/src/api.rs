@@ -2,14 +2,14 @@
 //! Copyright  : 2021 InfinitySwap Team
 //! Stability  : Experimental
 
+use crate::error::TokenFactoryError;
 use crate::state::{get_token_bytecode, State};
-use candid::{candid_method, Principal, Nat};
+use candid::{candid_method, Nat, Principal};
 use common::types::Metadata;
 use ic_cdk_macros::*;
-use ic_storage::IcStorage;
 use ic_helpers::factory::error::FactoryError;
 use ic_helpers::factory::FactoryState;
-use crate::error::TokenFactoryError;
+use ic_storage::IcStorage;
 
 ic_helpers::init_factory_api!(State, crate::state::get_token_bytecode());
 
@@ -53,13 +53,22 @@ async fn get_token(name: String) -> Option<Principal> {
 /// method.
 #[update(name = "create_token")]
 #[candid_method(update, rename = "create_token")]
-pub async fn create_token(info: Metadata, owner: Option<Principal>) -> Result<Principal, TokenFactoryError> {
+pub async fn create_token(
+    info: Metadata,
+    owner: Option<Principal>,
+) -> Result<Principal, TokenFactoryError> {
     if info.name.is_empty() {
-        return Err(TokenFactoryError::InvalidConfiguration("name", "cannot be `None`"));
+        return Err(TokenFactoryError::InvalidConfiguration(
+            "name",
+            "cannot be `None`",
+        ));
     }
 
     if info.symbol.is_empty() {
-        return Err(TokenFactoryError::InvalidConfiguration("symbol", "cannot be `None`"));
+        return Err(TokenFactoryError::InvalidConfiguration(
+            "symbol",
+            "cannot be `None`",
+        ));
     }
 
     let state = State::get();
@@ -73,9 +82,15 @@ pub async fn create_token(info: Metadata, owner: Option<Principal>) -> Result<Pr
     let actor = state.borrow().consume_provided_cycles_or_icp(caller);
     let cycles = actor.await?;
 
-    let create_token = state.borrow().factory.create_with_cycles(get_token_bytecode(), (info,), cycles);
+    let create_token =
+        state
+            .borrow()
+            .factory
+            .create_with_cycles(get_token_bytecode(), (info,), cycles);
 
-    let canister = create_token.await.map_err(|e| TokenFactoryError::CanisterCreateFailed(e.1))?;
+    let canister = create_token
+        .await
+        .map_err(|e| TokenFactoryError::CanisterCreateFailed(e.1))?;
     let principal = canister.identity();
     state.borrow_mut().factory.register(key, canister);
 

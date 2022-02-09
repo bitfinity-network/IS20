@@ -1,6 +1,6 @@
+use candid::CandidType;
 use ic_helpers::factory::error::FactoryError;
 use thiserror::Error;
-use candid::CandidType;
 
 #[derive(Debug, Error, CandidType)]
 pub enum TokenFactoryError {

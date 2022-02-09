@@ -1,5 +1,5 @@
 mod api;
-mod state;
 mod error;
+mod state;
 
 pub use self::api::*;
