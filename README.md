@@ -29,18 +29,29 @@ cargo install ic-cdk-optimizer
 Then deploy the factory:
 
 ```shell
-dfx deploy
-```
-
-After the factory is deployed, you can create a new token using factory api:
-
-```shell
 dfx identity get-principal
 >> y4nw3-upugh-yyv2b-jv6jy-ppfse-4fkfd-uaqv5-woqup-u3cx3-hah2c-yae
 
 // Use the user principal above to set the owner
-dfx canister call factory create_token \
-  'record {
+dfx deploy token_factory --argument '(principal "y4nw3-upugh-yyv2b-jv6jy-ppfse-4fkfd-uaqv5-woqup-u3cx3-hah2c-yae", null)'
+
+>> Creating a wallet canister on the local network.
+>> The wallet canister on the "local" network for user "max" is "yjeau-xiaaa-aaaaa-aabsa-cai"
+>> Deploying: token_factory
+>> Creating canisters...
+>> Creating canister "token_factory"...
+>> "token_factory" canister created with canister id: "yofga-2qaaa-aaaaa-aabsq-cai"
+
+```
+
+Not the wallet ID for the current user (in the example above it's `yjeau-xiaaa-aaaaa-aabsa-cai`). The factory requires
+the caller to provide cycles or ICP to create a token canister. As we don't have an ICP ledger locally, we use cycles.
+The minimum amount of cycles required by the factory to create a canister is `10^12`.
+
+```shell
+// Use the user principal above to set the owner
+dfx canister --wallet yjeau-xiaaa-aaaaa-aabsa-cai call --with-cycles 1000000000000 factory create_token \
+  '(record {
   logo = "";
   name = "y";
   symbol = "y";
@@ -48,9 +59,9 @@ dfx canister call factory create_token \
   totalSupply = 1000000000;
   owner = principal "y4nw3-upugh-yyv2b-jv6jy-ppfse-4fkfd-uaqv5-woqup-u3cx3-hah2c-yae";
   fee = 0;
-  feeTo = principal "y4nw3-upugh-yyv2b-jv6jy-ppfse-4fkfd-uaqv5-woqup-u3cx3-hah2c-yae"; }'
+  feeTo = principal "y4nw3-upugh-yyv2b-jv6jy-ppfse-4fkfd-uaqv5-woqup-u3cx3-hah2c-yae"; }, null)'
 
->> (opt principal "r7inp-6aaaa-aaaaa-aaabq-cai")
+>> (variant { principal "r7inp-6aaaa-aaaaa-aaabq-cai" })
 ```
 
 The returned principal id is the token canister principal. You can use this id to make token calls:

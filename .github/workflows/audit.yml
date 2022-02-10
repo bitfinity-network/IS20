@@ -10,6 +10,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
-      - uses: actions-rs/audit-check@35b7b53b1e25b55642157ac01b4adceb5b9ebef3
+      - uses: actions-rs/toolchain@v1
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}
+          toolchain: stable
+      - uses: actions-rs/cargo@v1
+        with:
+          command: install
+          args: cargo-audit
+      - uses: actions-rs/cargo@v1
+        with:
+          command: audit
+          args: --ignore RUSTSEC-2020-0071 --ignore RUSTSEC-2020-0159
