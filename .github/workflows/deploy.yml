@@ -29,29 +29,25 @@ jobs:
           submodules: recursive
           token: ${{ secrets.PAT_TOKEN }}
 
+      - uses: Swatinem/rust-cache@v1
+
       - name: setup config for dev net
-        env:
-          DEVNET_IP: ${{ secrets.DEVNET_IP }}
         run: |
-          echo "UPLOAD_DIR=devnet" >> $GITHUB_ENV
-          echo "SERVER_IP=$DEVNET_IP" >> $GITHUB_ENV
+          echo "NETWORK=devnet" >> $GITHUB_ENV
         if: ${{ endsWith(github.ref_name, '-dev') }}
 
       - name: setup config for test net
-        env:
-          TESTNET_IP: ${{ secrets.TESTNET_IP }}
         run: |
-          echo "UPLOAD_DIR=testnet" >> $GITHUB_ENV
-          echo "SERVER_IP=$TESTNET_IP" >> $GITHUB_ENV
+          echo "NETWORK=testnet" >> $GITHUB_ENV
         if: ${{ endsWith(github.ref_name, '-test') }}
 
       - name: Build canisters and candid files
         run: |
           bash scripts/build.sh
-          mkdir -p ${UPLOAD_DIR}/wasm ${UPLOAD_DIR}/candid
-          cp src/factory/src/token.wasm ${UPLOAD_DIR}/wasm
-          cp src/candid/token-factory.did src/candid/token.did ${UPLOAD_DIR}/candid/
-          cp target/wasm32-unknown-unknown/release/factory-opt.wasm ${UPLOAD_DIR}/wasm/token-factory.wasm
+          mkdir -p ${NETWORK}/wasm ${NETWORK}/candid
+          cp src/factory/src/token.wasm ${NETWORK}/wasm
+          cp src/candid/token-factory.did src/candid/token.did ${NETWORK}/candid/
+          cp target/wasm32-unknown-unknown/release/factory-opt.wasm ${NETWORK}/wasm/token-factory.wasm
 
       - id: "auth"
         uses: "google-github-actions/auth@v0"
@@ -61,13 +57,11 @@ jobs:
       - id: "upload-folder"
         uses: "google-github-actions/upload-cloud-storage@v0"
         with:
-          path: ${{ env.UPLOAD_DIR }}
+          path: ${{ env.NETWORK }}
           destination: ${{ secrets.NET_BUCKET_NAME }}
 
-      - uses: webfactory/ssh-agent@v0.5.4
-        with:
-          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
-
-      - name: restart dfx server
+      - name: redeploy factory
         run: |
-          ansible-playbook /ansible/restart.yaml -i /ansible/inventory.yaml -l "${SERVER_IP}"
+          bash scripts/redeploy.sh
+        env:
+          CONTROLLER_IDENTITY: ${{ secrets.CONTROLLER_IDENTITY }}

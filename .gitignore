@@ -1,6 +1,7 @@
 /target
 /.dfx
 /.idea
+/.vscode
 
 Cargo.lock
 token.did
