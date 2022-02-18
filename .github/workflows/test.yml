@@ -37,6 +37,8 @@ jobs:
           submodules: recursive
           token: ${{ secrets.PAT_TOKEN }}
 
+      - uses: Swatinem/rust-cache@v1
+
       - name: Checking format
         run: |
           cargo fmt -- --check

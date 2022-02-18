@@ -5,11 +5,25 @@
       "candid": "src/candid/token-factory.did",
       "wasm": "target/wasm32-unknown-unknown/release/factory-opt.wasm",
       "type": "custom"
+    },
+    "token": {
+      "build": "bash scripts/build.sh",
+      "candid": "src/candid/token.did",
+      "wasm": "src/factory/src/token.wasm",
+      "type": "custom"
     }
   },
   "networks": {
     "local": {
       "bind": "127.0.0.1:8000",
+      "type": "ephemeral"
+    },
+    "testnet": {
+      "bind": "34.67.183.52:8000",
+      "type": "ephemeral"
+    },
+    "devnet": {
+      "bind": "35.192.168.238:8000",
       "type": "ephemeral"
     }
   },
