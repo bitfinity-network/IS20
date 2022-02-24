@@ -5,6 +5,7 @@ use crate::types::{AuctionInfo, TokenInfo, TxError, TxReceipt, TxRecord};
 #[cfg(not(any(target_arch = "wasm32", test)))]
 use candid::{Nat, Principal};
 
+#[cfg(feature = "api")]
 mod api;
 mod ledger;
 mod state;
