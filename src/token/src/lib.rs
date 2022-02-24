@@ -1,7 +1,9 @@
+#[cfg(feature = "api")]
 mod api;
-mod ledger;
-mod state;
+
+pub mod ledger;
+pub mod state;
 #[cfg(test)]
 mod tests;
 pub mod types;
-mod utils;
+pub mod utils;
