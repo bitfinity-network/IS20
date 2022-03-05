@@ -11,3 +11,12 @@ pub fn check_caller_is_owner() -> Result<(), TxError> {
         Ok(())
     }
 }
+
+pub fn check_is_test_token() -> Result<(), TxError> {
+    let state = State::get();
+    if !state.borrow().stats().is_test_token {
+        Err(TxError::Unauthorized)
+    } else {
+        Ok(())
+    }
+}

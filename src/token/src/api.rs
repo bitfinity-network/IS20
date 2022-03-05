@@ -36,6 +36,7 @@ pub fn init(info: Metadata) {
         owner,
         fee,
         feeTo: fee_to,
+        isTestToken: is_test_token,
     } = info;
     let state = State::get();
     let mut state = state.borrow_mut();
@@ -51,6 +52,11 @@ pub fn init(info: Metadata) {
     stats.fee_to = fee_to;
     stats.deploy_time = ic::time();
     stats.min_cycles = DEFAULT_MIN_CYCLES;
+
+    match is_test_token {
+        Some(flag) => stats.is_test_token = flag,
+        _ => stats.is_test_token = false,
+    };
 
     let bidding_state = BiddingState::get();
     bidding_state.borrow_mut().auction_period = DEFAULT_AUCTION_PERIOD;

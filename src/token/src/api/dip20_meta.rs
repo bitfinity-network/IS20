@@ -80,6 +80,7 @@ pub fn get_metadata() -> Metadata {
         owner: s.owner,
         fee: s.fee.clone(),
         feeTo: s.fee_to,
+        isTestToken: None,
     }
 }
 

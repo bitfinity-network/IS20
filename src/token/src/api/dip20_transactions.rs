@@ -2,7 +2,7 @@ use crate::api::dip20_meta::{allowance, balance_of};
 use crate::api::is20_auction::auction_principal;
 use crate::state::{Balances, BiddingState, State};
 use crate::types::{TxError, TxReceipt};
-use crate::utils::check_caller_is_owner;
+use crate::utils::{check_caller_is_owner, check_is_test_token};
 use candid::{candid_method, Nat};
 use ic_cdk_macros::*;
 use ic_kit::{ic, Principal};
@@ -139,7 +139,9 @@ pub fn approve(spender: Principal, value: Nat) -> TxReceipt {
 #[update(name = "mint")]
 #[candid_method(update, rename = "mint")]
 pub fn mint(to: Principal, amount: Nat) -> TxReceipt {
-    check_caller_is_owner()?;
+    if check_caller_is_owner().is_err() {
+        check_is_test_token()?
+    }
 
     let caller = ic::caller();
     let state = State::get();
@@ -211,7 +213,7 @@ mod tests {
     use super::*;
     use crate::api::dip20_meta::{get_metadata, get_transaction, history_size, set_fee};
     use crate::api::get_user_approvals;
-    use crate::tests::{init_context, init_with_fee};
+    use crate::tests::{init_as_test_token, init_context, init_with_fee};
     use crate::types::{Operation, TransactionStatus};
     use common::types::Metadata;
     use ic_kit::mock_principals::{alice, bob, john};
@@ -265,6 +267,7 @@ mod tests {
             owner: alice(),
             fee: Nat::from(50),
             feeTo: john(),
+            isTestToken: None,
         });
 
         let bidding_state = BiddingState::get();
@@ -336,6 +339,21 @@ mod tests {
             assert!(ts < tx.timestamp);
             ts = tx.timestamp;
         }
+    }
+
+    #[test]
+    fn mint_test_token() {
+        let context = init_context();
+        context.update_caller(bob());
+        assert_eq!(mint(alice(), Nat::from(100)), Err(TxError::Unauthorized));
+
+        init_as_test_token();
+        context.update_caller(bob());
+
+        assert!(mint(alice(), Nat::from(2000)).is_ok());
+        assert!(mint(bob(), Nat::from(5000)).is_ok());
+        assert_eq!(balance_of(alice()), Nat::from(3000));
+        assert_eq!(balance_of(bob()), Nat::from(5000));
     }
 
     #[test]
@@ -553,6 +571,7 @@ mod tests {
             owner: alice(),
             fee: Nat::from(100),
             feeTo: bob(),
+            isTestToken: None,
         });
         assert!(approve(bob(), Nat::from(1500)).is_ok());
         assert_eq!(balance_of(bob()), Nat::from(100));

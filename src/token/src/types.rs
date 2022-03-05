@@ -19,6 +19,7 @@ pub struct StatsData {
     pub fee_to: Principal,
     pub deploy_time: u64,
     pub min_cycles: u64,
+    pub is_test_token: bool,
 }
 
 #[allow(non_snake_case)]
@@ -45,6 +46,7 @@ impl Default for StatsData {
             fee_to: Principal::anonymous(),
             deploy_time: 0,
             min_cycles: 0,
+            is_test_token: false,
         }
     }
 }
