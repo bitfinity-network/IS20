@@ -12,4 +12,5 @@ pub struct Metadata {
     pub owner: Principal,
     pub fee: Nat,
     pub feeTo: Principal,
+    pub isTestToken: Option<bool>,
 }
