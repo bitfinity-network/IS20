@@ -157,3 +157,11 @@ fn get_user_approvals(who: Principal) -> Vec<(Principal, Nat)> {
         None => Vec::new(),
     }
 }
+
+#[query(name = "isTestToken")]
+#[candid_method(query, rename = "isTestToken")]
+pub fn is_test_token() -> bool {
+    let state = State::get();
+    let state = state.borrow();
+    state.stats().is_test_token
+}
