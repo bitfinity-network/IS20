@@ -64,10 +64,10 @@ impl State {
     pub fn stable_restore() {
         let (mut loaded,): (Self,) = ::ic_cdk::storage::stable_restore().unwrap();
         let _ = loaded.token_wasm.take();
-        loaded.reset();
+        loaded.set_global_to_self();
     }
 
-    pub fn reset(self) {
+    pub fn set_global_to_self(self) {
         let state = State::get();
         let mut state = state.borrow_mut();
         *state = self;

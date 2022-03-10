@@ -16,7 +16,7 @@ ic_helpers::init_factory_api!(State, crate::state::get_token_bytecode());
 #[init]
 #[candid_method(init)]
 fn init(controller: Principal, ledger_principal: Option<Principal>) {
-    State::new(controller, ledger_principal).reset();
+    State::new(controller, ledger_principal).set_global_to_self();
 }
 
 /// Returns the token, or None if it does not exist.
