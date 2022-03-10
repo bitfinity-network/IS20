@@ -19,6 +19,14 @@ fn init(controller: Principal, ledger_principal: Option<Principal>) {
     State::new(controller, ledger_principal).set_global_to_self();
 }
 
+#[inspect_message]
+fn inspect_message_function() {
+    match &State::get().borrow().token_wasm {
+        Some(_) => ic_cdk::api::call::accept_message(),
+        None => ic_cdk::api::call::reject("the factory hasn't been completely intialized yet"),
+    }
+}
+
 /// Returns the token, or None if it does not exist.
 #[query(name = "get_token")]
 #[candid_method(query, rename = "get_token")]
@@ -29,14 +37,12 @@ async fn get_token(name: String) -> Option<Principal> {
 #[update(name = "set_token_bytecode")]
 #[candid_method(update, rename = "set_token_bytecode")]
 async fn set_token_bytecode(bytecode: Vec<u8>) {
-    if State::get().borrow().token_wasm.is_some() {
-        ic_cdk::api::call::reject("token bytecode is already set");
+    if State::get().borrow().controller() != ic_cdk::api::caller() {
+        ic_cdk::api::call::reject("not authorized");
         return;
     }
 
-    let state = State::get();
-
-    state.borrow_mut().token_wasm.replace(bytecode);
+    State::get().borrow_mut().token_wasm.replace(bytecode);
 }
 
 /// Creates a new token.
