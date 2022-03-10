@@ -13,6 +13,7 @@ const DEFAULT_LEDGER_PRINCIPAL: &str = "ryjl3-tyaaa-aaaaa-aaaba-cai";
 pub struct State {
     pub factory: Factory<String>,
     pub configuration: FactoryConfiguration,
+    pub token_wasm: Option<Vec<u8>>,
 }
 
 impl State {
@@ -23,6 +24,7 @@ impl State {
         });
         Self {
             factory: Default::default(),
+            token_wasm: None,
             configuration: FactoryConfiguration::new(
                 ledger,
                 DEFAULT_ICP_FEE,
@@ -39,6 +41,7 @@ impl Default for State {
         // it does not matter, if the state we create is not valid.
         Self {
             factory: Default::default(),
+            token_wasm: None,
             configuration: FactoryConfiguration::new(
                 Principal::anonymous(),
                 0,
@@ -50,10 +53,36 @@ impl Default for State {
 }
 
 pub fn get_token_bytecode() -> &'static [u8] {
-    include_bytes!("token.wasm")
+    &[]
 }
 
-ic_helpers::impl_factory_state_management!(State, get_token_bytecode());
+impl State {
+    pub fn stable_save(&self) {
+        ::ic_cdk::storage::stable_save((self,)).unwrap();
+    }
+
+    pub fn stable_restore() {
+        let (mut loaded,): (Self,) = ::ic_cdk::storage::stable_restore().unwrap();
+        let _ = loaded.token_wasm.take();
+        loaded.reset();
+    }
+
+    pub fn reset(self) {
+        let state = State::get();
+        let mut state = state.borrow_mut();
+        *state = self;
+    }
+}
+
+#[::ic_cdk_macros::pre_upgrade]
+fn pre_upgrade() {
+    State::get().borrow().stable_save();
+}
+
+#[::ic_cdk_macros::post_upgrade]
+fn post_upgrade() {
+    State::stable_restore();
+}
 
 impl FactoryState<String> for State {
     fn factory(&self) -> &Factory<String> {

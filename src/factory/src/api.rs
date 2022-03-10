@@ -26,6 +26,19 @@ async fn get_token(name: String) -> Option<Principal> {
     State::get().borrow().factory.get(&name)
 }
 
+#[update(name = "set_token_bytecode")]
+#[candid_method(update, rename = "set_token_bytecode")]
+async fn set_token_bytecode(bytecode: Vec<u8>) {
+    if State::get().borrow().token_wasm.is_some() {
+        ic_cdk::api::call::reject("token bytecode is already set");
+        return;
+    }
+
+    let state = State::get();
+
+    state.borrow_mut().token_wasm.replace(bytecode);
+}
+
 /// Creates a new token.
 ///
 /// Creating a token canister with the factory requires one of the following:
