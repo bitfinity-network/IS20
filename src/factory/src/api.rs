@@ -15,7 +15,7 @@ ic_helpers::init_factory_api!(State, crate::state::get_token_bytecode());
 
 #[init]
 #[candid_method(init)]
-fn init(controller: Principal, ledger_principal: Option<Principal>) {
+pub fn init(controller: Principal, ledger_principal: Option<Principal>) {
     State::new(controller, ledger_principal).set_global_to_self();
 }
 
@@ -38,15 +38,19 @@ async fn get_token(name: String) -> Option<Principal> {
     State::get().borrow().factory.get(&name)
 }
 
+pub async fn set_token_bytecode_impl(bytecode: Vec<u8>) {
+    State::get().borrow_mut().token_wasm.replace(bytecode);
+}
+
 #[update(name = "set_token_bytecode")]
 #[candid_method(update, rename = "set_token_bytecode")]
-async fn set_token_bytecode(bytecode: Vec<u8>) {
+pub async fn set_token_bytecode(bytecode: Vec<u8>) {
     if State::get().borrow().controller() != ic_cdk::api::caller() {
         ic_cdk::api::call::reject("not authorized");
         return;
     }
 
-    State::get().borrow_mut().token_wasm.replace(bytecode);
+    set_token_bytecode_impl(bytecode).await;
 }
 
 /// Creates a new token.
