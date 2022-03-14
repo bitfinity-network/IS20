@@ -21,6 +21,10 @@ fn init(controller: Principal, ledger_principal: Option<Principal>) {
 
 #[inspect_message]
 fn inspect_message_function() {
+    if ic_cdk::api::caller() == State::get().borrow().controller() {
+        return ic_cdk::api::call::accept_message();
+    }
+
     match &State::get().borrow().token_wasm {
         Some(_) => ic_cdk::api::call::accept_message(),
         None => ic_cdk::api::call::reject("the factory hasn't been completely intialized yet"),
