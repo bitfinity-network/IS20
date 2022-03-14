@@ -105,7 +105,7 @@ pub async fn create_token(
         state
             .borrow()
             .factory
-            .create_with_cycles(get_token_bytecode(), (info,), cycles);
+            .create_with_cycles(&get_token_bytecode(), (info,), cycles);
 
     let canister = create_token
         .await

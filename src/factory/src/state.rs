@@ -52,8 +52,8 @@ impl Default for State {
     }
 }
 
-pub fn get_token_bytecode() -> &'static [u8] {
-    &[]
+pub fn get_token_bytecode() -> Vec<u8> {
+    State::get().borrow().token_wasm.clone().unwrap_or_default()
 }
 
 impl State {
