@@ -68,9 +68,7 @@ impl State {
     }
 
     pub fn set_global_to_self(self) {
-        let state = State::get();
-        let mut state = state.borrow_mut();
-        *state = self;
+        State::get().replace(self);
     }
 }
 
