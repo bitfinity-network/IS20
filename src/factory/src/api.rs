@@ -16,12 +16,12 @@ ic_helpers::init_factory_api!(State, crate::state::get_token_bytecode());
 #[init]
 #[candid_method(init)]
 pub fn init(controller: Principal, ledger_principal: Option<Principal>) {
-    State::new(controller, ledger_principal).set_global_to_self();
+    State::new(controller, ledger_principal).reset();
 }
 
 #[inspect_message]
 fn inspect_message_function() {
-    if ic_cdk::api::caller() == State::get().borrow().controller() {
+    if ic_cdk::api::call::method_name() == "set_token_bytecode" {
         return ic_cdk::api::call::accept_message();
     }
 
@@ -122,4 +122,18 @@ pub async fn create_token(
     state.borrow_mut().factory.register(key, canister);
 
     Ok(principal)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn test_set_token_bytecode_impl() {
+        assert_eq!(State::get().borrow().token_wasm, None);
+
+        set_token_bytecode_impl(vec![12, 3]).await;
+
+        assert_eq!(State::get().borrow().token_wasm, Some(vec![12, 3]));
+    }
 }

@@ -53,34 +53,14 @@ impl Default for State {
 }
 
 pub fn get_token_bytecode() -> Vec<u8> {
-    State::get().borrow().token_wasm.clone().unwrap_or_default()
+    State::get()
+        .borrow()
+        .token_wasm
+        .clone()
+        .expect("the token bytecode should be set before accessing it")
 }
 
-impl State {
-    pub fn stable_save(&self) {
-        ::ic_cdk::storage::stable_save((self,)).unwrap();
-    }
-
-    pub fn stable_restore() {
-        let (mut loaded,): (Self,) = ::ic_cdk::storage::stable_restore().unwrap();
-        let _ = loaded.token_wasm.take();
-        loaded.set_global_to_self();
-    }
-
-    pub fn set_global_to_self(self) {
-        State::get().replace(self);
-    }
-}
-
-#[::ic_cdk_macros::pre_upgrade]
-fn pre_upgrade() {
-    State::get().borrow().stable_save();
-}
-
-#[::ic_cdk_macros::post_upgrade]
-fn post_upgrade() {
-    State::stable_restore();
-}
+ic_helpers::impl_factory_state_management!(State, &get_token_bytecode());
 
 impl FactoryState<String> for State {
     fn factory(&self) -> &Factory<String> {
