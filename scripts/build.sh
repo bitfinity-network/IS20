@@ -1,5 +1,5 @@
 set -e
-cargo build -j`nproc || echo 1` --target wasm32-unknown-unknown --package token --release
+cargo build -j`nproc || echo 1` --target wasm32-unknown-unknown --package token --release --features export_api
 ic-cdk-optimizer target/wasm32-unknown-unknown/release/token.wasm -o src/factory/src/token.wasm
 cargo build -j`nproc || echo 1` --target wasm32-unknown-unknown --package factory --release
 ic-cdk-optimizer target/wasm32-unknown-unknown/release/factory.wasm -o target/wasm32-unknown-unknown/release/factory-opt.wasm

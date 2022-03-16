@@ -6,6 +6,7 @@ version = "0.1.0"
 [features]
 default = ["api"]
 api = ["ic-cdk-macros"]
+export_api = []
 
 [dependencies]
 assert-panic = "1.0"
@@ -17,9 +18,11 @@ ic-kit = "0.4.3"
 num-traits = "0.2"
 serde = "1.0"
 ic-storage = { git = "https://github.com/infinity-swap/ic-helpers.git", package = "ic-storage" }
+ic-canister = {path = "../../../ic-helpers/ic-canister/ic-canister"}
 
 [target.'cfg(not(target_family = "wasm"))'.dependencies]
 async-std = {version = "1.10.0", features = ["attributes"]}
 
 [dev-dependencies]
 test-case = "1.2.1"
+tokio = {version = "1", features = ["macros", "rt"]}

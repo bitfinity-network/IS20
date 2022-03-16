@@ -44,13 +44,13 @@ dfx deploy token_factory --argument '(principal "y4nw3-upugh-yyv2b-jv6jy-ppfse-4
 
 ```
 
-Not the wallet ID for the current user (in the example above it's `yjeau-xiaaa-aaaaa-aabsa-cai`). The factory requires
+Note the wallet ID for the current user (in the example above it's `yjeau-xiaaa-aaaaa-aabsa-cai`). The factory requires
 the caller to provide cycles or ICP to create a token canister. As we don't have an ICP ledger locally, we use cycles.
 The minimum amount of cycles required by the factory to create a canister is `10^12`.
 
 ```shell
 // Use the user principal above to set the owner
-dfx canister --wallet yjeau-xiaaa-aaaaa-aabsa-cai call --with-cycles 1000000000000 factory create_token \
+dfx canister --wallet yjeau-xiaaa-aaaaa-aabsa-cai call --with-cycles 1000000000000 token_factory create_token \
   '(record {
   logo = "";
   name = "y";
