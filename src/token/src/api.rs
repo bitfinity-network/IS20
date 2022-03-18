@@ -165,3 +165,13 @@ pub fn is_test_token() -> bool {
     let state = state.borrow();
     state.stats().is_test_token
 }
+
+#[update(name = "toggleTest")]
+#[candid_method(query, rename = "toggleTest")]
+pub fn toggle_test() -> bool {
+    let state = State::get();
+    let mut state = state.borrow_mut();
+    let stats = state.stats_mut();
+    stats.is_test_token = !stats.is_test_token;
+    stats.is_test_token
+}
