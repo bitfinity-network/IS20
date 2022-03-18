@@ -24,6 +24,7 @@ static PUBLIC_METHODS: &[&str] = &[
     "owner",
     "symbol",
     "totalSupply",
+    "isTestToken",
 ];
 
 static OWNER_METHODS: &[&str] = &[
@@ -35,6 +36,7 @@ static OWNER_METHODS: &[&str] = &[
     "setMinCycles",
     "setName",
     "setOwner",
+    "toggleTest",
 ];
 
 static TRANSACTION_METHODS: &[&str] = &[
