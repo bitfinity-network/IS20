@@ -15,8 +15,20 @@ ic_helpers::init_factory_api!(State, crate::state::get_token_bytecode());
 
 #[init]
 #[candid_method(init)]
-fn init(controller: Principal, ledger_principal: Option<Principal>) {
+pub fn init(controller: Principal, ledger_principal: Option<Principal>) {
     State::new(controller, ledger_principal).reset();
+}
+
+#[inspect_message]
+fn inspect_message_function() {
+    if ic_cdk::api::call::method_name() == "set_token_bytecode" {
+        return ic_cdk::api::call::accept_message();
+    }
+
+    match &State::get().borrow().token_wasm {
+        Some(_) => ic_cdk::api::call::accept_message(),
+        None => ic_cdk::api::call::reject("the factory hasn't been completely intialized yet"),
+    }
 }
 
 /// Returns the token, or None if it does not exist.
@@ -24,6 +36,21 @@ fn init(controller: Principal, ledger_principal: Option<Principal>) {
 #[candid_method(query, rename = "get_token")]
 async fn get_token(name: String) -> Option<Principal> {
     State::get().borrow().factory.get(&name)
+}
+
+pub async fn set_token_bytecode_impl(bytecode: Vec<u8>) {
+    State::get().borrow_mut().token_wasm.replace(bytecode);
+}
+
+#[update(name = "set_token_bytecode")]
+#[candid_method(update, rename = "set_token_bytecode")]
+pub async fn set_token_bytecode(bytecode: Vec<u8>) {
+    if State::get().borrow().controller() != ic_cdk::api::caller() {
+        ic_cdk::api::call::reject("not authorized");
+        return;
+    }
+
+    set_token_bytecode_impl(bytecode).await;
 }
 
 /// Creates a new token.
@@ -86,7 +113,7 @@ pub async fn create_token(
         state
             .borrow()
             .factory
-            .create_with_cycles(get_token_bytecode(), (info,), cycles);
+            .create_with_cycles(&get_token_bytecode(), (info,), cycles);
 
     let canister = create_token
         .await
@@ -95,4 +122,18 @@ pub async fn create_token(
     state.borrow_mut().factory.register(key, canister);
 
     Ok(principal)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn test_set_token_bytecode_impl() {
+        assert_eq!(State::get().borrow().token_wasm, None);
+
+        set_token_bytecode_impl(vec![12, 3]).await;
+
+        assert_eq!(State::get().borrow().token_wasm, Some(vec![12, 3]));
+    }
 }

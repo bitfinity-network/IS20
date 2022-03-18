@@ -13,6 +13,7 @@ const DEFAULT_LEDGER_PRINCIPAL: &str = "ryjl3-tyaaa-aaaaa-aaaba-cai";
 pub struct State {
     pub factory: Factory<String>,
     pub configuration: FactoryConfiguration,
+    pub token_wasm: Option<Vec<u8>>,
 }
 
 impl State {
@@ -23,6 +24,7 @@ impl State {
         });
         Self {
             factory: Default::default(),
+            token_wasm: None,
             configuration: FactoryConfiguration::new(
                 ledger,
                 DEFAULT_ICP_FEE,
@@ -39,6 +41,7 @@ impl Default for State {
         // it does not matter, if the state we create is not valid.
         Self {
             factory: Default::default(),
+            token_wasm: None,
             configuration: FactoryConfiguration::new(
                 Principal::anonymous(),
                 0,
@@ -49,11 +52,15 @@ impl Default for State {
     }
 }
 
-pub fn get_token_bytecode() -> &'static [u8] {
-    include_bytes!("token.wasm")
+pub fn get_token_bytecode() -> Vec<u8> {
+    State::get()
+        .borrow()
+        .token_wasm
+        .clone()
+        .expect("the token bytecode should be set before accessing it")
 }
 
-ic_helpers::impl_factory_state_management!(State, get_token_bytecode());
+ic_helpers::impl_factory_state_management!(State, &get_token_bytecode());
 
 impl FactoryState<String> for State {
     fn factory(&self) -> &Factory<String> {
