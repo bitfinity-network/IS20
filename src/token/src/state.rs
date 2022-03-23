@@ -3,18 +3,34 @@ use crate::types::{Allowances, AuctionInfo, PendingNotifications, StatsData, Tim
 use candid::{CandidType, Deserialize, Nat, Principal};
 use common::types::Metadata;
 use ic_storage::IcStorage;
+use ic_storage::stable::Versioned;
 use std::collections::HashMap;
 
 #[derive(Default, CandidType, Deserialize, IcStorage)]
+pub struct CanisterState {
+    pub(crate) state: State,
+    pub(crate) bidding_state: BiddingState,
+    pub(crate) balances: Balances,
+    pub(crate) auction_history: AuctionHistory,
+}
+
+impl Versioned for CanisterState {
+    type Previous = ();
+    
+    fn upgrade(():()) -> Self {
+        Self::default()
+    }
+}
+
+#[derive(Default, CandidType, Deserialize)]
 pub struct State {
     pub(crate) stats: StatsData,
     allowances: Allowances,
     pub(crate) ledger: Ledger,
-    auction_history: AuctionHistory,
     pub notifications: PendingNotifications,
 }
 
-#[derive(Default, IcStorage, CandidType, Deserialize)]
+#[derive(Default, CandidType, Deserialize)]
 pub struct Balances(pub HashMap<Principal, Nat>);
 
 impl Balances {
@@ -23,23 +39,17 @@ impl Balances {
     }
 
     pub fn get_holders(&self, start: usize, limit: usize) -> Vec<(Principal, Nat)> {
-        let mut balance = Vec::new();
+        let mut balance = self.0.iter().map(|(&k, v)| (k, v.clone())).collect::<Vec<_>>();
 
-        for (k, v) in &self.0 {
-            balance.push((*k, v.clone()));
-        }
+        // Sort balance and principals by the balance
         balance.sort_by(|a, b| b.1.cmp(&a.1));
-        let limit: usize = if start + limit > balance.len() {
-            balance.len() - start
-        } else {
-            limit
-        };
 
-        balance[start..start + limit].to_vec()
+        let end = (start + limit).min(balance.len());
+        balance[start..end].to_vec()
     }
 }
 
-#[derive(CandidType, Default, Debug, Clone, Deserialize, IcStorage)]
+#[derive(CandidType, Default, Debug, Clone, Deserialize)]
 pub struct BiddingState {
     pub fee_ratio: f64,
     pub last_auction: Timestamp,
@@ -56,7 +66,7 @@ impl BiddingState {
     }
 }
 
-#[derive(Default, IcStorage, CandidType, Deserialize)]
+#[derive(Default, CandidType, Deserialize)]
 pub struct AuctionHistory(pub Vec<AuctionInfo>);
 
 impl State {

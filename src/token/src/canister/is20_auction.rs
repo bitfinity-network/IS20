@@ -3,7 +3,7 @@
 use crate::canister::dip20_transactions::_transfer;
 use crate::canister::TokenCanister;
 use crate::ledger::Ledger;
-use crate::state::{AuctionHistory, Balances, BiddingState, State};
+use crate::state::{CanisterState, AuctionHistory, Balances, BiddingState, State};
 use crate::types::{AuctionInfo, Timestamp};
 use candid::{CandidType, Deserialize, Nat, Principal};
 use ic_kit::ic;
@@ -61,41 +61,51 @@ pub(crate) fn bid_cycles(canister: &TokenCanister, bidder: Principal) -> Result<
         return Err(AuctionError::BiddingTooSmall);
     }
 
-    let mut state = canister.bidding_state.borrow_mut();
+    let bidding_state = &mut canister.state.borrow_mut().bidding_state;
 
     let amount_accepted = ic::msg_cycles_accept(amount);
-    state.cycles_since_auction += amount_accepted;
-    *state.bids.entry(bidder).or_insert(0) += amount_accepted;
+    bidding_state.cycles_since_auction += amount_accepted;
+    *bidding_state.bids.entry(bidder).or_insert(0) += amount_accepted;
 
     Ok(amount_accepted)
 }
 
 pub(crate) fn bidding_info(canister: &TokenCanister) -> BiddingInfo {
-    let state = canister.bidding_state.borrow();
+    let state = canister.state.borrow();
+    let bidding_state = &state.bidding_state;
+    let balances = &state.balances;
+
     BiddingInfo {
-        fee_ratio: state.fee_ratio,
-        last_auction: state.last_auction,
-        auction_period: state.auction_period,
-        total_cycles: state.cycles_since_auction,
-        caller_cycles: state.bids.get(&ic::caller()).cloned().unwrap_or(0),
-        accumulated_fees: accumulated_fees(&*canister.balances.borrow()),
+        fee_ratio: bidding_state.fee_ratio,
+        last_auction: bidding_state.last_auction,
+        auction_period: bidding_state.auction_period,
+        total_cycles: bidding_state.cycles_since_auction,
+        caller_cycles: bidding_state.bids.get(&ic::caller()).cloned().unwrap_or(0),
+        accumulated_fees: accumulated_fees(balances),
     }
 }
 
 pub(crate) fn run_auction(canister: &TokenCanister) -> Result<AuctionInfo, AuctionError> {
-    let mut state = canister.bidding_state.borrow_mut();
+    let mut state = canister.state.borrow_mut();
 
-    if !state.is_auction_due() {
+    if !state.bidding_state.is_auction_due() {
         return Err(AuctionError::TooEarlyToBeginAuction);
     }
 
+    let CanisterState {
+        ref mut state,
+        ref mut bidding_state,
+        ref mut balances,
+        ref mut auction_history
+    } = &mut *state;
+
     let result = perform_auction(
-        &mut *canister.state.borrow_mut().ledger_mut(),
-        &mut *state,
-        &mut *canister.balances.borrow_mut(),
-        &mut *canister.auction_history.borrow_mut(),
+        state.ledger_mut(),
+        bidding_state,
+        balances,
+        auction_history,
     );
-    reset_bidding_state(&mut *canister.state.borrow_mut(), &mut *state);
+    reset_bidding_state(state, bidding_state);
 
     result
 }
@@ -105,8 +115,9 @@ pub(crate) fn auction_info(
     id: usize,
 ) -> Result<AuctionInfo, AuctionError> {
     canister
-        .auction_history
+        .state
         .borrow()
+        .auction_history
         .0
         .get(id)
         .cloned()
@@ -279,8 +290,9 @@ mod tests {
         canister.bidCycles(bob()).unwrap();
 
         canister
-            .balances
+            .state
             .borrow_mut()
+            .balances
             .0
             .insert(auction_principal(), Nat::from(6_000));
 
@@ -290,7 +302,7 @@ mod tests {
         assert_eq!(result.last_transaction_id, Nat::from(2));
         assert_eq!(result.tokens_distributed, Nat::from(6_000));
 
-        assert_eq!(canister.balances.borrow().0[&bob()], 4_000);
+        assert_eq!(canister.state.borrow().balances.0[&bob()], 4_000);
 
         let retrieved_result = canister.auctionInfo(result.auction_id).unwrap();
         assert_eq!(retrieved_result, result);
@@ -309,7 +321,7 @@ mod tests {
         canister.bidCycles(alice()).unwrap();
 
         {
-            let mut state = canister.bidding_state.borrow_mut();
+            let state = &mut canister.state.borrow_mut().bidding_state;
             state.last_auction = ic::time() - 100_000;
             state.auction_period = 1_000_000_000;
         }
@@ -325,10 +337,10 @@ mod tests {
         let (context, canister) = test_context();
         context.update_balance(1_000_000_000);
 
-        canister.state.borrow_mut().stats_mut().min_cycles = 1_000_000;
+        canister.state.borrow_mut().state.stats_mut().min_cycles = 1_000_000;
         canister.runAuction().unwrap_err();
 
-        assert_eq!(canister.bidding_state.borrow().fee_ratio, 0.125);
+        assert_eq!(canister.state.borrow().bidding_state.fee_ratio, 0.125);
     }
 
     #[test]

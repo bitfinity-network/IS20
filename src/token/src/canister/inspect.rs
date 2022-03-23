@@ -1,4 +1,4 @@
-use crate::state::{Balances, BiddingState, State};
+use crate::state::CanisterState;
 use candid::{Nat, Principal};
 use ic_cdk_macros::inspect_message;
 use ic_storage::IcStorage;
@@ -53,8 +53,8 @@ static TRANSACTION_METHODS: &[&str] = &[
 fn inspect_message() {
     let method = ic_cdk::api::call::method_name();
 
-    let state = State::get();
-    let state = state.borrow();
+    let state = CanisterState::get();
+    let state = &state.borrow().state;
     let caller = ic_cdk::api::caller();
 
     match &method[..] {
@@ -72,8 +72,9 @@ fn inspect_message() {
         m if TRANSACTION_METHODS.contains(&m) => {
             // These methods require the caller to have some balance, so we check if the caller
             // has any token to their name.
-            let balances = Balances::get();
-            let balances = balances.borrow();
+            let state = CanisterState::get();
+            let state = state.borrow();
+            let balances = &state.balances;
             if balances.0.contains_key(&caller) {
                 ic_cdk::api::call::accept_message();
             } else {
@@ -112,8 +113,10 @@ fn inspect_message() {
         }
         "runAuction" => {
             // We allow running auction only to the owner or any of the cycle bidders.
-            let bidding_state = BiddingState::get();
-            let bidding_state = bidding_state.borrow();
+            let state = CanisterState::get();
+            let state = state.borrow();
+            let bidding_state = &state.bidding_state;
+            let state = &state.state;
             if bidding_state.is_auction_due()
                 && (bidding_state.bids.contains_key(&caller) || caller == state.stats().owner)
             {

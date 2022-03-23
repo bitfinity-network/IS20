@@ -8,7 +8,7 @@ use ic_cdk::api::call::CallResult;
 
 pub(crate) async fn notify(canister: &TokenCanister, transaction_id: Nat) -> TxReceipt {
     let tx = {
-        let mut state = canister.state.borrow_mut();
+        let state = &mut canister.state.borrow_mut().state;
         let tx = state
             .ledger()
             .get(&transaction_id)
@@ -28,6 +28,7 @@ pub(crate) async fn notify(canister: &TokenCanister, transaction_id: Nat) -> TxR
         canister
             .state
             .borrow_mut()
+            .state
             .notifications
             .insert(transaction_id);
         return Err(TxError::NotificationFailed);
