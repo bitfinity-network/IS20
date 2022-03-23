@@ -5,13 +5,18 @@ version = "0.1.0"
 
 [dependencies]
 candid = "0.7"
-common = {path = "../common"}
+common = { path = "../common" }
 ic-cdk = "0.3"
 ic-cdk-macros = "0.3"
+ic-storage = {git = "https://github.com/infinity-swap/ic-helpers.git", package = "ic-storage"}
 #ic-helpers = {git = "https://github.com/infinity-swap/ic-helpers.git", package = "ic-helpers", branch = "main"}
 ic-helpers = {path = "../../../ic-helpers/ic-helpers"}
+ic-canister = { git = "https://github.com/infinity-swap/ic-helpers.git", package = "ic-canister" }
 serde = "1.0"
-ic-storage = {git = "https://github.com/infinity-swap/ic-helpers.git", package = "ic-storage"}
 ic-types = {git = "https://github.com/flyq/ic"}
 ledger-canister = {git = "https://github.com/flyq/ic"}
 thiserror = "1.0"
+
+[dev-dependencies]
+ic-agent = "0.13.0"
+tokio = { version = "1", features = ["macros"] }
