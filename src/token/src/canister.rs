@@ -96,8 +96,9 @@ impl TokenCanister {
 
     #[update]
     fn toggleTest(&self) -> bool {
-        check_caller(self.owner());
-        self.state.borrow_mut().stats.is_test_token = !stats.is_test_token;
+        check_caller(self.owner()).unwrap();
+        let stats = &mut self.state.borrow_mut().stats;
+        stats.is_test_token = !stats.is_test_token;
         self.isTestToken()
     }
 
