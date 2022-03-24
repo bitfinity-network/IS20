@@ -63,15 +63,13 @@ pub fn transfer_from(
         return Err(TxError::InsufficientAllowance);
     }
 
-    {
-        let from_balance = balances.balance_of(&from);
-        if from_balance < value_with_fee {
-            return Err(TxError::InsufficientBalance);
-        }
-
-        _charge_fee(balances, from, fee_to, fee.clone(), fee_ratio);
-        _transfer(balances, from, to, value.clone());
+    let from_balance = balances.balance_of(&from);
+    if from_balance < value_with_fee {
+        return Err(TxError::InsufficientBalance);
     }
+
+    _charge_fee(balances, from, fee_to, fee.clone(), fee_ratio);
+    _transfer(balances, from, to, value.clone());
 
     let allowances = &mut state.allowances;
     match allowances.get(&from) {
@@ -90,9 +88,7 @@ pub fn transfer_from(
                 }
             }
         }
-        None => {
-            panic!()
-        }
+        None => panic!(),
     }
 
     let id = state.ledger.transfer_from(owner, from, to, value, fee);

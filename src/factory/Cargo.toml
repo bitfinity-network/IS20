@@ -9,8 +9,7 @@ common = { path = "../common" }
 ic-cdk = "0.3"
 ic-cdk-macros = "0.3"
 ic-storage = {git = "https://github.com/infinity-swap/ic-helpers.git", package = "ic-storage"}
-#ic-helpers = {git = "https://github.com/infinity-swap/ic-helpers.git", package = "ic-helpers", branch = "main"}
-ic-helpers = {path = "../../../ic-helpers/ic-helpers"}
+ic-helpers = {git = "https://github.com/infinity-swap/ic-helpers.git", package = "ic-helpers", branch = "main"}
 ic-canister = { git = "https://github.com/infinity-swap/ic-helpers.git", package = "ic-canister" }
 serde = "1.0"
 ic-types = {git = "https://github.com/flyq/ic"}
