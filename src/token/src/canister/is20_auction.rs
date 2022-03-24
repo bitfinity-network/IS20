@@ -3,8 +3,8 @@
 use crate::canister::dip20_transactions::_transfer;
 use crate::canister::TokenCanister;
 use crate::ledger::Ledger;
-use crate::state::{CanisterState, AuctionHistory, Balances, BiddingState};
-use crate::types::{AuctionInfo, Timestamp, StatsData};
+use crate::state::{AuctionHistory, Balances, BiddingState, CanisterState};
+use crate::types::{AuctionInfo, StatsData, Timestamp};
 use candid::{CandidType, Deserialize, Nat, Principal};
 use ic_kit::ic;
 use std::collections::HashMap;
@@ -101,12 +101,7 @@ pub(crate) fn run_auction(canister: &TokenCanister) -> Result<AuctionInfo, Aucti
         ..
     } = &mut *state;
 
-    let result = perform_auction(
-        ledger,
-        bidding_state,
-        balances,
-        auction_history,
-    );
+    let result = perform_auction(ledger, bidding_state, balances, auction_history);
     reset_bidding_state(stats, bidding_state);
 
     result

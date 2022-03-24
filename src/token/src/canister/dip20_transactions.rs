@@ -1,6 +1,6 @@
 use super::TokenCanister;
 use crate::canister::is20_auction::auction_principal;
-use crate::state::{CanisterState, Balances};
+use crate::state::{Balances, CanisterState};
 use crate::types::{TxError, TxReceipt};
 use candid::Nat;
 use ic_cdk::export::Principal;
@@ -95,9 +95,7 @@ pub fn transfer_from(
         }
     }
 
-    let id = state
-        .ledger
-        .transfer_from(owner, from, to, value, fee);
+    let id = state.ledger.transfer_from(owner, from, to, value, fee);
     Ok(id)
 }
 
@@ -111,20 +109,14 @@ pub fn approve(canister: &TokenCanister, spender: Principal, value: Nat) -> TxRe
         ref stats,
         ..
     } = &mut *state;
-        
+
     let (fee, fee_to) = stats.fee_info();
     let fee_ratio = bidding_state.fee_ratio;
     if balances.balance_of(&owner) < fee {
         return Err(TxError::InsufficientBalance);
     }
 
-    _charge_fee(
-        balances,
-        owner,
-        fee_to,
-        fee.clone(),
-        fee_ratio,
-    );
+    _charge_fee(balances, owner, fee_to, fee.clone(), fee_ratio);
     let v = value.clone() + fee.clone();
 
     match state.allowances.get(&owner) {
@@ -178,7 +170,10 @@ pub fn burn(canister: &TokenCanister, amount: Nat) -> TxReceipt {
             return Err(TxError::InsufficientBalance);
         }
 
-        state.balances.0.insert(caller, caller_balance - amount.clone());
+        state
+            .balances
+            .0
+            .insert(caller, caller_balance - amount.clone());
     }
 
     let mut state = canister.state.borrow_mut();

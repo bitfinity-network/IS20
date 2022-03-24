@@ -2,8 +2,8 @@ use crate::ledger::Ledger;
 use crate::types::{Allowances, AuctionInfo, PendingNotifications, StatsData, Timestamp};
 use candid::{CandidType, Deserialize, Nat, Principal};
 use common::types::Metadata;
-use ic_storage::IcStorage;
 use ic_storage::stable::Versioned;
+use ic_storage::IcStorage;
 use std::collections::HashMap;
 
 #[derive(Default, CandidType, Deserialize, IcStorage)]
@@ -59,8 +59,8 @@ impl CanisterState {
 }
 impl Versioned for CanisterState {
     type Previous = ();
-    
-    fn upgrade(():()) -> Self {
+
+    fn upgrade((): ()) -> Self {
         Self::default()
     }
 }
@@ -74,7 +74,11 @@ impl Balances {
     }
 
     pub fn get_holders(&self, start: usize, limit: usize) -> Vec<(Principal, Nat)> {
-        let mut balance = self.0.iter().map(|(&k, v)| (k, v.clone())).collect::<Vec<_>>();
+        let mut balance = self
+            .0
+            .iter()
+            .map(|(&k, v)| (k, v.clone()))
+            .collect::<Vec<_>>();
 
         // Sort balance and principals by the balance
         balance.sort_by(|a, b| b.1.cmp(&a.1));
@@ -103,4 +107,3 @@ impl BiddingState {
 
 #[derive(Default, CandidType, Deserialize)]
 pub struct AuctionHistory(pub Vec<AuctionInfo>);
-
