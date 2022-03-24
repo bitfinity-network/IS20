@@ -8,26 +8,61 @@ use std::collections::HashMap;
 
 #[derive(Default, CandidType, Deserialize, IcStorage)]
 pub struct CanisterState {
-    pub(crate) state: State,
     pub(crate) bidding_state: BiddingState,
     pub(crate) balances: Balances,
     pub(crate) auction_history: AuctionHistory,
+    pub(crate) stats: StatsData,
+    pub(crate) allowances: Allowances,
+    pub(crate) ledger: Ledger,
+    pub notifications: PendingNotifications,
 }
 
+impl CanisterState {
+    pub fn get_metadata(&self) -> Metadata {
+        Metadata {
+            logo: self.stats.logo.clone(),
+            name: self.stats.name.clone(),
+            symbol: self.stats.symbol.clone(),
+            decimals: self.stats.decimals,
+            totalSupply: self.stats.total_supply.clone(),
+            owner: self.stats.owner,
+            fee: self.stats.fee.clone(),
+            feeTo: self.stats.fee_to,
+            isTestToken: Some(self.stats.is_test_token),
+        }
+    }
+
+    pub fn allowance(&self, owner: Principal, spender: Principal) -> Nat {
+        match self.allowances.get(&owner) {
+            Some(inner) => match inner.get(&spender) {
+                Some(value) => value.clone(),
+                None => Nat::from(0),
+            },
+            None => Nat::from(0),
+        }
+    }
+
+    pub fn allowance_size(&self) -> usize {
+        self.allowances
+            .iter()
+            .map(|(_, v)| v.len())
+            .reduce(|accum, v| accum + v)
+            .unwrap_or(0)
+    }
+
+    pub fn user_approvals(&self, who: Principal) -> Vec<(Principal, Nat)> {
+        match self.allowances.get(&who) {
+            Some(allow) => Vec::from_iter(allow.clone().into_iter()),
+            None => Vec::new(),
+        }
+    }
+}
 impl Versioned for CanisterState {
     type Previous = ();
     
     fn upgrade(():()) -> Self {
         Self::default()
     }
-}
-
-#[derive(Default, CandidType, Deserialize)]
-pub struct State {
-    pub(crate) stats: StatsData,
-    allowances: Allowances,
-    pub(crate) ledger: Ledger,
-    pub notifications: PendingNotifications,
 }
 
 #[derive(Default, CandidType, Deserialize)]
@@ -69,67 +104,3 @@ impl BiddingState {
 #[derive(Default, CandidType, Deserialize)]
 pub struct AuctionHistory(pub Vec<AuctionInfo>);
 
-impl State {
-    pub fn stats(&self) -> &StatsData {
-        &self.stats
-    }
-
-    pub fn stats_mut(&mut self) -> &mut StatsData {
-        &mut self.stats
-    }
-
-    pub fn allowances(&self) -> &Allowances {
-        &self.allowances
-    }
-
-    pub fn allowances_mut(&mut self) -> &mut Allowances {
-        &mut self.allowances
-    }
-
-    pub fn ledger(&self) -> &Ledger {
-        &self.ledger
-    }
-
-    pub fn ledger_mut(&mut self) -> &mut Ledger {
-        &mut self.ledger
-    }
-
-    pub fn get_metadata(&self) -> Metadata {
-        Metadata {
-            logo: self.stats.logo.clone(),
-            name: self.stats.name.clone(),
-            symbol: self.stats.symbol.clone(),
-            decimals: self.stats.decimals,
-            totalSupply: self.stats.total_supply.clone(),
-            owner: self.stats.owner,
-            fee: self.stats.fee.clone(),
-            feeTo: self.stats.fee_to,
-            isTestToken: Some(self.stats.is_test_token),
-        }
-    }
-
-    pub fn allowance(&self, owner: Principal, spender: Principal) -> Nat {
-        match self.allowances().get(&owner) {
-            Some(inner) => match inner.get(&spender) {
-                Some(value) => value.clone(),
-                None => Nat::from(0),
-            },
-            None => Nat::from(0),
-        }
-    }
-
-    pub fn allowance_size(&self) -> usize {
-        self.allowances
-            .iter()
-            .map(|(_, v)| v.len())
-            .reduce(|accum, v| accum + v)
-            .unwrap_or(0)
-    }
-
-    pub fn user_approvals(&self, who: Principal) -> Vec<(Principal, Nat)> {
-        match self.allowances.get(&who) {
-            Some(allow) => Vec::from_iter(allow.clone().into_iter()),
-            None => Vec::new(),
-        }
-    }
-}

@@ -3,8 +3,8 @@
 use crate::canister::dip20_transactions::_transfer;
 use crate::canister::TokenCanister;
 use crate::ledger::Ledger;
-use crate::state::{CanisterState, AuctionHistory, Balances, BiddingState, State};
-use crate::types::{AuctionInfo, Timestamp};
+use crate::state::{CanisterState, AuctionHistory, Balances, BiddingState};
+use crate::types::{AuctionInfo, Timestamp, StatsData};
 use candid::{CandidType, Deserialize, Nat, Principal};
 use ic_kit::ic;
 use std::collections::HashMap;
@@ -93,19 +93,21 @@ pub(crate) fn run_auction(canister: &TokenCanister) -> Result<AuctionInfo, Aucti
     }
 
     let CanisterState {
-        ref mut state,
         ref mut bidding_state,
         ref mut balances,
-        ref mut auction_history
+        ref mut auction_history,
+        ref mut ledger,
+        ref stats,
+        ..
     } = &mut *state;
 
     let result = perform_auction(
-        state.ledger_mut(),
+        ledger,
         bidding_state,
         balances,
         auction_history,
     );
-    reset_bidding_state(state, bidding_state);
+    reset_bidding_state(stats, bidding_state);
 
     result
 }
@@ -163,8 +165,8 @@ fn perform_auction(
     Ok(result)
 }
 
-fn reset_bidding_state(state: &State, bidding_state: &mut BiddingState) {
-    bidding_state.fee_ratio = get_fee_ratio(state.stats.min_cycles, ic::balance());
+fn reset_bidding_state(stats: &StatsData, bidding_state: &mut BiddingState) {
+    bidding_state.fee_ratio = get_fee_ratio(stats.min_cycles, ic::balance());
     bidding_state.cycles_since_auction = 0;
     bidding_state.last_auction = ic::time();
     bidding_state.bids = HashMap::new();
@@ -337,7 +339,7 @@ mod tests {
         let (context, canister) = test_context();
         context.update_balance(1_000_000_000);
 
-        canister.state.borrow_mut().state.stats_mut().min_cycles = 1_000_000;
+        canister.state.borrow_mut().stats_mut().min_cycles = 1_000_000;
         canister.runAuction().unwrap_err();
 
         assert_eq!(canister.state.borrow().bidding_state.fee_ratio, 0.125);

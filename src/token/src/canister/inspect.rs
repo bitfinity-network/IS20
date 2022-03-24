@@ -54,7 +54,7 @@ fn inspect_message() {
     let method = ic_cdk::api::call::method_name();
 
     let state = CanisterState::get();
-    let state = &state.borrow().state;
+    let state = state.borrow();
     let caller = ic_cdk::api::caller();
 
     match &method[..] {
@@ -62,8 +62,7 @@ fn inspect_message() {
         m if PUBLIC_METHODS.contains(&m) => ic_cdk::api::call::accept_message(),
         m if OWNER_METHODS.contains(&m) => {
             // These methods are allowed to be run only by the owner of the canister.
-            let owner = state.stats().owner;
-            if caller == owner {
+            if caller == state.stats.owner {
                 ic_cdk::api::call::accept_message();
             } else {
                 ic_cdk::println!("Owner method is called not by an owner. Rejecting.");
@@ -83,7 +82,7 @@ fn inspect_message() {
         }
         "transferFrom" => {
             // Check if the caller has allowance for this transfer.
-            let allowances = state.allowances();
+            let allowances = &state.allowances;
             let (from, _, value) = ic_cdk::api::call::arg_data::<(Principal, Principal, Nat)>();
             if let Some(user_allowances) = allowances.get(&caller) {
                 if let Some(allowance) = user_allowances.get(&from) {
@@ -116,9 +115,8 @@ fn inspect_message() {
             let state = CanisterState::get();
             let state = state.borrow();
             let bidding_state = &state.bidding_state;
-            let state = &state.state;
             if bidding_state.is_auction_due()
-                && (bidding_state.bids.contains_key(&caller) || caller == state.stats().owner)
+                && (bidding_state.bids.contains_key(&caller) || caller == state.stats.owner)
             {
                 ic_cdk::api::call::accept_message();
             } else {

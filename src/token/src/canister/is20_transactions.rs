@@ -15,13 +15,13 @@ pub fn transfer_include_fee(canister: &TokenCanister, to: Principal, value: Nat)
     let mut state = canister.state.borrow_mut();
 
     let CanisterState {
-        ref mut state,
         ref mut balances,
         ref bidding_state,
+        ref stats,
         ..
     } = &mut *state;
 
-    let (fee, fee_to) = state.stats.fee_info();
+    let (fee, fee_to) = stats.fee_info();
     let fee_ratio = bidding_state.fee_ratio;
 
     if value <= fee {
@@ -35,7 +35,7 @@ pub fn transfer_include_fee(canister: &TokenCanister, to: Principal, value: Nat)
     _charge_fee(balances, from, fee_to, fee.clone(), fee_ratio);
     _transfer(balances, from, to, value.clone() - fee.clone());
 
-    let id = state.ledger_mut().transfer(from, to, value, fee);
+    let id = state.ledger.transfer(from, to, value, fee);
     state.notifications.insert(id.clone());
 
     Ok(id)
@@ -83,8 +83,8 @@ mod tests {
         let canister = test_canister();
 
         let mut state = canister.state.borrow_mut();
-        state.state.stats.fee = Nat::from(100);
-        state.state.stats.fee_to = john();
+        state.stats.fee = Nat::from(100);
+        state.stats.fee_to = john();
         drop(state);
 
         assert!(canister.transferIncludeFee(bob(), Nat::from(200)).is_ok());

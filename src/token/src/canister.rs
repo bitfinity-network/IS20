@@ -43,12 +43,12 @@ impl TokenCanister {
             .balances
             .0
             .insert(metadata.owner, metadata.totalSupply.clone());
-        self.state.borrow_mut().state.ledger.mint(
+        self.state.borrow_mut().ledger.mint(
             metadata.owner,
             metadata.owner,
             metadata.totalSupply.clone(),
         );
-        self.state.borrow_mut().state.stats = metadata.into();
+        self.state.borrow_mut().stats = metadata.into();
         self.state.borrow_mut().bidding_state.auction_period = DEFAULT_AUCTION_PERIOD;
     }
 
@@ -58,11 +58,11 @@ impl TokenCanister {
             fee_to,
             deploy_time,
             ..
-        } = self.state.borrow().state.stats;
+        } = self.state.borrow().stats;
         TokenInfo {
-            metadata: self.state.borrow().state.get_metadata(),
+            metadata: self.state.borrow().get_metadata(),
             feeTo: fee_to,
-            historySize: self.state.borrow().state.ledger.len(),
+            historySize: self.state.borrow().ledger.len(),
             deployTime: deploy_time,
             holderNumber: self.state.borrow().balances.0.len(),
             cycles: ic_kit::ic::balance(),
@@ -76,42 +76,42 @@ impl TokenCanister {
 
     #[query]
     fn getAllowanceSize(&self) -> usize {
-        self.state.borrow().state.allowance_size()
+        self.state.borrow().allowance_size()
     }
 
     #[query]
     fn getUserApprovals(&self, who: Principal) -> Vec<(Principal, Nat)> {
-        self.state.borrow().state.user_approvals(who)
+        self.state.borrow().user_approvals(who)
     }
 
     #[query]
     fn isTestToken(&self) -> bool {
-        self.state.borrow().state.stats.is_test_token
+        self.state.borrow().stats.is_test_token
     }
 
     #[query]
     fn name(&self) -> String {
-        self.state.borrow().state.stats.name.clone()
+        self.state.borrow().stats.name.clone()
     }
 
     #[query]
     fn symbol(&self) -> String {
-        self.state.borrow().state.stats.symbol.clone()
+        self.state.borrow().stats.symbol.clone()
     }
 
     #[query]
     fn logo(&self) -> String {
-        self.state.borrow().state.stats.logo.clone()
+        self.state.borrow().stats.logo.clone()
     }
 
     #[query]
     fn decimals(&self) -> u8 {
-        self.state.borrow().state.stats.decimals
+        self.state.borrow().stats.decimals
     }
 
     #[query]
     fn totalSupply(&self) -> Nat {
-        self.state.borrow().state.stats.total_supply.clone()
+        self.state.borrow().stats.total_supply.clone()
     }
 
     #[query]
@@ -121,25 +121,24 @@ impl TokenCanister {
 
     #[query]
     fn allowance(&self, owner: Principal, spender: Principal) -> Nat {
-        self.state.borrow().state.allowance(owner, spender)
+        self.state.borrow().allowance(owner, spender)
     }
 
     #[query]
     fn getMetadata(&self) -> Metadata {
-        self.state.borrow().state.get_metadata()
+        self.state.borrow().get_metadata()
     }
 
     #[query]
     fn historySize(&self) -> Nat {
-        self.state.borrow().state.ledger().len()
+        self.state.borrow().ledger.len()
     }
 
     #[query]
     fn getTransaction(&self, id: Nat) -> TxRecord {
         self.state
             .borrow()
-            .state
-            .ledger()
+            .ledger
             .get(&id)
             .unwrap_or_else(|| ic_kit::ic::trap(&format!("Transaction {} does not exist", id)))
     }
@@ -155,8 +154,7 @@ impl TokenCanister {
 
         self.state
             .borrow()
-            .state
-            .ledger()
+            .ledger
             .get_range(&start, &limit)
             .to_vec()
     }
@@ -164,36 +162,36 @@ impl TokenCanister {
     #[update]
     fn setName(&self, name: String) {
         check_caller(self.owner()).unwrap();
-        self.state.borrow_mut().state.stats.name = name;
+        self.state.borrow_mut().stats.name = name;
     }
 
     #[update]
     fn setLogo(&self, logo: String) {
         check_caller(self.owner()).unwrap();
-        self.state.borrow_mut().state.stats.logo = logo;
+        self.state.borrow_mut().stats.logo = logo;
     }
 
     #[update]
     fn setFee(&self, fee: Nat) {
         check_caller(self.owner()).unwrap();
-        self.state.borrow_mut().state.stats.fee = fee;
+        self.state.borrow_mut().stats.fee = fee;
     }
 
     #[update]
     fn setFeeTo(&self, fee_to: Principal) {
         check_caller(self.owner()).unwrap();
-        self.state.borrow_mut().state.stats.fee_to = fee_to;
+        self.state.borrow_mut().stats.fee_to = fee_to;
     }
 
     #[update]
     fn setOwner(&self, owner: Principal) {
         check_caller(self.owner()).unwrap();
-        self.state.borrow_mut().state.stats.owner = owner;
+        self.state.borrow_mut().stats.owner = owner;
     }
 
     #[query]
     fn owner(&self) -> Principal {
-        self.state.borrow().state.stats.owner
+        self.state.borrow().stats.owner
     }
 
     /// Returns an array of transaction records in range [start, start + limit) related to user `who`.
@@ -213,7 +211,7 @@ impl TokenCanister {
             ));
         }
 
-        for tx in self.state.borrow().state.ledger().get_range(&start, &limit) {
+        for tx in self.state.borrow().ledger.get_range(&start, &limit) {
             if tx.from == who || tx.to == who || tx.caller == Some(who) {
                 transactions.push(tx.clone());
             }
@@ -226,7 +224,7 @@ impl TokenCanister {
     #[query]
     fn getUserTransactionAmount(&self, who: Principal) -> Nat {
         let mut amount = Nat::from(0);
-        for tx in self.state.borrow().state.ledger().iter() {
+        for tx in self.state.borrow().ledger.iter() {
             if tx.from == who || tx.to == who || tx.caller == Some(who) {
                 amount += tx.amount.clone();
             }
@@ -317,7 +315,7 @@ impl TokenCanister {
     /// of cycles in the canister drops below this value, all the fees will be used for cycle auction.
     #[query]
     fn getMinCycles(&self) -> u64 {
-        self.state.borrow().state.stats.min_cycles
+        self.state.borrow().stats.min_cycles
     }
 
     /// Sets the minimum cycles for the canister. For more information about this value, read [get_min_cycles].
@@ -326,7 +324,7 @@ impl TokenCanister {
     #[update]
     fn setMinCycles(&self, min_cycles: u64) -> Result<(), TxError> {
         check_caller(self.owner())?;
-        self.state.borrow_mut().state.stats.min_cycles = min_cycles;
+        self.state.borrow_mut().stats.min_cycles = min_cycles;
         Ok(())
     }
 
