@@ -95,7 +95,7 @@ pub(crate) fn run_auction(canister: &TokenCanister) -> Result<AuctionInfo, Aucti
         &mut *canister.balances.borrow_mut(),
         &mut *canister.auction_history.borrow_mut(),
     );
-    reset_bidding_state(&mut *canister.state.borrow_mut(), &mut *state);
+    reset_bidding_state(&*canister.state.borrow_mut(), &mut *state);
 
     result
 }

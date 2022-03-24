@@ -100,7 +100,7 @@ pub fn approve(canister: &TokenCanister, spender: Principal, value: Nat) -> TxRe
     let owner = ic_kit::ic::caller();
     let (fee, fee_to) = canister.state.borrow().stats.fee_info();
     let fee_ratio = canister.bidding_state.borrow().fee_ratio;
-    if canister.balances.borrow().balance_of(&owner) < fee.clone() {
+    if canister.balances.borrow().balance_of(&owner) < fee {
         return Err(TxError::InsufficientBalance);
     }
 
