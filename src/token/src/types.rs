@@ -22,6 +22,34 @@ pub struct StatsData {
     pub is_test_token: bool,
 }
 
+impl StatsData {
+    pub fn fee_info(&self) -> (Nat, Principal) {
+        (self.fee.clone(), self.fee_to)
+    }
+}
+
+// 10T cycles is an equivalent of approximately $10. This should be enough to last the canister
+// for the default auction cycle, which is 1 day.
+const DEFAULT_MIN_CYCLES: u64 = 10_000_000_000_000;
+
+impl From<Metadata> for StatsData {
+    fn from(md: Metadata) -> Self {
+        Self {
+            logo: md.logo,
+            name: md.name,
+            symbol: md.symbol,
+            decimals: md.decimals,
+            total_supply: md.totalSupply,
+            owner: md.owner,
+            fee: md.fee,
+            fee_to: md.feeTo,
+            deploy_time: ic_kit::ic::time(),
+            min_cycles: DEFAULT_MIN_CYCLES,
+            is_test_token: md.isTestToken.unwrap_or(false),
+        }
+    }
+}
+
 #[allow(non_snake_case)]
 #[derive(Deserialize, CandidType, Clone, Debug)]
 pub struct TokenInfo {

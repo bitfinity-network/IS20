@@ -62,13 +62,11 @@ fn inspect_message() {
     match &method[..] {
         // These are query methods, so no checks are needed.
         m if PUBLIC_METHODS.contains(&m) => ic_cdk::api::call::accept_message(),
+        m if m == "mint" && state.stats().is_test_token => ic_cdk::api::call::accept_message(),
         m if OWNER_METHODS.contains(&m) => {
             // These methods are allowed to be run only by the owner of the canister.
             let owner = state.stats().owner;
-            if m == "mint" && state.stats().is_test_token {
-                ic_cdk::api::call::accept_message();
-            }
-            else if  caller == owner {
+            if caller == owner {
                 ic_cdk::api::call::accept_message();
             } else {
                 ic_cdk::println!("Owner method is called not by an owner. Rejecting.");
