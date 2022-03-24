@@ -24,6 +24,7 @@ static PUBLIC_METHODS: &[&str] = &[
     "owner",
     "symbol",
     "totalSupply",
+    "isTestToken",
 ];
 
 static OWNER_METHODS: &[&str] = &[
@@ -35,6 +36,7 @@ static OWNER_METHODS: &[&str] = &[
     "setMinCycles",
     "setName",
     "setOwner",
+    "toggleTest",
 ];
 
 static TRANSACTION_METHODS: &[&str] = &[
@@ -59,14 +61,15 @@ fn inspect_message() {
 
     match &method[..] {
         // These are query methods, so no checks are needed.
+        "mint" if state.stats.is_test_token => ic_cdk::api::call::accept_message(),
         m if PUBLIC_METHODS.contains(&m) => ic_cdk::api::call::accept_message(),
+        // Owner
+        m if OWNER_METHODS.contains(&m) && caller == state.stats.owner => {
+            ic_cdk::api::call::accept_message()
+        }
+        // Not owner
         m if OWNER_METHODS.contains(&m) => {
-            // These methods are allowed to be run only by the owner of the canister.
-            if caller == state.stats.owner {
-                ic_cdk::api::call::accept_message();
-            } else {
-                ic_cdk::println!("Owner method is called not by an owner. Rejecting.");
-            }
+            ic_cdk::println!("Owner method is called not by an owner. Rejecting.")
         }
         m if TRANSACTION_METHODS.contains(&m) => {
             // These methods require the caller to have some balance, so we check if the caller

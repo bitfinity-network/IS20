@@ -89,6 +89,14 @@ impl TokenCanister {
         self.state.borrow().stats.is_test_token
     }
 
+    #[update]
+    fn toggleTest(&self) -> bool {
+        check_caller(self.owner()).unwrap();
+        let stats = &mut self.state.borrow_mut().stats;
+        stats.is_test_token = !stats.is_test_token;
+        self.isTestToken()
+    }
+
     #[query]
     fn name(&self) -> String {
         self.state.borrow().stats.name.clone()
@@ -371,6 +379,8 @@ impl TokenCanister {
     ) -> TxReceipt {
         transfer_and_notify(self, to, amount, fee_limit).await
     }
+
+
 }
 
 fn check_caller(caller: Principal) -> Result<(), TxError> {

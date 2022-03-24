@@ -339,7 +339,7 @@ mod tests {
         let (context, canister) = test_context();
         context.update_balance(1_000_000_000);
 
-        canister.state.borrow_mut().stats_mut().min_cycles = 1_000_000;
+        canister.state.borrow_mut().stats.min_cycles = 1_000_000;
         canister.runAuction().unwrap_err();
 
         assert_eq!(canister.state.borrow().bidding_state.fee_ratio, 0.125);
