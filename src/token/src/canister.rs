@@ -379,8 +379,6 @@ impl TokenCanister {
     ) -> TxReceipt {
         transfer_and_notify(self, to, amount, fee_limit).await
     }
-
-
 }
 
 fn check_caller(caller: Principal) -> Result<(), TxError> {
