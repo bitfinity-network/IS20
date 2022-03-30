@@ -30,7 +30,8 @@ pub struct TokenCanister {
     #[id]
     principal: Principal,
 
-    #[state]
+    // TODO: default this to true
+    #[state(stable_store = true)]
     state: Rc<RefCell<CanisterState>>,
 }
 
@@ -386,5 +387,40 @@ fn check_caller(caller: Principal) -> Result<(), TxError> {
         Ok(())
     } else {
         Err(TxError::Unauthorized)
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn test_upgrade_from_previous() {
+        use ic_storage::stable::write;
+        write(&()).unwrap();
+        let canister = TokenCanister::init_instance();
+        canister.__post_upgrade_inst();
+    }
+
+    #[test]
+    fn test_upgrade_from_current() {
+        // Set a value on the state...
+        let canister = TokenCanister::init_instance();
+        let mut state = canister.state.borrow_mut();
+        state.bidding_state.fee_ratio = 12345.0;
+        // ... write the state to stable storage
+        canister.__pre_upgrade_inst();
+
+        // Update the value without writing it to stable
+        // storage should then ignore this change
+        let mut state = canister.state.borrow_mut();
+        state.bidding_state.fee_ratio = 0.0;
+        drop(state);
+
+        // Upgrade the canister should have the state
+        // written before pre_upgrade
+        canister.__post_upgrade_inst();
+        let state = canister.state.borrow();
+        assert_eq!(state.bidding_state.fee_ratio, 12345.0);
     }
 }
