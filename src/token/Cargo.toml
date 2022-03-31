@@ -4,16 +4,15 @@ name = "token"
 version = "0.1.0"
 
 [features]
-default = ["api"]
-api = ["ic-cdk-macros"]
-export_api = []
+default = []
+no_api = []
 
 [dependencies]
 assert-panic = "1.0"
 candid = "0.7"
 common = {path = "../common"}
 ic-cdk = "0.3"
-ic-cdk-macros = {version = "0.3", optional = true}
+ic-cdk-macros = "0.3"
 ic-kit = "0.4.3"
 num-traits = "0.2"
 serde = "1.0"
