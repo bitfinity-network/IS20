@@ -30,8 +30,7 @@ pub struct TokenCanister {
     #[id]
     principal: Principal,
 
-    // TODO: default this to true
-    #[state(stable_store = true)]
+    #[state]
     state: Rc<RefCell<CanisterState>>,
 }
 
@@ -408,11 +407,11 @@ mod test {
         let canister = TokenCanister::init_instance();
         let mut state = canister.state.borrow_mut();
         state.bidding_state.fee_ratio = 12345.0;
+        drop(state);
         // ... write the state to stable storage
         canister.__pre_upgrade_inst();
 
-        // Update the value without writing it to stable
-        // storage should then ignore this change
+        // Update the value without writing it to stable storage
         let mut state = canister.state.borrow_mut();
         state.bidding_state.fee_ratio = 0.0;
         drop(state);
