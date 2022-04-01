@@ -51,6 +51,7 @@ static TRANSACTION_METHODS: &[&str] = &[
 /// calls for anyone, but update calls have different checks to see, if it's reasonable to spend
 /// canister cycles on accepting this call. Check the comments in this method for details on
 /// the checks for different methods.
+#[cfg(not(feature = "no_api"))]
 #[inspect_message]
 fn inspect_message() {
     let method = ic_cdk::api::call::method_name();
