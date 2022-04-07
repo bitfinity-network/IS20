@@ -32,11 +32,11 @@ pub struct TokenCanister {
 
     #[state]
     state: Rc<RefCell<State>>,
-    #[state]
+    #[state(stable_store = false)]
     bidding_state: Rc<RefCell<BiddingState>>,
-    #[state]
+    #[state(stable_store = false)]
     balances: Rc<RefCell<Balances>>,
-    #[state]
+    #[state(stable_store = false)]
     auction_history: Rc<RefCell<AuctionHistory>>,
 }
 

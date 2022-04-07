@@ -2,6 +2,7 @@ use crate::ledger::Ledger;
 use crate::types::{Allowances, AuctionInfo, PendingNotifications, StatsData, Timestamp};
 use candid::{CandidType, Deserialize, Nat, Principal};
 use common::types::Metadata;
+use ic_storage::stable::Versioned;
 use ic_storage::IcStorage;
 use std::collections::HashMap;
 
@@ -12,6 +13,14 @@ pub struct State {
     pub(crate) ledger: Ledger,
     auction_history: AuctionHistory,
     pub notifications: PendingNotifications,
+}
+
+impl Versioned for State {
+    type Previous = ();
+
+    fn upgrade((): ()) -> Self {
+        Self::default()
+    }
 }
 
 #[derive(Default, IcStorage, CandidType, Deserialize)]
