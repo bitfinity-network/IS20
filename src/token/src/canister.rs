@@ -4,7 +4,7 @@ use crate::canister::is20_auction::{
 };
 use crate::canister::is20_notify::{notify, transfer_and_notify};
 use crate::canister::is20_transactions::transfer_include_fee;
-use crate::state::{AuctionHistory, Balances, BiddingState, State};
+use crate::state::CanisterState;
 use crate::types::{AuctionInfo, StatsData, Timestamp, TokenInfo, TxError, TxReceipt, TxRecord};
 use candid::Nat;
 use common::types::Metadata;
@@ -31,21 +31,16 @@ pub struct TokenCanister {
     principal: Principal,
 
     #[state]
-    state: Rc<RefCell<State>>,
-    #[state]
-    bidding_state: Rc<RefCell<BiddingState>>,
-    #[state]
-    balances: Rc<RefCell<Balances>>,
-    #[state]
-    auction_history: Rc<RefCell<AuctionHistory>>,
+    state: Rc<RefCell<CanisterState>>,
 }
 
 #[allow(non_snake_case)]
 impl TokenCanister {
     #[init]
     fn init(&self, metadata: Metadata) {
-        self.balances
+        self.state
             .borrow_mut()
+            .balances
             .0
             .insert(metadata.owner, metadata.totalSupply.clone());
         self.state.borrow_mut().ledger.mint(
@@ -54,7 +49,7 @@ impl TokenCanister {
             metadata.totalSupply.clone(),
         );
         self.state.borrow_mut().stats = metadata.into();
-        self.bidding_state.borrow_mut().auction_period = DEFAULT_AUCTION_PERIOD;
+        self.state.borrow_mut().bidding_state.auction_period = DEFAULT_AUCTION_PERIOD;
     }
 
     #[query]
@@ -69,14 +64,14 @@ impl TokenCanister {
             feeTo: fee_to,
             historySize: self.state.borrow().ledger.len(),
             deployTime: deploy_time,
-            holderNumber: self.balances.borrow().0.len(),
+            holderNumber: self.state.borrow().balances.0.len(),
             cycles: ic_kit::ic::balance(),
         }
     }
 
     #[query]
     fn getHolders(&self, start: usize, limit: usize) -> Vec<(Principal, Nat)> {
-        self.balances.borrow().get_holders(start, limit)
+        self.state.borrow().balances.get_holders(start, limit)
     }
 
     #[query]
@@ -129,7 +124,7 @@ impl TokenCanister {
 
     #[query]
     fn balanceOf(&self, id: Principal) -> Nat {
-        self.balances.borrow().balance_of(&id)
+        self.state.borrow().balances.balance_of(&id)
     }
 
     #[query]
@@ -144,14 +139,14 @@ impl TokenCanister {
 
     #[query]
     fn historySize(&self) -> Nat {
-        self.state.borrow().ledger().len()
+        self.state.borrow().ledger.len()
     }
 
     #[query]
     fn getTransaction(&self, id: Nat) -> TxRecord {
         self.state
             .borrow()
-            .ledger()
+            .ledger
             .get(&id)
             .unwrap_or_else(|| ic_kit::ic::trap(&format!("Transaction {} does not exist", id)))
     }
@@ -167,7 +162,7 @@ impl TokenCanister {
 
         self.state
             .borrow()
-            .ledger()
+            .ledger
             .get_range(&start, &limit)
             .to_vec()
     }
@@ -224,7 +219,7 @@ impl TokenCanister {
             ));
         }
 
-        for tx in self.state.borrow().ledger().get_range(&start, &limit) {
+        for tx in self.state.borrow().ledger.get_range(&start, &limit) {
             if tx.from == who || tx.to == who || tx.caller == Some(who) {
                 transactions.push(tx.clone());
             }
@@ -237,7 +232,7 @@ impl TokenCanister {
     #[query]
     fn getUserTransactionAmount(&self, who: Principal) -> Nat {
         let mut amount = Nat::from(0);
-        for tx in self.state.borrow().ledger().iter() {
+        for tx in self.state.borrow().ledger.iter() {
             if tx.from == who || tx.to == who || tx.caller == Some(who) {
                 amount += tx.amount.clone();
             }
@@ -348,7 +343,7 @@ impl TokenCanister {
     fn setAuctionPeriod(&self, period_sec: u64) -> Result<(), TxError> {
         check_caller(self.owner())?;
         // IC timestamp is in nanoseconds, thus multiplying
-        self.bidding_state.borrow_mut().auction_period = period_sec * 1_000_000;
+        self.state.borrow_mut().bidding_state.auction_period = period_sec * 1_000_000;
         Ok(())
     }
 
@@ -391,5 +386,40 @@ fn check_caller(caller: Principal) -> Result<(), TxError> {
         Ok(())
     } else {
         Err(TxError::Unauthorized)
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn test_upgrade_from_previous() {
+        use ic_storage::stable::write;
+        write(&()).unwrap();
+        let canister = TokenCanister::init_instance();
+        canister.__post_upgrade_inst();
+    }
+
+    #[test]
+    fn test_upgrade_from_current() {
+        // Set a value on the state...
+        let canister = TokenCanister::init_instance();
+        let mut state = canister.state.borrow_mut();
+        state.bidding_state.fee_ratio = 12345.0;
+        drop(state);
+        // ... write the state to stable storage
+        canister.__pre_upgrade_inst();
+
+        // Update the value without writing it to stable storage
+        let mut state = canister.state.borrow_mut();
+        state.bidding_state.fee_ratio = 0.0;
+        drop(state);
+
+        // Upgrade the canister should have the state
+        // written before pre_upgrade
+        canister.__post_upgrade_inst();
+        let state = canister.state.borrow();
+        assert_eq!(state.bidding_state.fee_ratio, 12345.0);
     }
 }

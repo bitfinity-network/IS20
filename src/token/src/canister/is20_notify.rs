@@ -10,7 +10,7 @@ pub(crate) async fn notify(canister: &TokenCanister, transaction_id: Nat) -> TxR
     let tx = {
         let mut state = canister.state.borrow_mut();
         let tx = state
-            .ledger()
+            .ledger
             .get(&transaction_id)
             .ok_or(TxError::TransactionDoesNotExist)?;
 
