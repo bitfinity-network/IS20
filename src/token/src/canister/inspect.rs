@@ -43,7 +43,6 @@ static TRANSACTION_METHODS: &[&str] = &[
     "approve",
     "burn",
     "transfer",
-    "transferAndNotify",
     "transferIncludeFee",
 ];
 
@@ -51,7 +50,6 @@ static TRANSACTION_METHODS: &[&str] = &[
 /// calls for anyone, but update calls have different checks to see, if it's reasonable to spend
 /// canister cycles on accepting this call. Check the comments in this method for details on
 /// the checks for different methods.
-#[cfg(not(feature = "no_api"))]
 #[inspect_message]
 fn inspect_message() {
     let method = ic_cdk::api::call::method_name();
@@ -100,18 +98,6 @@ fn inspect_message() {
                 }
             } else {
                 ic_cdk::println!("Caller is not allowed to transfer tokens for the requested principal. Rejecting.");
-            }
-        }
-        "notify" => {
-            // This method can only be called if the notification id is in the pending notifications
-            // list.
-            let notifications = &state.notifications;
-            let (tx_id,) = ic_cdk::api::call::arg_data::<(Nat,)>();
-
-            if notifications.contains(&tx_id) {
-                ic_cdk::api::call::accept_message();
-            } else {
-                ic_cdk::println!("No pending notification with the given id. Rejecting.");
             }
         }
         "runAuction" => {

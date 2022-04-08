@@ -1,61 +1,35 @@
+use crate::ledger::history::History;
 use crate::types::TxRecord;
 use candid::{CandidType, Deserialize, Nat, Principal};
-use num_traits::ToPrimitive;
+use ic_certified_map::HashTree;
 
-const MAX_HISTORY_LENGTH: usize = 1_000_000;
-const HISTORY_REMOVAL_BATCH_SIZE: usize = 10_000;
+mod history;
 
 #[derive(Default, CandidType, Deserialize)]
 pub struct Ledger {
-    history: Vec<TxRecord>,
-    vec_offset: Nat,
+    history: History,
+    next_id: u128,
 }
 
 impl Ledger {
     pub fn len(&self) -> Nat {
-        self.vec_offset.clone() + self.history.len()
+        Nat::from(self.next_id)
     }
 
     fn next_id(&self) -> Nat {
-        self.vec_offset.clone() + self.history.len()
+        Nat::from(self.next_id)
     }
 
     pub fn get(&self, id: &Nat) -> Option<TxRecord> {
-        self.history.get(self.get_index(id)?).cloned()
+        self.history.get(id)
     }
 
     pub fn get_range(&self, start: &Nat, limit: &Nat) -> Vec<TxRecord> {
-        let start = match self.get_index(start) {
-            Some(v) => v,
-            None => {
-                if *start > self.vec_offset.clone() {
-                    usize::MAX
-                } else {
-                    0
-                }
-            }
-        };
-
-        let limit = limit.0.to_usize().unwrap_or(usize::MAX);
-        self.history
-            .iter()
-            .skip(start)
-            .take(limit)
-            .cloned()
-            .collect()
+        self.history.get_range(start, limit)
     }
 
-    pub fn iter(&self) -> impl Iterator<Item = &TxRecord> {
+    pub fn iter(&self) -> impl Iterator<Item = TxRecord> + '_ {
         self.history.iter()
-    }
-
-    fn get_index(&self, id: &Nat) -> Option<usize> {
-        if *id < self.vec_offset {
-            None
-        } else {
-            let index = id.clone() - self.vec_offset.clone();
-            index.0.to_usize()
-        }
     }
 
     pub fn transfer(&mut self, from: Principal, to: Principal, amount: Nat, fee: Nat) -> Nat {
@@ -113,14 +87,12 @@ impl Ledger {
     }
 
     fn push(&mut self, record: TxRecord) {
-        self.history.push(record);
-        if self.len() > MAX_HISTORY_LENGTH + HISTORY_REMOVAL_BATCH_SIZE {
-            // We remove first `HISTORY_REMOVAL_BATCH_SIZE` from the history at one go, to prevent
-            // often relocation of the history vec.
-            // This removal code can later be changed to moving old history records into another
-            // storage.
-            self.history = self.history[HISTORY_REMOVAL_BATCH_SIZE..].into();
-            self.vec_offset += HISTORY_REMOVAL_BATCH_SIZE;
-        }
+        self.history.insert(record);
+        self.history.sign();
+        self.next_id += 1;
+    }
+
+    pub fn get_witness(&self, id: &Nat) -> Option<HashTree> {
+        self.history.get_witness(id)
     }
 }

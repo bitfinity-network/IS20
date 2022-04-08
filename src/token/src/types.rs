@@ -88,9 +88,6 @@ pub enum TxError {
     Unauthorized,
     AmountTooSmall,
     FeeExceededLimit,
-    NotificationFailed,
-    AlreadyNotified,
-    TransactionDoesNotExist,
 }
 
 pub type TxReceipt = Result<Nat, TxError>;
@@ -121,4 +118,19 @@ pub struct AuctionInfo {
     pub fee_ratio: f64,
     pub first_transaction_id: Nat,
     pub last_transaction_id: Nat,
+}
+
+/// Hash tree witness for a transaction with a certificate signed by the token canister and IC.
+#[derive(CandidType, Debug, Clone, Deserialize)]
+pub struct SignedTx {
+    /// Id of the token canister.
+    pub principal: Principal,
+
+    /// Signed certificate. The certificate is in the format returned by `get_certificate` IC API
+    /// call. The certified data in the certificate equals to the root hash of the witness.
+    pub certificate: Vec<u8>,
+
+    /// Hash tree serialized with `serde-cbor`. The hash tree is in the format defined in
+    /// `ic-certified-map::HashTree` and contains one leaf node with the value of type [`TxRecord`].
+    pub witness: Vec<u8>,
 }

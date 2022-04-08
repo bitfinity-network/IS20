@@ -2,10 +2,11 @@ use crate::canister::dip20_transactions::{approve, burn, mint, transfer, transfe
 use crate::canister::is20_auction::{
     auction_info, bid_cycles, bidding_info, run_auction, AuctionError, BiddingInfo,
 };
-use crate::canister::is20_notify::{notify, transfer_and_notify};
 use crate::canister::is20_transactions::transfer_include_fee;
 use crate::state::{AuctionHistory, Balances, BiddingState, State};
-use crate::types::{AuctionInfo, StatsData, Timestamp, TokenInfo, TxError, TxReceipt, TxRecord};
+use crate::types::{
+    AuctionInfo, SignedTx, StatsData, Timestamp, TokenInfo, TxError, TxReceipt, TxRecord,
+};
 use candid::Nat;
 use common::types::Metadata;
 use ic_canister::{init, query, update, Canister};
@@ -15,9 +16,9 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 mod dip20_transactions;
+#[cfg(not(feature = "no_api"))]
 mod inspect;
 pub mod is20_auction;
-mod is20_notify;
 mod is20_transactions;
 
 // 1 day in nanoseconds.
@@ -154,6 +155,25 @@ impl TokenCanister {
             .ledger()
             .get(&id)
             .unwrap_or_else(|| ic_kit::ic::trap(&format!("Transaction {} does not exist", id)))
+    }
+
+    /// Returns a witness for the given transaction with a certificate signed by the canister and IC
+    /// for that witness.
+    ///
+    /// If the transaction with the given ID is not present in the transaction history, returns None.
+    /// This can be if the transaction with the given ID does not exist, or if it was removed
+    /// from the history because it is too old.
+    #[query]
+    fn getSignedTransaction(&self, id: Nat) -> Option<SignedTx> {
+        let certificate = ic_cdk::api::data_certificate()?;
+        let witness = serde_cbor::to_vec(&self.state.borrow().ledger.get_witness(&id)?)
+            .expect("serialization of a hash tree does not fail");
+
+        Some(SignedTx {
+            principal: ic_kit::ic::id(),
+            certificate,
+            witness,
+        })
     }
 
     #[query]
@@ -350,39 +370,6 @@ impl TokenCanister {
         // IC timestamp is in nanoseconds, thus multiplying
         self.bidding_state.borrow_mut().auction_period = period_sec * 1_000_000;
         Ok(())
-    }
-
-    /*********************** NOTIFY **********************/
-
-    /// Notifies the transaction receiver about a previously performed transaction.
-    ///
-    /// This method guarantees that a notification for the same transaction id can be sent only once.
-    /// It allows to use this method to reliably inform the transaction receiver without danger of
-    /// duplicate transaction attack.
-    ///
-    /// In case the notification call fails, an [TxError::NotificationFailed] error is returned and
-    /// the transaction will still be marked as not notified.
-    ///
-    /// If a notification request is made for a transaction that was already notified, a
-    /// [TxError::AlreadyNotified] error is returned.
-    #[update]
-    async fn notify(&self, transaction_id: Nat) -> TxReceipt {
-        notify(self, transaction_id).await
-    }
-
-    /// Convenience method to make a transaction and notify the receiver with just one call.
-    ///
-    /// If the notification fails for any reason, the transaction is still completed, but it will be
-    /// marked as not notified, so a [notify] call can be done later to re-request the notification of
-    /// this transaction.
-    #[update]
-    async fn transferAndNotify(
-        &self,
-        to: Principal,
-        amount: Nat,
-        fee_limit: Option<Nat>,
-    ) -> TxReceipt {
-        transfer_and_notify(self, to, amount, fee_limit).await
     }
 }
 
