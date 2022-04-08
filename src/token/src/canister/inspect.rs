@@ -39,12 +39,7 @@ static OWNER_METHODS: &[&str] = &[
     "toggleTest",
 ];
 
-static TRANSACTION_METHODS: &[&str] = &[
-    "approve",
-    "burn",
-    "transfer",
-    "transferIncludeFee",
-];
+static TRANSACTION_METHODS: &[&str] = &["approve", "burn", "transfer", "transferIncludeFee"];
 
 /// This function checks if the canister should accept ingress message or not. We allow query
 /// calls for anyone, but update calls have different checks to see, if it's reasonable to spend
