@@ -13,6 +13,8 @@ use ic_canister::{init, query, update, Canister};
 use ic_helpers::factory::error::FactoryError;
 use ic_helpers::factory::FactoryState;
 
+mod inspect_message;
+
 ic_helpers::extend_with_factory_api!(
     TokenFactoryCanister,
     state,
@@ -34,19 +36,6 @@ impl TokenFactoryCanister {
     fn init(&self, controller: Principal, ledger_principal: Option<Principal>) {
         self.state.replace(State::new(controller, ledger_principal));
     }
-
-    // TODO
-    // #[inspect_message]
-    // fn inspect_message_function(&self) {
-    //     if ic_cdk::api::call::method_name() == "set_token_bytecode" {
-    //         return ic_cdk::api::call::accept_message();
-    //     }
-
-    //     match &State::get().borrow().token_wasm {
-    //         Some(_) => ic_cdk::api::call::accept_message(),
-    //         None => ic_cdk::api::call::reject("the factory hasn't been completely intialized yet"),
-    //     }
-    // }
 
     /// Returns the token, or None if it does not exist.
     #[query]
@@ -124,7 +113,7 @@ impl TokenFactoryCanister {
             return Err(TokenFactoryError::AlreadyExists);
         }
 
-        let caller = owner.unwrap_or_else(ic_cdk::api::caller);
+        let caller = owner.unwrap_or_else(ic_kit::ic::caller);
         let actor = self.state.borrow().consume_provided_cycles_or_icp(caller);
         let cycles = actor.await?;
 
