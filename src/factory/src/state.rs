@@ -1,7 +1,7 @@
 use candid::Principal;
 use ic_cdk::export::candid::CandidType;
 use ic_helpers::factory::{Factory, FactoryConfiguration, FactoryState};
-use ic_storage::IcStorage;
+use ic_storage::{stable::Versioned, IcStorage};
 use serde::Deserialize;
 
 // 1 ICP
@@ -35,6 +35,14 @@ impl State {
     }
 }
 
+impl Versioned for State {
+    type Previous = ();
+
+    fn upgrade((): ()) -> Self {
+        Self::default()
+    }
+}
+
 impl Default for State {
     fn default() -> Self {
         // The default state is only used to initialize storage before `init` method is called, so
@@ -53,11 +61,17 @@ impl Default for State {
 }
 
 pub fn get_token_bytecode() -> Vec<u8> {
-    State::get()
-        .borrow()
-        .token_wasm
-        .clone()
-        .expect("the token bytecode should be set before accessing it")
+    #[cfg(target_family = "wasm")]
+    {
+        State::get()
+            .borrow()
+            .token_wasm
+            .clone()
+            .expect("the token bytecode should be set before accessing it")
+    }
+    // In the mocking context we don't care about injecting wasm code anywhere
+    #[cfg(not(target_family = "wasm"))]
+    vec![]
 }
 
 ic_helpers::impl_factory_state_management!(State, &get_token_bytecode());
