@@ -1,7 +1,7 @@
 use candid::Principal;
 use ic_cdk::export::candid::CandidType;
 use ic_helpers::factory::{Factory, FactoryConfiguration, FactoryState};
-use ic_storage::IcStorage;
+use ic_storage::{stable::Versioned, IcStorage};
 use serde::Deserialize;
 
 // 1 ICP
@@ -32,6 +32,14 @@ impl State {
                 controller,
             ),
         }
+    }
+}
+
+impl Versioned for State {
+    type Previous = ();
+
+    fn upgrade((): ()) -> Self {
+        Self::default()
     }
 }
 

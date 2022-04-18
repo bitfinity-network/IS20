@@ -12,6 +12,5 @@ fn main() {
     use common::types::Metadata;
     use ic_helpers::factory::error::FactoryError;
 
-    candid::export_service!();
-    std::print!("{}", __export_service());
+    std::print!("{}", ic_canister::generate_idl!());
 }
