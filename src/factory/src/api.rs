@@ -30,7 +30,6 @@ pub struct TokenFactoryCanister {
     state: Rc<RefCell<State>>,
 }
 
-#[allow(dead_code)]
 impl TokenFactoryCanister {
     #[init]
     fn init(&self, controller: Principal, ledger_principal: Option<Principal>) {
@@ -43,23 +42,13 @@ impl TokenFactoryCanister {
         self.state.borrow().factory.get(&name)
     }
 
-    pub async fn set_token_bytecode_impl(&self, bytecode: Vec<u8>) {
-        self.state.borrow_mut().token_wasm.replace(bytecode);
-    }
-
     #[update]
     async fn set_token_bytecode(&self, bytecode: Vec<u8>) {
         if self.state.borrow().controller() != ic_kit::ic::caller() {
-            #[cfg(target_family = "wasm")]
-            {
-                ic_cdk::api::call::reject("not authorized");
-                return;
-            }
-            #[cfg(not(target_family = "wasm"))]
-            panic!("not authorized");
+            ic_kit::ic::trap("not authorized");
         }
 
-        self.set_token_bytecode_impl(bytecode).await;
+        self.state.borrow_mut().token_wasm.replace(bytecode);
     }
 
     /// Creates a new token.
@@ -139,9 +128,10 @@ mod tests {
 
     #[tokio::test]
     async fn test_set_token_bytecode_impl() {
+        ic_kit::MockContext::new().inject();
         let factory = TokenFactoryCanister::init_instance();
         assert_eq!(factory.state.borrow().token_wasm, None);
-        factory.set_token_bytecode_impl(vec![12, 3]).await;
+        factory.set_token_bytecode(vec![12, 3]).await;
         assert_eq!(factory.state.borrow().token_wasm, Some(vec![12, 3]));
     }
 }

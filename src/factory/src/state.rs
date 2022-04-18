@@ -61,17 +61,11 @@ impl Default for State {
 }
 
 pub fn get_token_bytecode() -> Vec<u8> {
-    #[cfg(target_family = "wasm")]
-    {
-        State::get()
-            .borrow()
-            .token_wasm
-            .clone()
-            .expect("the token bytecode should be set before accessing it")
-    }
-    // In the mocking context we don't care about injecting wasm code anywhere
-    #[cfg(not(target_family = "wasm"))]
-    vec![]
+    State::get()
+        .borrow()
+        .token_wasm
+        .clone()
+        .expect("the token bytecode should be set before accessing it")
 }
 
 ic_helpers::impl_factory_state_management!(State, &get_token_bytecode());
