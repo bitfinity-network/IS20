@@ -68,8 +68,6 @@ pub fn get_token_bytecode() -> Vec<u8> {
         .expect("the token bytecode should be set before accessing it")
 }
 
-ic_helpers::impl_factory_state_management!(State, &get_token_bytecode());
-
 impl FactoryState<String> for State {
     fn factory(&self) -> &Factory<String> {
         &self.factory
