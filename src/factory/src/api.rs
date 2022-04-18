@@ -44,10 +44,6 @@ impl TokenFactoryCanister {
 
     #[update]
     async fn set_token_bytecode(&self, bytecode: Vec<u8>) {
-        if self.state.borrow().controller() != ic_kit::ic::caller() {
-            ic_kit::ic::trap("not authorized");
-        }
-
         self.state.borrow_mut().token_wasm.replace(bytecode);
     }
 

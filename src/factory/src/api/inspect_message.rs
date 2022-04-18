@@ -1,5 +1,6 @@
 use crate::state::State;
 use ic_cdk_macros::inspect_message;
+use ic_helpers::factory::FactoryState;
 use ic_storage::IcStorage;
 
 #[cfg(not(feature = "no_api"))]
@@ -8,7 +9,9 @@ fn inspect_message() {
     let state = State::get();
     let state = state.borrow();
 
-    if ic_cdk::api::call::method_name() == "set_token_bytecode" {
+    if ic_cdk::api::call::method_name() == "set_token_bytecode"
+        && state.controller() == ic_kit::ic::caller()
+    {
         return ic_cdk::api::call::accept_message();
     }
 
