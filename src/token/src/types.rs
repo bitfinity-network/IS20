@@ -85,10 +85,12 @@ pub type Allowances = HashMap<Principal, HashMap<Principal, Nat>>;
 pub enum TxError {
     InsufficientBalance,
     InsufficientAllowance,
-    Unauthorized,
+    // When thread panics, it prints the structure via `Debug` trait,
+    // hence we're storing the strings instead of principals for readability
+    Unauthorized { owner: String, caller: String },
     AmountTooSmall,
     FeeExceededLimit,
-    NotificationFailed,
+    NotificationFailed { cdk_msg: String },
     AlreadyNotified,
     TransactionDoesNotExist,
 }

@@ -24,16 +24,19 @@ pub(crate) async fn notify(canister: &TokenCanister, transaction_id: Nat) -> TxR
         tx
     };
 
-    if send_notification(&tx).await.is_err() {
-        canister
-            .state
-            .borrow_mut()
-            .notifications
-            .insert(transaction_id);
-        return Err(TxError::NotificationFailed);
+    match send_notification(&tx).await {
+        Ok(()) => Ok(tx.index),
+        Err((_, description)) => {
+            canister
+                .state
+                .borrow_mut()
+                .notifications
+                .insert(transaction_id);
+            Err(TxError::NotificationFailed {
+                cdk_msg: description,
+            })
+        }
     }
-
-    Ok(tx.index)
 }
 
 pub(crate) async fn transfer_and_notify(
@@ -159,9 +162,9 @@ mod tests {
         );
 
         let canister = test_canister();
-        let id = canister.transfer(bob(), Nat::from(100), None).unwrap();
+        let id = canister.transfer(bob(), Nat::from(100u32), None).unwrap();
         let response = canister.notify(id.clone()).await;
-        assert_eq!(response, Err(TxError::NotificationFailed));
+        assert!(response.is_err());
 
         register_virtual_responder(
             bob(),

@@ -17,7 +17,7 @@ use std::rc::Rc;
 mod dip20_transactions;
 mod inspect;
 pub mod is20_auction;
-mod is20_notify;
+pub mod is20_notify;
 mod is20_transactions;
 
 // 1 day in nanoseconds.
@@ -123,8 +123,8 @@ impl TokenCanister {
     }
 
     #[query]
-    fn balanceOf(&self, id: Principal) -> Nat {
-        self.state.borrow().balances.balance_of(&id)
+    fn balanceOf(&self, holder: Principal) -> Nat {
+        self.state.borrow().balances.balance_of(&holder)
     }
 
     #[query]
@@ -381,11 +381,14 @@ impl TokenCanister {
     }
 }
 
-fn check_caller(caller: Principal) -> Result<(), TxError> {
-    if ic_kit::ic::caller() == caller {
+fn check_caller(owner: Principal) -> Result<(), TxError> {
+    if ic_kit::ic::caller() == owner {
         Ok(())
     } else {
-        Err(TxError::Unauthorized)
+        Err(TxError::Unauthorized {
+            owner: owner.to_string(),
+            caller: ic_kit::ic::caller().to_string(),
+        })
     }
 }
 
