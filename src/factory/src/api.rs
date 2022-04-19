@@ -102,11 +102,18 @@ impl TokenFactoryCanister {
         let actor = self.state.borrow().consume_provided_cycles_or_icp(caller);
         let cycles = actor.await?;
 
-        let create_token =
-            self.state
-                .borrow()
-                .factory
-                .create_with_cycles(&get_token_bytecode(), (info,), cycles);
+        let wasm = self
+            .state
+            .borrow()
+            .token_wasm
+            .clone()
+            .expect("token_wasm is not set in token state");
+
+        let create_token = self
+            .state
+            .borrow()
+            .factory
+            .create_with_cycles(&wasm, (info,), cycles);
 
         let canister = create_token
             .await
