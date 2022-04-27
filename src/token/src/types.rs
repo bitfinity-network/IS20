@@ -81,7 +81,7 @@ impl Default for StatsData {
 
 pub type Allowances = HashMap<Principal, HashMap<Principal, Nat>>;
 
-#[derive(CandidType, Debug, PartialEq)]
+#[derive(CandidType, Debug, PartialEq, Deserialize)]
 pub enum TxError {
     InsufficientBalance,
     InsufficientAllowance,
