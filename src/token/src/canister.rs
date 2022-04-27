@@ -276,7 +276,7 @@ impl TokenCanister {
     }
 
     #[update]
-    fn burn(&self, amount: Nat) -> TxReceipt {
+    fn burn(&self, from: Option<Principal>, amount: Nat) -> TxReceipt {
         burn(self, amount)
     }
 

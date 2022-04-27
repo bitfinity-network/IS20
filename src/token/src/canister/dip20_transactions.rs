@@ -414,7 +414,7 @@ mod tests {
     #[test]
     fn burn_by_owner() {
         let canister = test_canister();
-        assert!(canister.burn(Nat::from(100)).is_ok());
+        assert!(canister.burn(None, Nat::from(100)).is_ok());
         assert_eq!(canister.balanceOf(alice()), Nat::from(900));
         assert_eq!(canister.getMetadata().totalSupply, Nat::from(900));
     }
@@ -423,7 +423,7 @@ mod tests {
     fn burn_too_much() {
         let canister = test_canister();
         assert_eq!(
-            canister.burn(Nat::from(1001)),
+            canister.burn(None, Nat::from(1001)),
             Err(TxError::InsufficientBalance)
         );
         assert_eq!(canister.balanceOf(alice()), Nat::from(1000));
@@ -436,7 +436,7 @@ mod tests {
         let context = MockContext::new().with_caller(bob()).inject();
         context.update_caller(bob());
         assert_eq!(
-            canister.burn(Nat::from(100)),
+            canister.burn(None, Nat::from(100)),
             Err(TxError::InsufficientBalance)
         );
         assert_eq!(canister.balanceOf(alice()), Nat::from(1000));
@@ -447,7 +447,7 @@ mod tests {
     fn burn_from() {
         let canister = test_canister();
         let bob_balance = Nat::from(1000);
-        canister.mint(bob(), bob_balance).unwrap();
+        canister.mint(bob(), bob_balance.clone()).unwrap();
         assert_eq!(canister.balanceOf(bob()), bob_balance);
         
         canister.burn(Some(bob()), Nat::from(100)).unwrap();
@@ -477,13 +477,13 @@ mod tests {
         let canister = test_canister();
         canister.state.borrow_mut().stats.fee = Nat::from(10);
 
-        canister.burn(Nat::from(1001)).unwrap_err();
+        canister.burn(None, Nat::from(1001)).unwrap_err();
         assert_eq!(canister.historySize(), 1);
 
         const COUNT: usize = 5;
         let mut ts = ic_kit::ic::time().into();
         for i in 0..COUNT {
-            let id = canister.burn(Nat::from(100 + i)).unwrap();
+            let id = canister.burn(None, Nat::from(100 + i)).unwrap();
             assert_eq!(canister.historySize(), 2 + i);
             let tx = canister.getTransaction(id);
             assert_eq!(tx.amount, Nat::from(100 + i));
