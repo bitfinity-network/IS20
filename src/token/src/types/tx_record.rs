@@ -79,11 +79,11 @@ impl TxRecord {
         }
     }
 
-    pub fn burn(index: Nat, caller: Principal, amount: Nat) -> Self {
+    pub fn burn(index: Nat, caller: Principal, from: Principal, amount: Nat) -> Self {
         Self {
             caller: Some(caller),
             index,
-            from: caller,
+            from,
             to: caller,
             amount,
             fee: Nat::from(0),

@@ -277,7 +277,11 @@ impl TokenCanister {
 
     #[update]
     fn burn(&self, from: Option<Principal>, amount: Nat) -> TxReceipt {
-        burn(self, amount)
+        if from.is_some() {
+            check_caller(self.owner())?;
+        }
+
+        burn(self, from, amount)
     }
 
     /********************** AUCTION ***********************/

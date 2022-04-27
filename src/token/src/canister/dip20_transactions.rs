@@ -157,25 +157,26 @@ pub fn mint(canister: &TokenCanister, to: Principal, amount: Nat) -> TxReceipt {
     Ok(id)
 }
 
-pub fn burn(canister: &TokenCanister, amount: Nat) -> TxReceipt {
+pub fn burn(canister: &TokenCanister, from: Option<Principal>, amount: Nat) -> TxReceipt {
     let caller = ic_kit::ic::caller();
+    let from = from.unwrap_or(caller);
     {
         let mut state = canister.state.borrow_mut();
-        let caller_balance = state.balances.balance_of(&caller);
-        if caller_balance < amount {
+        let balance = state.balances.balance_of(&from);
+        if balance < amount {
             return Err(TxError::InsufficientBalance);
         }
 
         state
             .balances
             .0
-            .insert(caller, caller_balance - amount.clone());
+            .insert(from, balance - amount.clone());
     }
 
     let mut state = canister.state.borrow_mut();
     state.stats.total_supply -= amount.clone();
 
-    let id = state.ledger.burn(caller, amount);
+    let id = state.ledger.burn(caller, from, amount);
     Ok(id)
 }
 
