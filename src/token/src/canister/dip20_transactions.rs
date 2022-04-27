@@ -444,6 +444,35 @@ mod tests {
     }
 
     #[test]
+    fn burn_from() {
+        let canister = test_canister();
+        let bob_balance = Nat::from(1000);
+        canister.mint(bob(), bob_balance).unwrap();
+        assert_eq!(canister.balanceOf(bob()), bob_balance);
+        
+        canister.burn(Some(bob()), Nat::from(100)).unwrap();
+        assert_eq!(canister.balanceOf(bob()), Nat::from(900));
+
+        assert_eq!(canister.getMetadata().totalSupply, Nat::from(1900));
+    }
+
+    #[test]
+    fn burn_from_unauthorized() {
+        let canister = test_canister();
+        let context = MockContext::new().with_caller(bob()).inject();
+        context.update_caller(bob());
+        assert_eq!(
+            canister.burn(Some(alice()), Nat::from(100)),
+            Err(TxError::Unauthorized {
+                owner: alice().to_string(),
+                caller: bob().to_string()
+            })
+        );
+        assert_eq!(canister.balanceOf(alice()), Nat::from(1000));
+        assert_eq!(canister.getMetadata().totalSupply, Nat::from(1000));
+    }
+
+    #[test]
     fn burn_saved_into_history() {
         let canister = test_canister();
         canister.state.borrow_mut().stats.fee = Nat::from(10);
