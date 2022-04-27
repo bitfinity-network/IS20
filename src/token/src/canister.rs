@@ -275,6 +275,10 @@ impl TokenCanister {
         mint(self, to, amount)
     }
 
+    /// Burn `amount` of tokens from `from` principal.
+    /// If `from` is None, then caller's tokens will be burned.
+    /// If `from` is Some(_) but method called not by owner, `TxError::Unauthorized` will be returned.
+    /// If owner calls this method and `from` is Some(who), then who's tokens will be burned.
     #[update]
     fn burn(&self, from: Option<Principal>, amount: Nat) -> TxReceipt {
         if from.is_some() {

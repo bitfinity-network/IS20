@@ -167,10 +167,7 @@ pub fn burn(canister: &TokenCanister, from: Option<Principal>, amount: Nat) -> T
             return Err(TxError::InsufficientBalance);
         }
 
-        state
-            .balances
-            .0
-            .insert(from, balance - amount.clone());
+        state.balances.0.insert(from, balance - amount.clone());
     }
 
     let mut state = canister.state.borrow_mut();
@@ -450,7 +447,7 @@ mod tests {
         let bob_balance = Nat::from(1000);
         canister.mint(bob(), bob_balance.clone()).unwrap();
         assert_eq!(canister.balanceOf(bob()), bob_balance);
-        
+
         canister.burn(Some(bob()), Nat::from(100)).unwrap();
         assert_eq!(canister.balanceOf(bob()), Nat::from(900));
 
