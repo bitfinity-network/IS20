@@ -79,7 +79,17 @@ fn inspect_message() {
             let state = state.borrow();
             let balances = &state.balances;
             if balances.0.contains_key(&caller) {
-                ic_cdk::api::call::accept_message();
+                if caller == state.stats.owner || m != "burn" {
+                    ic_cdk::api::call::accept_message();
+                } else {
+                    // It's `burn` method, and caller isn't owner.
+                    let (from, _): (Option<Principal>, Nat) = ic_cdk::api::call::arg_data();
+                    if from.is_some() {
+                        ic_cdk::println!("Only owner can burn other's tokens. Rejecting.");
+                    } else {
+                        ic_cdk::api::call::accept_message();
+                    }
+                }
             } else {
                 ic_cdk::println!("Transaction method is called not by a stakeholder. Rejecting.");
             }
