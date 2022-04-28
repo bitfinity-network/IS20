@@ -84,7 +84,7 @@ impl TxRecord {
             caller: Some(caller),
             index,
             from,
-            to: caller,
+            to: from,
             amount,
             fee: Nat::from(0),
             timestamp: ic::time().into(),
