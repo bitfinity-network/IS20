@@ -12,6 +12,7 @@ use common::types::Metadata;
 use ic_canister::{init, query, update, Canister};
 use ic_helpers::factory::error::FactoryError;
 use ic_helpers::factory::FactoryState;
+use ledger_canister::{account_identifier::Subaccount, DEFAULT_TRANSFER_FEE};
 
 mod inspect_message;
 
