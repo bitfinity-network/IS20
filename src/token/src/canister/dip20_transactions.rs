@@ -224,7 +224,7 @@ mod tests {
     use crate::canister::MAX_TRANSACTION_QUERY_LEN;
     use ic_canister::Canister;
 
-    fn test_canister() -> TokenCanister {
+    fn test_canister(total_supply: Nat) -> TokenCanister {
         MockContext::new().with_caller(alice()).inject();
 
         let canister = TokenCanister::init_instance();
@@ -233,7 +233,7 @@ mod tests {
             name: "".to_string(),
             symbol: "".to_string(),
             decimals: 8,
-            totalSupply: Nat::from(1000),
+            totalSupply: total_supply, //Nat::from(1000u64),
             owner: alice(),
             fee: Nat::from(0),
             feeTo: alice(),
@@ -242,9 +242,10 @@ mod tests {
 
         canister
     }
+
     #[test]
     fn transfer_without_fee() {
-        let canister = test_canister();
+        let canister = test_canister(Nat::from(1000u64));
         assert_eq!(Nat::from(1000), canister.balanceOf(alice()));
 
         assert!(transfer(&canister, bob(), Nat::from(100), None).is_ok());
@@ -252,9 +253,25 @@ mod tests {
         assert_eq!(canister.balanceOf(alice()), Nat::from(900));
     }
 
+    proptest::proptest! {
+        #[test]
+        fn transfer_without_fee_proptest(num: u64) {
+            let amount = 100;
+            if num < amount {
+                return Ok(());
+            }
+            let canister = test_canister(Nat::from(num));
+            assert_eq!(Nat::from(num), canister.balanceOf(alice()));
+
+            assert!(transfer(&canister, bob(), Nat::from(amount), None).is_ok());
+            assert_eq!(canister.balanceOf(bob()), Nat::from(amount));
+            assert_eq!(canister.balanceOf(alice()), Nat::from(num - amount));
+        }
+    }
+
     #[test]
     fn transfer_with_fee() {
-        let canister = test_canister();
+        let canister = test_canister(Nat::from(1000u64));
         canister.state.borrow_mut().stats.fee = Nat::from(100);
         canister.state.borrow_mut().stats.fee_to = john();
 
@@ -266,7 +283,7 @@ mod tests {
 
     #[test]
     fn transfer_fee_exceeded() {
-        let canister = test_canister();
+        let canister = test_canister(Nat::from(1000u64));
         canister.state.borrow_mut().stats.fee = Nat::from(100);
         canister.state.borrow_mut().stats.fee_to = john();
 
@@ -281,7 +298,7 @@ mod tests {
 
     #[test]
     fn fees_with_auction_enabled() {
-        let canister = test_canister();
+        let canister = test_canister(Nat::from(1000u64));
         canister.state.borrow_mut().stats.fee = Nat::from(50);
         canister.state.borrow_mut().stats.fee_to = john();
         canister.state.borrow_mut().bidding_state.fee_ratio = 0.5;
@@ -295,7 +312,7 @@ mod tests {
 
     #[test]
     fn transfer_insufficient_balance() {
-        let canister = test_canister();
+        let canister = test_canister(Nat::from(1000u64));
         assert_eq!(
             canister.transfer(bob(), Nat::from(1001), None),
             Err(TxError::InsufficientBalance)
@@ -306,7 +323,7 @@ mod tests {
 
     #[test]
     fn transfer_with_fee_insufficient_balance() {
-        let canister = test_canister();
+        let canister = test_canister(Nat::from(1000u64));
         canister.state.borrow_mut().stats.fee = Nat::from(100);
         canister.state.borrow_mut().stats.fee_to = john();
 
@@ -320,7 +337,7 @@ mod tests {
 
     #[test]
     fn transfer_wrong_caller() {
-        let canister = test_canister();
+        let canister = test_canister(Nat::from(1000u64));
         MockContext::new().with_caller(bob()).inject();
         assert_eq!(
             canister.transfer(bob(), Nat::from(100), None),
@@ -332,7 +349,7 @@ mod tests {
 
     #[test]
     fn transfer_saved_into_history() {
-        let canister = test_canister();
+        let canister = test_canister(Nat::from(1000u64));
         canister.state.borrow_mut().stats.fee = Nat::from(10);
 
         canister.transfer(bob(), Nat::from(1001), None).unwrap_err();
@@ -358,7 +375,7 @@ mod tests {
 
     #[test]
     fn mint_test_token() {
-        let canister = test_canister();
+        let canister = test_canister(Nat::from(1000u64));
         MockContext::new().with_caller(bob()).inject();
         assert_eq!(
             canister.mint(alice(), Nat::from(100u32)),
@@ -378,7 +395,7 @@ mod tests {
 
     #[test]
     fn mint_by_owner() {
-        let canister = test_canister();
+        let canister = test_canister(Nat::from(1000u64));
         assert!(canister.mint(alice(), Nat::from(2000)).is_ok());
         assert!(canister.mint(bob(), Nat::from(5000)).is_ok());
         assert_eq!(canister.balanceOf(alice()), Nat::from(3000));
@@ -388,7 +405,7 @@ mod tests {
 
     #[test]
     fn mint_saved_into_history() {
-        let canister = test_canister();
+        let canister = test_canister(Nat::from(1000u64));
         canister.state.borrow_mut().stats.fee = Nat::from(10);
 
         assert_eq!(canister.historySize(), 1);
@@ -413,7 +430,7 @@ mod tests {
 
     #[test]
     fn burn_by_owner() {
-        let canister = test_canister();
+        let canister = test_canister(Nat::from(1000u64));
         assert!(canister.burn(Nat::from(100)).is_ok());
         assert_eq!(canister.balanceOf(alice()), Nat::from(900));
         assert_eq!(canister.getMetadata().totalSupply, Nat::from(900));
@@ -421,7 +438,7 @@ mod tests {
 
     #[test]
     fn burn_too_much() {
-        let canister = test_canister();
+        let canister = test_canister(Nat::from(1000u64));
         assert_eq!(
             canister.burn(Nat::from(1001)),
             Err(TxError::InsufficientBalance)
@@ -432,7 +449,7 @@ mod tests {
 
     #[test]
     fn burn_by_wrong_user() {
-        let canister = test_canister();
+        let canister = test_canister(Nat::from(1000u64));
         let context = MockContext::new().with_caller(bob()).inject();
         context.update_caller(bob());
         assert_eq!(
@@ -445,7 +462,7 @@ mod tests {
 
     #[test]
     fn burn_saved_into_history() {
-        let canister = test_canister();
+        let canister = test_canister(Nat::from(1000u64));
         canister.state.borrow_mut().stats.fee = Nat::from(10);
 
         canister.burn(Nat::from(1001)).unwrap_err();
@@ -471,7 +488,7 @@ mod tests {
 
     #[test]
     fn transfer_from_with_approve() {
-        let canister = test_canister();
+        let canister = test_canister(Nat::from(1000u64));
         let context = MockContext::new().with_caller(alice()).inject();
         assert!(canister.approve(bob(), Nat::from(500)).is_ok());
         context.update_caller(bob());
@@ -497,7 +514,7 @@ mod tests {
 
     #[test]
     fn insufficient_allowance() {
-        let canister = test_canister();
+        let canister = test_canister(Nat::from(1000u64));
         let context = MockContext::new().with_caller(alice()).inject();
         assert!(canister.approve(bob(), Nat::from(500)).is_ok());
         context.update_caller(bob());
@@ -511,7 +528,7 @@ mod tests {
 
     #[test]
     fn transfer_from_without_approve() {
-        let canister = test_canister();
+        let canister = test_canister(Nat::from(1000u64));
         let context = MockContext::new().with_caller(alice()).inject();
         context.update_caller(bob());
         assert_eq!(
@@ -524,7 +541,7 @@ mod tests {
 
     #[test]
     fn transfer_from_saved_into_history() {
-        let canister = test_canister();
+        let canister = test_canister(Nat::from(1000u64));
         let context = MockContext::new().with_caller(alice()).inject();
         canister.state.borrow_mut().stats.fee = Nat::from(10);
 
@@ -559,7 +576,7 @@ mod tests {
 
     #[test]
     fn multiple_approves() {
-        let canister = test_canister();
+        let canister = test_canister(Nat::from(1000u64));
         assert!(canister.approve(bob(), Nat::from(500)).is_ok());
         assert_eq!(
             canister.getUserApprovals(alice()),
@@ -584,7 +601,7 @@ mod tests {
 
     #[test]
     fn approve_over_balance() {
-        let canister = test_canister();
+        let canister = test_canister(Nat::from(1000u64));
         let context = MockContext::new().with_caller(alice()).inject();
         assert!(canister.approve(bob(), Nat::from(1500)).is_ok());
         context.update_caller(bob());
@@ -604,7 +621,7 @@ mod tests {
 
     #[test]
     fn transfer_from_with_fee() {
-        let canister = test_canister();
+        let canister = test_canister(Nat::from(1000u64));
         canister.state.borrow_mut().stats.fee = Nat::from(100);
         canister.state.borrow_mut().stats.fee_to = bob();
         let context = MockContext::new().with_caller(alice()).inject();
@@ -623,7 +640,7 @@ mod tests {
 
     #[test]
     fn approve_saved_into_history() {
-        let canister = test_canister();
+        let canister = test_canister(Nat::from(1000u64));
         canister.state.borrow_mut().stats.fee = Nat::from(10);
         assert_eq!(canister.historySize(), 1);
 
@@ -647,7 +664,7 @@ mod tests {
 
     #[test]
     fn get_transactions_test() {
-        let canister = test_canister();
+        let canister = test_canister(Nat::from(1000u64));
         const COUNT: usize = 5;
         for _ in 0..COUNT {
             canister.transfer(bob(), Nat::from(10), None).unwrap();
@@ -665,14 +682,14 @@ mod tests {
     #[test]
     #[should_panic]
     fn get_transactions_over_limit() {
-        let canister = test_canister();
+        let canister = test_canister(Nat::from(1000u64));
         canister.getTransactions(Nat::from(0), Nat::from(MAX_TRANSACTION_QUERY_LEN + 1));
     }
 
     #[test]
     #[should_panic]
     fn get_transaction_not_existing() {
-        let canister = test_canister();
+        let canister = test_canister(Nat::from(1000u64));
         canister.getTransaction(Nat::from(2));
     }
 }

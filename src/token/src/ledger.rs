@@ -17,7 +17,7 @@ impl Ledger {
     }
 
     fn next_id(&self) -> Nat {
-        self.vec_offset.clone() + self.history.len()
+        self.len()
     }
 
     pub fn get(&self, id: &Nat) -> Option<TxRecord> {
@@ -27,13 +27,8 @@ impl Ledger {
     pub fn get_range(&self, start: &Nat, limit: &Nat) -> Vec<TxRecord> {
         let start = match self.get_index(start) {
             Some(v) => v,
-            None => {
-                if *start > self.vec_offset.clone() {
-                    usize::MAX
-                } else {
-                    0
-                }
-            }
+            None if *start > self.vec_offset.clone() => usize::MAX,
+            None => 0,
         };
 
         let limit = limit.0.to_usize().unwrap_or(usize::MAX);
@@ -74,14 +69,16 @@ impl Ledger {
         fee: Nat,
     ) -> Nat {
         let id = self.next_id();
-        self.push(TxRecord::transfer_from(
+        let record = TxRecord::transfer_from(
             id.clone(),
             caller,
             from,
             to,
             amount,
             fee,
-        ));
+        );
+
+        self.push(record);
 
         id
     }
@@ -115,8 +112,8 @@ impl Ledger {
     fn push(&mut self, record: TxRecord) {
         self.history.push(record);
         if self.len() > MAX_HISTORY_LENGTH + HISTORY_REMOVAL_BATCH_SIZE {
-            // We remove first `HISTORY_REMOVAL_BATCH_SIZE` from the history at one go, to prevent
-            // often relocation of the history vec.
+            // We remove first `HISTORY_REMOVAL_BATCH_SIZE` from the history in one go, to prevent
+            // frequent reallocation of the history vec.
             // This removal code can later be changed to moving old history records into another
             // storage.
             self.history = self.history[HISTORY_REMOVAL_BATCH_SIZE..].into();

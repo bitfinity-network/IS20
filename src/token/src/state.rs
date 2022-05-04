@@ -33,13 +33,11 @@ impl CanisterState {
     }
 
     pub fn allowance(&self, owner: Principal, spender: Principal) -> Nat {
-        match self.allowances.get(&owner) {
-            Some(inner) => match inner.get(&spender) {
-                Some(value) => value.clone(),
-                None => Nat::from(0),
-            },
-            None => Nat::from(0),
-        }
+        self.allowances
+            .get(&owner)
+            .and_then(|inner| inner.get(&spender))
+            .cloned()
+            .unwrap_or_else(|| Nat::from(0))
     }
 
     pub fn allowance_size(&self) -> usize {
