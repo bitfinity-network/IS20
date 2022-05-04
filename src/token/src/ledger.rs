@@ -69,14 +69,7 @@ impl Ledger {
         fee: Nat,
     ) -> Nat {
         let id = self.next_id();
-        let record = TxRecord::transfer_from(
-            id.clone(),
-            caller,
-            from,
-            to,
-            amount,
-            fee,
-        );
+        let record = TxRecord::transfer_from(id.clone(), caller, from, to, amount, fee);
 
         self.push(record);
 
