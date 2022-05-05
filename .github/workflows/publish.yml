@@ -1,6 +1,9 @@
-name: "Build & Puplish"
+name: "Publishing"
 
 on:
+  workflow_dispatch:
+    # Just in case
+
   push:
     branches:    
       - 'main'  
