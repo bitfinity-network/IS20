@@ -255,17 +255,19 @@ mod tests {
 
     proptest::proptest! {
         #[test]
-        fn transfer_without_fee_proptest(num: u64) {
-            let amount = 100;
+        fn transfer_without_fee_proptest(num: Vec<u32>) {
+            use num_bigint::{BigInt, BigUint};
+            let num = Nat(BigUint::new(num));
+            let amount = Nat::from(100u32);
             if num < amount {
                 return Ok(());
             }
-            let canister = test_canister(Nat::from(num));
-            assert_eq!(Nat::from(num), canister.balanceOf(alice()));
+            let canister = test_canister(num.clone());
+            assert_eq!(num.clone(), canister.balanceOf(alice()));
 
-            assert!(transfer(&canister, bob(), Nat::from(amount), None).is_ok());
-            assert_eq!(canister.balanceOf(bob()), Nat::from(amount));
-            assert_eq!(canister.balanceOf(alice()), Nat::from(num - amount));
+            assert!(transfer(&canister, bob(), amount.clone(), None).is_ok());
+            assert_eq!(canister.balanceOf(bob()), amount.clone());
+            assert_eq!(canister.balanceOf(alice()), num - amount.clone());
         }
     }
 

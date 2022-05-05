@@ -5,7 +5,7 @@ use ic_storage::{stable::Versioned, IcStorage};
 use serde::Deserialize;
 
 // 1 ICP
-pub const DEFAULT_ICP_FEE: u64 = 10u64.pow(8);
+const DEFAULT_ICP_FEE: u64 = 10u64.pow(8);
 
 const DEFAULT_LEDGER_PRINCIPAL: &str = "ryjl3-tyaaa-aaaaa-aaaba-cai";
 
