@@ -1,0 +1,52 @@
+name: "Build & Puplish"
+
+on:
+  push:
+    branches:    
+      - 'main'  
+    tags:
+      - 'v*'
+      - "!**-test"
+      - "!**-dev"
+
+
+jobs:
+  build-modules:
+    uses: infinity-swap/.github/.github/workflows/build-n-test.yml@v0.1
+    with:
+      output-artifact: is20-modules
+    secrets:
+      gh_token: ${{ secrets.GH_PKG_TOKEN }}
+      gh_login: ${{ secrets.GH_PKG_LOGIN }}
+  
+  publish-prepare:
+    runs-on: ubuntu-latest
+
+    outputs:
+      tag: ${{ steps.tag.outputs.value }}
+      latest: ${{ steps.tag-latest.outputs.value }}
+
+    steps:
+      - id: tag
+        if: ${{ github.ref_type == 'tag' }}
+        run: echo "::set-output name=value::${{ github.ref_name }}"
+
+      - id: tag-latest
+        if: ${{ github.ref_type == 'branch' && github.ref == 'refs/heads/main' }}
+        run: echo "::set-output name=value::true"
+      
+
+  publishing:
+    needs: [build-modules, publish-prepare]
+    uses: infinity-swap/.github/.github/workflows/publish-wrapped-artifact.yml@v0.1
+    with:
+      input-artifact: is20-modules
+      output-image-name: is20-modules
+      output-image-tag: ${{ needs.publish-prepare.outputs.tag }}
+      output-image-tag-latest: ${{ needs.publish-prepare.outputs.latest == 'true' }}
+      push-image: true
+      add-prefix-to-files: is20_
+
+    secrets:
+      gh_token: ${{ secrets.GH_PKG_TOKEN }}
+      gh_login: ${{ secrets.GH_PKG_LOGIN }}
