@@ -1,12 +1,14 @@
-name: "Publishing"
+name: "Build Test Publish"
 
 on:
   workflow_dispatch:
     # Just in case
 
+  pull_request:
+    branches: [main]
+
   push:
-    branches:    
-      - 'main'  
+    branches: [main]
     tags:
       - 'v*'
       - "!**-test"
@@ -17,6 +19,8 @@ jobs:
   build-modules:
     uses: infinity-swap/.github/.github/workflows/build-n-test.yml@v0.1
     with:
+      test-script: ./scripts/cargo.test.sh
+      skip-test: ${{ github.ref_type == 'tag' }}
       output-artifact: is20-modules
     secrets:
       gh_token: ${{ secrets.GH_PKG_TOKEN }}
@@ -47,7 +51,7 @@ jobs:
       output-image-name: is20-modules
       output-image-tag: ${{ needs.publish-prepare.outputs.tag }}
       output-image-tag-latest: ${{ needs.publish-prepare.outputs.latest == 'true' }}
-      push-image: true
+      push-image: ${{ github.event_name != 'pull_request' }}
       add-prefix-to-files: is20_
 
     secrets:
