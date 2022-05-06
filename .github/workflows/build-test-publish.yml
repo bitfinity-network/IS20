@@ -17,11 +17,12 @@ on:
 
 jobs:
   build-modules:
-    uses: infinity-swap/.github/.github/workflows/build-n-test.yml@v0.1
+    uses: infinity-swap/ci-wf/.github/workflows/build-n-test.yml@main
     with:
-      test-script: ./scripts/cargo.test.sh
       skip-test: ${{ github.ref_type == 'tag' }}
       output-artifact: is20-modules
+      test-script: |
+        cargo test
     secrets:
       gh_token: ${{ secrets.GH_PKG_TOKEN }}
       gh_login: ${{ secrets.GH_PKG_LOGIN }}
@@ -45,7 +46,7 @@ jobs:
 
   publishing:
     needs: [build-modules, publish-prepare]
-    uses: infinity-swap/.github/.github/workflows/publish-wrapped-artifact.yml@v0.1
+    uses: infinity-swap/ci-wf/.github/workflows/publish-wrapped-artifact.yml@main
     with:
       input-artifact: is20-modules
       output-image-name: is20-modules
