@@ -1,0 +1,17 @@
+name: Build-Test
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  call-workflow:
+    uses: infinity-swap/.github/.github/workflows/tests-in-dfx.yml@main
+    with:
+      entrypoint-script: ./scripts/build.sh && ./scripts/test.sh
+      ic-module-name: is20
+    secrets:
+      gh_token: ${{ secrets.GH_PKG_TOKEN }}
+      gh_login: ${{ secrets.GH_PKG_LOGIN }}
