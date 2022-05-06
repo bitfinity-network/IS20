@@ -4,4 +4,4 @@ ic-cdk-optimizer target/wasm32-unknown-unknown/release/token.wasm -o src/factory
 cargo build -j`nproc || echo 1` --target wasm32-unknown-unknown --package factory --release
 ic-cdk-optimizer target/wasm32-unknown-unknown/release/factory.wasm -o target/wasm32-unknown-unknown/release/factory-opt.wasm
 cargo run -p factory > src/candid/token-factory.did
-cargo run -p token > src/candid/token.did
+cargo run -p token-factory > src/candid/token.did
