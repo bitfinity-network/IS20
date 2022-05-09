@@ -385,10 +385,7 @@ fn check_caller(owner: Principal) -> Result<(), TxError> {
     if ic_kit::ic::caller() == owner {
         Ok(())
     } else {
-        Err(TxError::Unauthorized {
-            owner: owner.to_string(),
-            caller: ic_kit::ic::caller().to_string(),
-        })
+        Err(TxError::Unauthorized)
     }
 }
 
