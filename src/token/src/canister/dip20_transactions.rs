@@ -216,7 +216,7 @@ mod tests {
     use super::*;
     use crate::types::{Operation, TransactionStatus};
     use common::types::Metadata;
-    use ic_kit::mock_principals::{alice, bob, john};
+    use ic_kit::mock_principals::{alice, bob, john, xtc};
     use ic_kit::MockContext;
     use std::collections::HashSet;
     use std::iter::FromIterator;
@@ -685,5 +685,33 @@ mod tests {
     fn get_transaction_not_existing() {
         let canister = test_canister();
         canister.getTransaction(Nat::from(2));
+    }
+
+    #[test]
+    fn get_user_transactions() {
+        let canister = test_canister();
+        const COUNT: usize = 5;
+        for _ in 1..COUNT {
+            canister.transfer(bob(), Nat::from(10), None).unwrap();
+        }
+        canister.transfer(john(), Nat::from(10), None).unwrap();
+        canister.transfer(xtc(), Nat::from(10), None).unwrap();
+        let txs = canister.getUserTransactions(alice(), Nat::from(0), Nat::from(10));
+
+        assert_eq!(txs.len(), 7);
+        assert_eq!(txs[0].to, xtc());
+
+        let txs = canister.getUserTransactions(alice(), Nat::from(0), Nat::from(2));
+        assert_eq!(txs.len(), 2);
+    }
+
+    #[test]
+    fn get_transaction_count() {
+        let canister = test_canister();
+        const COUNT: usize = 10;
+        for _ in 1..COUNT {
+            canister.transfer(bob(), Nat::from(10), None).unwrap();
+        }
+        assert_eq!(canister.getUserTransactionCount(alice()), Nat::from(COUNT));
     }
 }

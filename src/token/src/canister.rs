@@ -207,10 +207,13 @@ impl TokenCanister {
     /// is not the global range of all transactions. The range [start, start + limit) here pertains to
     /// the transactions of user who. Implementations are allowed to return less TxRecords than
     /// requested to fend off DoS attacks.
+    ///
+    /// # Arguments
+    /// * `who` - The user to get transactions for.
+    /// * `start` - The index of the first transaction to return.
+    /// * `limit` - The number of transactions to return.
     #[query]
     fn getUserTransactions(&self, who: Principal, start: Nat, limit: Nat) -> Vec<TxRecord> {
-        let mut transactions = vec![];
-
         let limit_usize = limit.0.to_usize().unwrap_or(usize::MAX);
         if limit_usize > MAX_TRANSACTION_QUERY_LEN {
             ic_kit::ic::trap(&format!(
@@ -219,26 +222,32 @@ impl TokenCanister {
             ));
         }
 
-        for tx in self.state.borrow().ledger.get_range(&start, &limit) {
-            if tx.from == who || tx.to == who || tx.caller == Some(who) {
-                transactions.push(tx.clone());
-            }
-        }
+        let mut transactions: Vec<TxRecord> = self
+            .state
+            .borrow()
+            .ledger
+            .iter()
+            .filter(|tx| tx.from == who || tx.to == who || tx.caller == Some(who))
+            .skip(start.0.to_usize().unwrap())
+            .take(limit_usize)
+            .cloned()
+            .collect();
+
+        transactions.reverse();
 
         transactions
     }
-
-    /// Returns total number of transactions related to the user `who`.
+    /// Returns the total number of transactions related to the user `who`.
     #[query]
-    fn getUserTransactionAmount(&self, who: Principal) -> Nat {
-        let mut amount = Nat::from(0);
+    fn getUserTransactionCount(&self, who: Principal) -> Nat {
+        let mut count = Nat::from(0);
         for tx in self.state.borrow().ledger.iter() {
             if tx.from == who || tx.to == who || tx.caller == Some(who) {
-                amount += tx.amount.clone();
+                count += Nat::from(1);
             }
         }
 
-        amount
+        count
     }
 
     #[update]
