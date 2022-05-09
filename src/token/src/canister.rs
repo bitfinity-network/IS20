@@ -25,7 +25,7 @@ const DEFAULT_AUCTION_PERIOD: Timestamp = 24 * 60 * 60 * 1_000_000;
 
 const MAX_TRANSACTION_QUERY_LEN: usize = 1000;
 
-#[derive(Clone, Canister)]
+#[derive(Debug, Clone, Canister)]
 pub struct TokenCanister {
     #[id]
     principal: Principal,

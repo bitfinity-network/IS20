@@ -253,23 +253,23 @@ mod tests {
         assert_eq!(canister.balanceOf(alice()), Nat::from(900));
     }
 
-    proptest::proptest! {
-        #[test]
-        fn transfer_without_fee_proptest(num: Vec<u32>) {
-            use num_bigint::{BigInt, BigUint};
-            let num = Nat(BigUint::new(num));
-            let amount = Nat::from(100u32);
-            if num < amount {
-                return Ok(());
-            }
-            let canister = test_canister(num.clone());
-            assert_eq!(num.clone(), canister.balanceOf(alice()));
+    // proptest::proptest! {
+    //     #[test]
+    //     fn transfer_without_fee_proptest(num: Vec<u32>) {
+    //         use num_bigint::{BigInt, BigUint};
+    //         let num = Nat(BigUint::new(num));
+    //         let amount = Nat::from(100u32);
+    //         if num < amount {
+    //             return Ok(());
+    //         }
+    //         let canister = test_canister(num.clone());
+    //         assert_eq!(num.clone(), canister.balanceOf(alice()));
 
-            assert!(transfer(&canister, bob(), amount.clone(), None).is_ok());
-            assert_eq!(canister.balanceOf(bob()), amount.clone());
-            assert_eq!(canister.balanceOf(alice()), num - amount.clone());
-        }
-    }
+    //         assert!(transfer(&canister, bob(), amount.clone(), None).is_ok());
+    //         assert_eq!(canister.balanceOf(bob()), amount.clone());
+    //         assert_eq!(canister.balanceOf(alice()), num - amount.clone());
+    //     }
+    // }
 
     #[test]
     fn transfer_with_fee() {
@@ -693,5 +693,117 @@ mod tests {
     fn get_transaction_not_existing() {
         let canister = test_canister(Nat::from(1000u64));
         canister.getTransaction(Nat::from(2));
+    }
+
+    #[test]
+    fn prop_test_magic() {
+        // create a randomly generated token using `test_canister`
+        // create random principals
+        // create random number of transaction actions (transfers)
+        //
+        // For every action executed, check the balance of the users and make sure
+        // they match (including the `feeTo` principal)
+        //
+        // Ensure total supply never changes
+
+        // Actions:
+        // * Mint
+        // * Burn
+        // * Transfer
+    }
+}
+
+
+#[cfg(test)]
+mod proptests {
+    use super::*;
+    use proptest::prelude::*;
+    use proptest::collection::vec;
+    use common::types::Metadata;
+    use ic_kit::MockContext;
+    use ic_canister::Canister;
+
+    fn make_principal() -> BoxedStrategy<Principal> {
+        (
+            any::<[u8; 29]>().prop_map(|mut bytes| {
+                bytes[28] = bytes[28].saturating_add(5);
+                bytes
+            })
+        ) 
+            .prop_map(|bytes| Principal::from_slice(&bytes))
+            .boxed()
+    }
+
+    prop_compose! {
+        fn make_nat() (num in "[0-9]{1,1000}") -> Nat {
+            Nat::parse(num.as_bytes()).unwrap()
+        }
+
+    }
+
+    prop_compose! {
+        fn make_canister(owner: Principal, fee_to: Principal) (
+            logo in any::<String>(),
+            name in any::<String>(),
+            symbol in any::<String>(),
+            decimals in any::<u8>(),
+            totalSupply in make_nat(),
+            fee in make_nat(),
+        )-> TokenCanister {
+            MockContext::new().with_caller(owner).inject();
+
+            let meta = Metadata {
+                logo,
+                name,
+                symbol,
+                decimals,
+                totalSupply,
+                owner,
+                fee,
+                feeTo: fee_to,
+                isTestToken: None,
+            };
+            let canister = TokenCanister::init_instance();
+            canister.init(meta);
+
+            canister
+
+        }
+    }
+
+
+    proptest! {
+        // fn test_canister(total_supply: Nat) -> TokenCanister {
+        //     MockContext::new().with_caller(alice()).inject();
+
+        //     canister.init(Metadata {
+        //         logo: "".to_string(),
+        //         name: "".to_string(),
+        //         symbol: "".to_string(),
+        //         decimals: 8,
+        //         totalSupply: total_supply, //Nat::from(1000u64),
+        //         owner: alice(),
+        //         fee: Nat::from(0),
+        //         feeTo: alice(),
+        //         isTestToken: None,
+        //     });
+
+        //     canister
+        // // }
+
+
+        #[test]
+        // fn generic_proptest(principals in vec(make_principal(), 1..=6)) {
+        fn generic_proptest(number in make_nat()) {
+            eprintln!("{number}");
+
+//             for principal in principals {
+//                 eprintln!("{principal:?}");
+//             }
+
+//             eprintln!("-----------------");
+//             assert!(true);
+        }
+        
     }
 }
