@@ -697,7 +697,6 @@ mod tests {
         canister.transfer(xtc(), Nat::from(10), None).unwrap();
         canister.transfer(john(), Nat::from(10), None).unwrap();
 
-
         let txs = canister.getUserTransactions(alice(), Nat::from(0), Nat::from(6));
         assert_eq!(txs.len(), 6);
         assert_eq!(txs[0].to, john());
@@ -716,8 +715,7 @@ mod tests {
             canister.transfer(bob(), Nat::from(10), None).unwrap();
         }
         let txs = canister.getUserTransactions(alice(), Nat::from(6), Nat::from(5));
-        assert_eq!(txs.is_empty(),true)
-
+        assert_eq!(txs.is_empty(), true)
     }
 
     #[test]
