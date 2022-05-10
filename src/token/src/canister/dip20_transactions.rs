@@ -724,7 +724,6 @@ mod proptests {
     use proptest::prelude::*;
     use proptest::sample::Index;
     // Enum of Actions
-    // mint, burn, transfer with / without fee and transfer from
     #[derive(Debug, Clone, Copy, PartialEq, Eq)]
     enum Action {
         Mint,
@@ -792,12 +791,12 @@ mod proptests {
         }
     }
 
+    // Make a canister with prop_compose
+
 
 
 
     proptest! {
-
-
         #[test]
         fn generic_proptest(
             principals in vec(make_principal(), 1..7),
@@ -811,52 +810,20 @@ mod proptests {
             let fee_to = principals[fee_to_idx.index(principals.len())];
 
             // generate a canister from make_canister strategy
-            let canister = make_canister(owner, fee_to).prop_map(move |canister| {
-                  canister
-            });
+            let canister = make_canister(owner, fee_to).boxed();
 
             // pick a random action
             for action in actions {
-                println!("{:?}", action);
+                use Action::*;
+                    match action {
+                        Mint => {
+                        todo!()
+                        },
+                        _ => eprintln!("Not implemented"),
+                    }
+
             }
           }
 
     }
 }
-
-// for action in actions {
-// use Action::*;
-// match action {
-// Mint => {
-// canister.prop_map(|canister| {
-// canister.mint(owner.clone(),amount.clone());
-// });
-// }
-// Burn => {
-//
-// todo!()
-//
-//
-// }
-//
-// TransferWithFee => {
-// todo!()
-//
-// }
-//
-// TransferWithoutFee => {
-// todo!()
-//
-// }
-//
-// TransferFrom => {
-// // eprintln!("Transferring {} from {} to {}", amount, owner, fee_to);
-// todo!()
-//
-// }
-//
-//
-// _ => unreachable!(),
-// }
-// }
-// }
