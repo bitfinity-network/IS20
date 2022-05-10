@@ -214,30 +214,30 @@ impl TokenCanister {
     /// * `limit` - The number of transactions to return.
     #[query]
     fn getUserTransactions(&self, who: Principal, start: Nat, limit: Nat) -> Vec<TxRecord> {
-        let length = self.state.borrow().ledger.get_len_user_history(who);
-
-        if start > length {
-            return vec![];
+        // If the start value is larger than usize then return an
+        // empty vec
+        let start = match start.0.to_usize() {
+            Some(start) => start,
+            None => return vec![],
         };
 
-        let transactions: Vec<TxRecord> = self
-            .state
+        // limit the query to `MAX_TRANSACTION_QUERY_LEN`
+        let limit = limit
+            .0
+            .to_usize()
+            .unwrap_or(MAX_TRANSACTION_QUERY_LEN)
+            .min(MAX_TRANSACTION_QUERY_LEN);
+
+        self.state
             .borrow()
             .ledger
             .iter()
             .filter(|tx| tx.from == who || tx.to == who || tx.caller == Some(who))
             .rev()
-            .skip(
-                start
-                    .0
-                    .to_usize()
-                    .expect("start is checked if it is less than length"),
-            )
-            .take(limit.0.to_usize().expect("we are not going to overflow"))
+            .skip(start)
+            .take(limit)
             .cloned()
-            .collect();
-
-        transactions
+            .collect()
     }
     /// Returns the total number of transactions related to the user `who`.
     #[query]
