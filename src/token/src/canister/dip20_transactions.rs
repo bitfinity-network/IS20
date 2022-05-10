@@ -362,10 +362,7 @@ mod tests {
         MockContext::new().with_caller(bob()).inject();
         assert_eq!(
             canister.mint(alice(), Nat::from(100u32)),
-            Err(TxError::Unauthorized {
-                owner: alice().to_string(),
-                caller: bob().to_string(),
-            })
+            Err(TxError::Unauthorized)
         );
 
         canister.state.borrow_mut().stats.is_test_token = true;
