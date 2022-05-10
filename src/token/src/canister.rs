@@ -222,6 +222,10 @@ impl TokenCanister {
             ));
         }
 
+        if start > self.historySize() {
+            ic_kit::ic::trap(&format!("Start must be less then {}", self.historySize()));
+        }
+
         let mut transactions: Vec<TxRecord> = self
             .state
             .borrow()
