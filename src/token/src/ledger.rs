@@ -45,7 +45,7 @@ impl Ledger {
             .collect()
     }
 
-    pub fn iter(&self) -> impl Iterator<Item = &TxRecord> {
+    pub fn iter(&self) -> impl DoubleEndedIterator<Item = &TxRecord> {
         self.history.iter()
     }
 
@@ -56,6 +56,14 @@ impl Ledger {
             let index = id.clone() - self.vec_offset.clone();
             index.0.to_usize()
         }
+    }
+
+    pub fn get_len_user_history(&self, user: Principal) -> Nat {
+        self.history
+            .iter()
+            .filter(|tx| tx.to == user || tx.from == user || tx.caller == Some(user))
+            .count()
+            .into()
     }
 
     pub fn transfer(&mut self, from: Principal, to: Principal, amount: Nat, fee: Nat) -> Nat {

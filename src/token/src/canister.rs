@@ -202,43 +202,40 @@ impl TokenCanister {
         self.state.borrow().stats.owner
     }
 
-    /// Returns an array of transaction records in range [start, start + limit) related to user `who`.
-    /// Unlike `getTransactions` function, the range [start, start + limit) for `getUserTransactions`
-    /// is not the global range of all transactions. The range [start, start + limit) here pertains to
+    /// Returns an array of transaction records in range [start, start + limit] related to user `who`.
+    /// Unlike `getTransactions` function, the range [start, start + limit] for `getUserTransactions`
+    /// is not the global range of all transactions. The range [start, start + limit] here pertains to
     /// the transactions of user who. Implementations are allowed to return less TxRecords than
     /// requested to fend off DoS attacks.
+    ///
+    /// # Arguments
+    /// * `who` - The user to get transactions for.
+    /// * `start` - The index of the first transaction to return.
+    /// * `limit` - The number of transactions to return.
     #[query]
     fn getUserTransactions(&self, who: Principal, start: Nat, limit: Nat) -> Vec<TxRecord> {
-        let mut transactions = vec![];
+        // If the start value is larger than usize then return an
+        // empty vec
+        let start = start.0.to_usize().expect("not that big");
 
-        let limit_usize = limit.0.to_usize().unwrap_or(usize::MAX);
-        if limit_usize > MAX_TRANSACTION_QUERY_LEN {
-            ic_kit::ic::trap(&format!(
-                "Limit must be less then {}",
-                MAX_TRANSACTION_QUERY_LEN
-            ));
-        }
+        // limit the query to `MAX_TRANSACTION_QUERY_LEN`
+        let limit = limit.0.to_usize().expect("not that big");
 
-        for tx in self.state.borrow().ledger.get_range(&start, &limit) {
-            if tx.from == who || tx.to == who || tx.caller == Some(who) {
-                transactions.push(tx.clone());
-            }
-        }
-
-        transactions
+        self.state
+            .borrow()
+            .ledger
+            .iter()
+            .filter(|tx| tx.from == who || tx.to == who || tx.caller == Some(who))
+            .rev()
+            .skip(start)
+            .take(limit)
+            .cloned()
+            .collect()
     }
-
-    /// Returns total number of transactions related to the user `who`.
+    /// Returns the total number of transactions related to the user `who`.
     #[query]
-    fn getUserTransactionAmount(&self, who: Principal) -> Nat {
-        let mut amount = Nat::from(0);
-        for tx in self.state.borrow().ledger.iter() {
-            if tx.from == who || tx.to == who || tx.caller == Some(who) {
-                amount += tx.amount.clone();
-            }
-        }
-
-        amount
+    fn getUserTransactionCount(&self, who: Principal) -> Nat {
+        self.state.borrow().ledger.get_len_user_history(who)
     }
 
     #[update]
@@ -385,10 +382,7 @@ fn check_caller(owner: Principal) -> Result<(), TxError> {
     if ic_kit::ic::caller() == owner {
         Ok(())
     } else {
-        Err(TxError::Unauthorized {
-            owner: owner.to_string(),
-            caller: ic_kit::ic::caller().to_string(),
-        })
+        Err(TxError::Unauthorized)
     }
 }
 

@@ -27,21 +27,21 @@ jobs:
       gh_token: ${{ secrets.GH_PKG_TOKEN }}
       gh_login: ${{ secrets.GH_PKG_LOGIN }}
   
-  publish-prepare:
-    runs-on: ubuntu-latest
+  # publish-prepare:
+  #   runs-on: ubuntu-latest
 
-    outputs:
-      tag: ${{ steps.tag.outputs.value }}
-      latest: ${{ steps.tag-latest.outputs.value }}
+  #   outputs:
+  #     tag: ${{ steps.tag.outputs.value }}
+  #     latest: ${{ steps.tag-latest.outputs.value }}
 
-    steps:
-      - id: tag
-        if: ${{ github.ref_type == 'tag' }}
-        run: echo "::set-output name=value::${{ github.ref_name }}"
+  #   steps:
+      # - id: tag
+      #   if: ${{ github.ref_type == 'tag' }}
+      #   run: echo "::set-output name=value::${{ github.ref_name }}"
 
-      - id: tag-latest
-        if: ${{ github.ref_type == 'branch' && github.ref == 'refs/heads/main' }}
-        run: echo "::set-output name=value::true"
+      # - id: tag-latest
+      #   if: ${{ github.ref_type == 'branch' && github.ref == 'refs/heads/main' }}
+      #   run: echo "::set-output name=value::true"
       
 
   publishing:
@@ -50,10 +50,13 @@ jobs:
     with:
       input-artifact: is20-modules
       output-image-name: is20-modules
-      output-image-tag: ${{ needs.publish-prepare.outputs.tag }}
-      output-image-tag-latest: ${{ needs.publish-prepare.outputs.latest == 'true' }}
-      push-image: ${{ github.event_name != 'pull_request' }}
       add-prefix-to-files: is20_
+      # output-image-tag: ${{ needs.publish-prepare.outputs.tag }}
+      # output-image-tag-latest: ${{ needs.publish-prepare.outputs.latest == 'true' }}
+      # Provide condition when to publish docker image with latest tag
+      output-image-tag-latest: ${{ github.ref_type == 'branch' && github.ref == 'refs/heads/main' }}
+      # Provide condition when to push docker image
+      push-image: ${{ github.event_name != 'pull_request' && github.ref == 'refs/heads/main' }}
 
     secrets:
       gh_token: ${{ secrets.GH_PKG_TOKEN }}

@@ -1,7 +1,11 @@
 [package]
 edition = "2021"
-name = "factory"
+name = "token-factory"
 version = "0.1.0"
+
+[features]
+default = []
+no_api = []
 
 [dependencies]
 candid = "0.7"
