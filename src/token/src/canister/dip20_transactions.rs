@@ -722,6 +722,27 @@ mod proptests {
     use proptest::collection::vec;
     use proptest::prelude::*;
     use proptest::sample::Index;
+    // Enum of Actions
+    // mint, burn, transfer with / without fee and transfer from
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    enum Action {
+        Mint,
+        Burn,
+        TransferWithFee,
+        TransferWithoutFee,
+        TransferFrom,
+    }
+
+    fn make_action() -> impl Strategy<Value = Action> {
+        (0..=4).prop_map(|i| match i {
+            0 => Action::Mint,
+            1 => Action::Burn,
+            2 => Action::TransferWithFee,
+            3 => Action::TransferWithoutFee,
+            4 => Action::TransferFrom,
+            _ => unreachable!(),
+        })
+    }
 
     fn make_principal() -> BoxedStrategy<Principal> {
         (any::<[u8; 29]>().prop_map(|mut bytes| {
@@ -772,58 +793,23 @@ mod proptests {
     }
 
     proptest! {
-            // fn test_canister(total_supply: Nat) -> TokenCanister {
-            //     MockContext::new().with_caller(alice()).inject();
-
-            //     canister.init(Metadata {
-            //         logo: "".to_string(),
-            //         name: "".to_string(),
-            //         symbol: "".to_string(),
-            //         decimals: 8,
-            //         totalSupply: total_supply, //Nat::from(1000u64),
-            //         owner: alice(),
-            //         fee: Nat::from(0),
-            //         feeTo: alice(),
-            //         isTestToken: None,
-            //     });
-
-            //     canister
-            // // }
-
-        enum Action {
-            Mint,
-            Burn,
-            TransferTo
-        }
-
             #[test]
             fn generic_proptest(
                 principals in vec(make_principal(), 1..7),
                 owner_idx in any::<Index>(),
                 fee_to_idx in any::<Index>(),
+                actions in vec(make_action(), 1..7),
+                amount in make_nat(),
             ) {
                 // pick two random principals (they could very well be the same principal twice)
                 let owner = principals[owner_idx.index(principals.len())];
                 let fee_to = principals[fee_to_idx.index(principals.len())];
+                let canister = make_canister(owner, fee_to)
 
-                let canister = make_canister(owner, fee_to);
-
-                for action in actions {
-                    use Action::*;
-                    match action {
-                        Mint => {
-                            let current_balance = canister.get_bal();
-                            canister.mint(123);
-                            expected_balance -= 123;
-                            assert_eq!(current_balance + 123, canister.get_bal());
-                        }
-                    }
                 }
-
-                // associate actions with random principal from the list
-                // perform action
-                // check outcome
-            }
-
-        }
+    }
 }
+
+// associate actions with random principal from the list
+// perform action
+// check outcome
