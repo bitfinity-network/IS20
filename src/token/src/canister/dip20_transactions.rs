@@ -690,30 +690,34 @@ mod tests {
     #[test]
     fn get_user_transactions() {
         let canister = test_canister();
-        const COUNT: usize = 5;
-        for _ in 1..COUNT {
-            canister.transfer(bob(), Nat::from(10), None).unwrap();
-        }
+        canister.transfer(alice(), Nat::from(10), None).unwrap();
         canister.transfer(john(), Nat::from(10), None).unwrap();
         canister.transfer(xtc(), Nat::from(10), None).unwrap();
-        let txs = canister.getUserTransactions(alice(), Nat::from(0), Nat::from(10));
+        canister.transfer(bob(), Nat::from(10), None).unwrap();
+        canister.transfer(xtc(), Nat::from(10), None).unwrap();
+        canister.transfer(john(), Nat::from(10), None).unwrap();
 
-        assert_eq!(txs.len(), 7);
-        assert_eq!(txs[0].to, xtc());
 
-        let txs = canister.getUserTransactions(alice(), Nat::from(0), Nat::from(2));
-        assert_eq!(txs.len(), 2);
+        let txs = canister.getUserTransactions(alice(), Nat::from(0), Nat::from(6));
+        assert_eq!(txs.len(), 6);
+        assert_eq!(txs[0].to, john());
+        assert_eq!(txs[1].to, xtc());
+        assert_eq!(txs[2].to, bob());
+        assert_eq!(txs[3].to, xtc());
+        assert_eq!(txs[4].to, john());
+        assert_eq!(txs[5].to, alice());
     }
 
     #[test]
-    #[should_panic]
     fn get_user_transactions_over_limit() {
         let canister = test_canister();
-        const COUNT: usize = 5;
-        for _ in 1..COUNT {
+
+        for _ in 1..5 {
             canister.transfer(bob(), Nat::from(10), None).unwrap();
         }
-        canister.getUserTransactions(alice(), Nat::from(6), Nat::from(5));
+        let txs = canister.getUserTransactions(alice(), Nat::from(6), Nat::from(5));
+        assert_eq!(txs.is_empty(),true)
+
     }
 
     #[test]

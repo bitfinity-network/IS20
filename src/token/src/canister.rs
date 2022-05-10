@@ -202,9 +202,9 @@ impl TokenCanister {
         self.state.borrow().stats.owner
     }
 
-    /// Returns an array of transaction records in range [start, start + limit) related to user `who`.
-    /// Unlike `getTransactions` function, the range [start, start + limit) for `getUserTransactions`
-    /// is not the global range of all transactions. The range [start, start + limit) here pertains to
+    /// Returns an array of transaction records in range [start, start + limit] related to user `who`.
+    /// Unlike `getTransactions` function, the range [start, start + limit] for `getUserTransactions`
+    /// is not the global range of all transactions. The range [start, start + limit] here pertains to
     /// the transactions of user who. Implementations are allowed to return less TxRecords than
     /// requested to fend off DoS attacks.
     ///
@@ -214,52 +214,38 @@ impl TokenCanister {
     /// * `limit` - The number of transactions to return.
     #[query]
     fn getUserTransactions(&self, who: Principal, start: Nat, limit: Nat) -> Vec<TxRecord> {
-        let limit_usize = limit.0.to_usize().unwrap_or(usize::MAX);
-        if limit_usize > MAX_TRANSACTION_QUERY_LEN {
-            ic_kit::ic::trap(&format!(
-                "Limit must be less than {}",
-                MAX_TRANSACTION_QUERY_LEN
-            ));
-        }
-
         let length = self
             .state
             .borrow()
             .ledger
-            .iter()
-            .filter(|tx| tx.from == who || tx.to == who || tx.caller == Some(who))
-            .count();
+            .get_len_user_history(who);
 
         if start > length {
-            ic_kit::ic::trap(&format!("Start must be less than {}", length));
-        }
+            return vec![];
+        };
 
-        let mut transactions: Vec<TxRecord> = self
+        let  transactions: Vec<TxRecord> = self
             .state
             .borrow()
             .ledger
             .iter()
             .filter(|tx| tx.from == who || tx.to == who || tx.caller == Some(who))
-            .skip(start.0.to_usize().unwrap())
-            .take(limit_usize)
+            .rev()
+            .skip(start.0.to_usize().expect("start is checked if it is less than length"))
+            .take(limit.0.to_usize().expect("we are not going to overflow"))
             .cloned()
             .collect();
 
-        transactions.reverse();
-
         transactions
+
     }
     /// Returns the total number of transactions related to the user `who`.
     #[query]
     fn getUserTransactionCount(&self, who: Principal) -> Nat {
-        let mut count = Nat::from(0);
-        for tx in self.state.borrow().ledger.iter() {
-            if tx.from == who || tx.to == who || tx.caller == Some(who) {
-                count += Nat::from(1);
-            }
-        }
-
-        count
+        self.state
+            .borrow()
+            .ledger
+            .get_len_user_history(who)
     }
 
     #[update]
