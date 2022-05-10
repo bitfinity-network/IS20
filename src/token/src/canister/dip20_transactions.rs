@@ -706,6 +706,17 @@ mod tests {
     }
 
     #[test]
+    #[should_panic]
+    fn get_user_transactions_over_limit() {
+        let canister = test_canister();
+        const COUNT: usize = 5;
+        for _ in 1..COUNT {
+            canister.transfer(bob(), Nat::from(10), None).unwrap();
+        }
+        canister.getUserTransactions(alice(), Nat::from(6), Nat::from(5));
+    }
+
+    #[test]
     fn get_transaction_count() {
         let canister = test_canister();
         const COUNT: usize = 10;

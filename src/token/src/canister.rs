@@ -217,13 +217,22 @@ impl TokenCanister {
         let limit_usize = limit.0.to_usize().unwrap_or(usize::MAX);
         if limit_usize > MAX_TRANSACTION_QUERY_LEN {
             ic_kit::ic::trap(&format!(
-                "Limit must be less then {}",
+                "Limit must be less than {}",
                 MAX_TRANSACTION_QUERY_LEN
             ));
         }
 
-        if start > self.historySize() {
-            ic_kit::ic::trap(&format!("Start must be less then {}", self.historySize()));
+        // Check all transactions for the user.
+        let length = self
+            .state
+            .borrow()
+            .ledger
+            .iter()
+            .filter(|tx| tx.from == who || tx.to == who || tx.caller == Some(who))
+            .count();
+
+        if start > length {
+            ic_kit::ic::trap(&format!("Start must be less than {}", length));
         }
 
         let mut transactions: Vec<TxRecord> = self
