@@ -713,25 +713,25 @@ mod tests {
     }
 }
 
-
 #[cfg(test)]
 mod proptests {
     use super::*;
-    use proptest::prelude::*;
-    use proptest::collection::vec;
     use common::types::Metadata;
-    use ic_kit::MockContext;
     use ic_canister::Canister;
+    use ic_kit::MockContext;
+    use proptest::collection::vec;
+    use proptest::prelude::*;
+    use proptest::sample::Index;
 
     fn make_principal() -> BoxedStrategy<Principal> {
-        (
-            any::<[u8; 29]>().prop_map(|mut bytes| {
-                bytes[28] = bytes[28].saturating_add(5);
-                bytes
-            })
-        ) 
-            .prop_map(|bytes| Principal::from_slice(&bytes))
-            .boxed()
+        (any::<[u8; 29]>().prop_map(|mut bytes| {
+            // Make sure the last byte is more than four as the last byte carries special
+            // meaning
+            bytes[28] = bytes[28].saturating_add(5);
+            bytes
+        }))
+        .prop_map(|bytes| Principal::from_slice(&bytes))
+        .boxed()
     }
 
     prop_compose! {
@@ -771,39 +771,59 @@ mod proptests {
         }
     }
 
-
     proptest! {
-        // fn test_canister(total_supply: Nat) -> TokenCanister {
-        //     MockContext::new().with_caller(alice()).inject();
+            // fn test_canister(total_supply: Nat) -> TokenCanister {
+            //     MockContext::new().with_caller(alice()).inject();
 
-        //     canister.init(Metadata {
-        //         logo: "".to_string(),
-        //         name: "".to_string(),
-        //         symbol: "".to_string(),
-        //         decimals: 8,
-        //         totalSupply: total_supply, //Nat::from(1000u64),
-        //         owner: alice(),
-        //         fee: Nat::from(0),
-        //         feeTo: alice(),
-        //         isTestToken: None,
-        //     });
+            //     canister.init(Metadata {
+            //         logo: "".to_string(),
+            //         name: "".to_string(),
+            //         symbol: "".to_string(),
+            //         decimals: 8,
+            //         totalSupply: total_supply, //Nat::from(1000u64),
+            //         owner: alice(),
+            //         fee: Nat::from(0),
+            //         feeTo: alice(),
+            //         isTestToken: None,
+            //     });
 
-        //     canister
-        // // }
+            //     canister
+            // // }
 
-
-        #[test]
-        // fn generic_proptest(principals in vec(make_principal(), 1..=6)) {
-        fn generic_proptest(number in make_nat()) {
-            eprintln!("{number}");
-
-//             for principal in principals {
-//                 eprintln!("{principal:?}");
-//             }
-
-//             eprintln!("-----------------");
-//             assert!(true);
+        enum Action {
+            Mint,
+            Burn,
+            TransferTo
         }
-        
-    }
+
+            #[test]
+            fn generic_proptest(
+                principals in vec(make_principal(), 1..7),
+                owner_idx in any::<Index>(),
+                fee_to_idx in any::<Index>(),
+            ) {
+                // pick two random principals (they could very well be the same principal twice)
+                let owner = principals[owner_idx.index(principals.len())];
+                let fee_to = principals[fee_to_idx.index(principals.len())];
+
+                let canister = make_canister(owner, fee_to);
+
+                for action in actions {
+                    use Action::*;
+                    match action {
+                        Mint => {
+                            let current_balance = canister.get_bal();
+                            canister.mint(123);
+                            expected_balance -= 123;
+                            assert_eq!(current_balance + 123, canister.get_bal());
+                        }
+                    }
+                }
+
+                // associate actions with random principal from the list
+                // perform action
+                // check outcome
+            }
+
+        }
 }
