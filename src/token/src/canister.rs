@@ -216,17 +216,10 @@ impl TokenCanister {
     fn getUserTransactions(&self, who: Principal, start: Nat, limit: Nat) -> Vec<TxRecord> {
         // If the start value is larger than usize then return an
         // empty vec
-        let start = match start.0.to_usize() {
-            Some(start) => start,
-            None => return vec![],
-        };
+        let start = start.0.to_usize().expect("not that big");
 
         // limit the query to `MAX_TRANSACTION_QUERY_LEN`
-        let limit = limit
-            .0
-            .to_usize()
-            .unwrap_or(MAX_TRANSACTION_QUERY_LEN)
-            .min(MAX_TRANSACTION_QUERY_LEN);
+        let limit = limit.0.to_usize().expect("not that big");
 
         self.state
             .borrow()
