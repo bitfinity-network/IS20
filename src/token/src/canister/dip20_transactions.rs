@@ -715,6 +715,7 @@ mod tests {
 
 #[cfg(test)]
 mod proptests {
+    use std::borrow::Borrow;
     use super::*;
     use common::types::Metadata;
     use ic_canister::Canister;
@@ -734,14 +735,13 @@ mod proptests {
     }
 
     fn make_action() -> impl Strategy<Value = Action> {
-        (0..=4).prop_map(|i| match i {
-            0 => Action::Mint,
-            1 => Action::Burn,
-            2 => Action::TransferWithFee,
-            3 => Action::TransferWithoutFee,
-            4 => Action::TransferFrom,
-            _ => unreachable!(),
-        })
+        prop_oneof![
+            Just(Action::Mint),
+            Just(Action::Burn),
+            Just(Action::TransferWithFee),
+            Just(Action::TransferWithoutFee),
+            Just(Action::TransferFrom),
+        ]
     }
 
     fn make_principal() -> BoxedStrategy<Principal> {
@@ -792,24 +792,71 @@ mod proptests {
         }
     }
 
-    proptest! {
-            #[test]
-            fn generic_proptest(
-                principals in vec(make_principal(), 1..7),
-                owner_idx in any::<Index>(),
-                fee_to_idx in any::<Index>(),
-                actions in vec(make_action(), 1..7),
-                amount in make_nat(),
-            ) {
-                // pick two random principals (they could very well be the same principal twice)
-                let owner = principals[owner_idx.index(principals.len())];
-                let fee_to = principals[fee_to_idx.index(principals.len())];
-                let canister = make_canister(owner, fee_to)
 
-                }
+
+
+    proptest! {
+
+
+        #[test]
+        fn generic_proptest(
+            principals in vec(make_principal(), 1..7),
+            owner_idx in any::<Index>(),
+            fee_to_idx in any::<Index>(),
+            actions in vec(make_action(), 1..7),
+            amount in make_nat(),
+        ) {
+            // pick two random principals (they could very well be the same principal twice)
+            let owner = principals[owner_idx.index(principals.len())];
+            let fee_to = principals[fee_to_idx.index(principals.len())];
+
+            // generate a canister from make_canister strategy
+            let canister = make_canister(owner, fee_to).prop_map(move |canister| {
+                  canister
+            });
+
+            // pick a random action
+            for action in actions {
+                println!("{:?}", action);
+            }
+          }
+
     }
 }
 
-// associate actions with random principal from the list
-// perform action
-// check outcome
+// for action in actions {
+// use Action::*;
+// match action {
+// Mint => {
+// canister.prop_map(|canister| {
+// canister.mint(owner.clone(),amount.clone());
+// });
+// }
+// Burn => {
+//
+// todo!()
+//
+//
+// }
+//
+// TransferWithFee => {
+// todo!()
+//
+// }
+//
+// TransferWithoutFee => {
+// todo!()
+//
+// }
+//
+// TransferFrom => {
+// // eprintln!("Transferring {} from {} to {}", amount, owner, fee_to);
+// todo!()
+//
+// }
+//
+//
+// _ => unreachable!(),
+// }
+// }
+// }
