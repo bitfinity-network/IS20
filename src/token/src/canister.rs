@@ -222,7 +222,6 @@ impl TokenCanister {
             ));
         }
 
-        // Check all transactions for the user.
         let length = self
             .state
             .borrow()
