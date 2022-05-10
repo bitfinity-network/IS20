@@ -26,15 +26,13 @@ pub(crate) async fn notify(canister: &TokenCanister, transaction_id: Nat) -> TxR
 
     match send_notification(&tx).await {
         Ok(()) => Ok(tx.index),
-        Err((_, description)) => {
+        Err((_, _)) => {
             canister
                 .state
                 .borrow_mut()
                 .notifications
                 .insert(transaction_id);
-            Err(TxError::NotificationFailed {
-                cdk_msg: description,
-            })
+            Err(TxError::NotificationFailed)
         }
     }
 }
