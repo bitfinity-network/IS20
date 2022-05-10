@@ -1,0 +1,22 @@
+name: "Build Test Publish"
+
+on:
+  workflow_dispatch:
+    # Just in case
+
+  pull_request:
+    branches: [main]
+
+  push:
+    branches: [main]
+
+jobs:
+  build-modules:
+    uses: infinity-swap/ci-wf/.github/workflows/build-n-test.yml@main
+    with:
+      test-script: |
+        cargo test
+    secrets:
+      gh_token: ${{ secrets.GH_PKG_TOKEN }}
+      gh_login: ${{ secrets.GH_PKG_LOGIN }}
+      
