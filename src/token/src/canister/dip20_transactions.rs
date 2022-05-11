@@ -715,7 +715,6 @@ mod tests {
 
 #[cfg(test)]
 mod proptests {
-    use std::borrow::Borrow;
     use super::*;
     use common::types::Metadata;
     use ic_canister::Canister;
@@ -723,19 +722,37 @@ mod proptests {
     use proptest::collection::vec;
     use proptest::prelude::*;
     use proptest::sample::Index;
-    // Enum of Actions
-    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    use std::borrow::Borrow;
+
+    #[derive(Debug, Clone, PartialEq, Eq)]
     enum Action {
-        Mint,
+        Mint(Nat, Principal),
         Burn,
         TransferWithFee,
         TransferWithoutFee,
         TransferFrom,
     }
 
-    fn make_action() -> impl Strategy<Value = Action> {
+    prop_compose! {
+        fn select_principal(p: Vec<Principal>) (index in any::<Index>()) -> Principal {
+            let i = index.index(p.len());
+            p[i]
+        }
+
+    }
+
+    prop_compose! {
+        fn select_principals(p: Vec<Principal>) (index in any::<Index>()) -> (Principal, Principal) {
+            let i1 = index.index(p.len());
+            let i2 = index.index(p.len());
+            (p[i1], p[i2])
+        }
+    }
+
+    fn make_action(principals: Vec<Principal>) -> impl Strategy<Value = Action> {
         prop_oneof![
-            Just(Action::Mint),
+            (make_nat(), select_principal(principals))
+                .prop_map(|(amount, principal)| Action::Mint(amount, principal)),
             Just(Action::Burn),
             Just(Action::TransferWithFee),
             Just(Action::TransferWithoutFee),
@@ -756,20 +773,29 @@ mod proptests {
 
     prop_compose! {
         fn make_nat() (num in "[0-9]{1,1000}") -> Nat {
-            Nat::parse(num.as_bytes()).unwrap()
+            let nat = Nat::parse(num.as_bytes()).unwrap();
+            nat
         }
 
     }
 
     prop_compose! {
-        fn make_canister(owner: Principal, fee_to: Principal) (
+        fn make_canister() (
             logo in any::<String>(),
             name in any::<String>(),
             symbol in any::<String>(),
             decimals in any::<u8>(),
             totalSupply in make_nat(),
             fee in make_nat(),
-        )-> TokenCanister {
+            principals in vec(make_principal(), 1..7),
+            owner_idx in any::<Index>(),
+            fee_to_idx in any::<Index>(),
+        )-> (TokenCanister, Vec<Principal>) {
+
+            // pick two random principals (they could very well be the same principal twice)
+            let owner = principals[owner_idx.index(principals.len())];
+            let fee_to = principals[fee_to_idx.index(principals.len())];
+
             MockContext::new().with_caller(owner).inject();
 
             let meta = Metadata {
@@ -786,44 +812,46 @@ mod proptests {
             let canister = TokenCanister::init_instance();
             canister.init(meta);
 
-            canister
-
+            (canister, principals)
         }
     }
 
-    // Make a canister with prop_compose
-
-
-
+    fn canister_and_actions() -> impl Strategy<Value = (TokenCanister, Vec<Principal>, Vec<Action>)> {
+        make_canister().prop_flat_map(|(canister, principals)| {
+            let actions = vec(make_action(principals.clone()), 1..7);
+            (Just(canister), Just(principals), actions)
+        })
+    }
 
     proptest! {
         #[test]
         fn generic_proptest(
-            principals in vec(make_principal(), 1..7),
-            owner_idx in any::<Index>(),
-            fee_to_idx in any::<Index>(),
-            actions in vec(make_action(), 1..7),
-            amount in make_nat(),
+            (canister, principals, actions) in canister_and_actions(),
         ) {
-            // pick two random principals (they could very well be the same principal twice)
-            let owner = principals[owner_idx.index(principals.len())];
-            let fee_to = principals[fee_to_idx.index(principals.len())];
-
-            // generate a canister from make_canister strategy
-            let canister = make_canister(owner, fee_to).boxed();
+            let mut total_minted = Nat::from(0);
+            let mut starting_balance = canister.balanceOf(canister.owner());
 
             // pick a random action
             for action in actions {
                 use Action::*;
-                    match action {
-                        Mint => {
-                        todo!()
-                        },
-                        _ => eprintln!("Not implemented"),
+                match action {
+                    Mint(amount, minter) => {
+                        let original = canister.balanceOf(canister.owner());
+                        let tx = canister.mint(minter, amount.clone());
+                        let expected = if minter == canister.owner() {
+                            total_minted += amount.clone();
+                            original + amount
+                        } else { 
+                            original 
+                        };
+                        prop_assert_eq!(expected, canister.balanceOf(canister.owner()));
                     }
-
+                    _ => {}
+                }
             }
-          }
+
+            prop_assert_eq!(total_minted.clone() + starting_balance, canister.balanceOf(canister.owner()));
+        }
 
     }
 }
