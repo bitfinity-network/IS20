@@ -215,7 +215,7 @@ pub fn _charge_fee(
 mod tests {
     use super::*;
     use crate::types::{Metadata, Operation, TransactionStatus};
-    use ic_kit::mock_principals::{alice, bob, john};
+    use ic_kit::mock_principals::{alice, bob, john, xtc};
     use ic_kit::MockContext;
     use std::collections::HashSet;
     use std::iter::FromIterator;
@@ -688,12 +688,12 @@ mod tests {
     #[test]
     fn get_user_transactions() {
         let canister = test_canister();
-        canister.transfer(alice(), Nat::from(10), None).unwrap();
-        canister.transfer(john(), Nat::from(10), None).unwrap();
-        canister.transfer(xtc(), Nat::from(10), None).unwrap();
-        canister.transfer(bob(), Nat::from(10), None).unwrap();
-        canister.transfer(xtc(), Nat::from(10), None).unwrap();
-        canister.transfer(john(), Nat::from(10), None).unwrap();
+        canister.transfer(alice(), Nat::from(10u32), None).unwrap();
+        canister.transfer(john(), Nat::from(10u32), None).unwrap();
+        canister.transfer(xtc(), Nat::from(10u32), None).unwrap();
+        canister.transfer(bob(), Nat::from(10u32), None).unwrap();
+        canister.transfer(xtc(), Nat::from(10u32), None).unwrap();
+        canister.transfer(john(), Nat::from(10u32), None).unwrap();
 
         let txs = canister.getUserTransactions(alice(), Nat::from(0), Nat::from(6));
         assert_eq!(txs.len(), 6);

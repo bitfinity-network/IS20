@@ -8,7 +8,8 @@ use crate::{
     },
     state::CanisterState,
     types::{
-        AuctionInfo, Metadata, SignedTx, StatsData, Timestamp, TokenInfo, TxReceipt, TxRecord,
+        AuctionInfo, Metadata, SignedTx, StatsData, Timestamp, TokenError, TokenInfo, TxReceipt,
+        TxRecord,
     },
 };
 use candid::Nat;
@@ -21,6 +22,7 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 mod dip20_transactions;
+#[cfg(not(feature = "no_api"))]
 mod inspect;
 pub mod is20_auction;
 mod is20_transactions;
@@ -163,8 +165,15 @@ impl TokenCanister {
     /// This can be if the transaction with the given ID does not exist, or if it was removed
     /// from the history because it is too old.
     #[update]
-    async fn getSignedTransaction(&self, id: Nat) -> Option<SignedTx> {
-        let tx = self.state.borrow().ledger.get(&id)?;
+    async fn getSignedTransaction(&self, id: Nat) -> Result<SignedTx, TokenError> {
+        let tx = self
+            .state
+            .borrow()
+            .ledger
+            .get(&id)
+            .ok_or(TokenError::TransactionError(
+                TxError::TransactionDoesNotExist,
+            ))?;
         let encoded = crate::types::get_tx_bytes(&tx);
 
         use sha2::{Digest, Sha256};
@@ -176,18 +185,28 @@ impl TokenCanister {
 
         let signature_serialized = ManagementCanister::sign_with_ecdsa(hash.clone(), vec![])
             .await
-            .map_err(|(_, err)| format!("sign_with_ecdsa failed for {own_principal}: {err}"))
-            .unwrap();
+            .map_err(|(_, err)| {
+                TokenError::SignatureError(format!(
+                    "sign_with_ecdsa failed for {own_principal}: {err}"
+                ))
+            })?;
 
         let pubkey_serialized = ManagementCanister::get_ecdsa_pubkey(Some(own_principal), vec![])
             .await
-            .map_err(|(_, err)| format!("get_ecdsa_pubkey failed for {own_principal}: {err}"))
-            .unwrap();
+            .map_err(|(_, err)| {
+                TokenError::PubkeyError(format!(
+                    "get_ecdsa_pubkey failed for {own_principal}: {err}"
+                ))
+            })?;
 
         let pubkey = libsecp256k1::PublicKey::parse_slice(&pubkey_serialized.as_bytes(), None)
-            .expect("Response is not a valid public key");
+            .map_err(|err| {
+                TokenError::PubkeyError(format!(
+                    "Failed to parse pubkey for {own_principal}: {err}"
+                ))
+            })?;
 
-        Some(SignedTx {
+        Ok(SignedTx {
             principal: ic_kit::ic::id(),
             publickey: pubkey.serialize().to_vec(),
             signature: signature_serialized.signature,

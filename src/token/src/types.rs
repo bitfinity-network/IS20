@@ -111,6 +111,13 @@ pub type Allowances = HashMap<Principal, HashMap<Principal, Nat>>;
 
 pub type TxReceipt = Result<Nat, TxError>;
 
+#[derive(CandidType, Debug, Eq, PartialEq, Deserialize)]
+pub enum TokenError {
+    TransactionError(TxError),
+    SignatureError(String),
+    PubkeyError(String),
+}
+
 #[derive(CandidType, Debug, Clone, Copy, Deserialize, PartialEq, Hash)]
 pub enum TransactionStatus {
     Succeeded,

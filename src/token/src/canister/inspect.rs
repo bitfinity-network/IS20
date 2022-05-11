@@ -45,7 +45,6 @@ static TRANSACTION_METHODS: &[&str] = &["approve", "burn", "transfer", "transfer
 /// calls for anyone, but update calls have different checks to see, if it's reasonable to spend
 /// canister cycles on accepting this call. Check the comments in this method for details on
 /// the checks for different methods.
-#[cfg(not(feature = "no_api"))]
 #[inspect_message]
 fn inspect_message() {
     let method = ic_cdk::api::call::method_name();
@@ -72,10 +71,7 @@ fn inspect_message() {
             let state = CanisterState::get();
             let state = state.borrow();
             let balances = &state.balances;
-            ic_cdk::println!("balances: {:?}", balances);
-            ic_cdk::println!("caller: {:?}, {}", caller, caller.to_string());
             if balances.0.contains_key(&caller) {
-                ic_cdk::println!("key present");
                 ic_cdk::api::call::accept_message();
             } else {
                 ic_cdk::println!("Transaction method is called not by a stakeholder. Rejecting.");
