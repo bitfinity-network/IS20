@@ -201,13 +201,12 @@ pub fn accumulated_fees(balances: &Balances) -> Nat {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use common::types::Metadata;
+    use crate::types::Metadata;
+    use ic_canister::Canister;
+    use ic_helpers::is20::TxError;
     use ic_kit::mock_principals::{alice, bob};
     use ic_kit::MockContext;
     use test_case::test_case;
-
-    use crate::types::TxError;
-    use ic_canister::Canister;
 
     fn test_context() -> (&'static mut MockContext, TokenCanister) {
         let context = MockContext::new().with_caller(alice()).inject();
@@ -218,9 +217,9 @@ mod tests {
             name: "".to_string(),
             symbol: "".to_string(),
             decimals: 8,
-            totalSupply: Nat::from(1000),
+            totalSupply: Nat::from(1000u32),
             owner: alice(),
-            fee: Nat::from(0),
+            fee: Nat::from(0u32),
             feeTo: alice(),
             isTestToken: None,
         });

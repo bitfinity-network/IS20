@@ -39,13 +39,7 @@ static OWNER_METHODS: &[&str] = &[
     "toggleTest",
 ];
 
-static TRANSACTION_METHODS: &[&str] = &[
-    "approve",
-    "burn",
-    "transfer",
-    "transferAndNotify",
-    "transferIncludeFee",
-];
+static TRANSACTION_METHODS: &[&str] = &["approve", "burn", "transfer", "transferIncludeFee"];
 
 /// This function checks if the canister should accept ingress message or not. We allow query
 /// calls for anyone, but update calls have different checks to see, if it's reasonable to spend
@@ -78,7 +72,10 @@ fn inspect_message() {
             let state = CanisterState::get();
             let state = state.borrow();
             let balances = &state.balances;
+            ic_cdk::println!("balances: {:?}", balances);
+            ic_cdk::println!("caller: {:?}, {}", caller, caller.to_string());
             if balances.0.contains_key(&caller) {
+                ic_cdk::println!("key present");
                 ic_cdk::api::call::accept_message();
             } else {
                 ic_cdk::println!("Transaction method is called not by a stakeholder. Rejecting.");
@@ -102,18 +99,6 @@ fn inspect_message() {
                 ic_cdk::println!("Caller is not allowed to transfer tokens for the requested principal. Rejecting.");
             }
         }
-        "notify" => {
-            // This method can only be called if the notification id is in the pending notifications
-            // list.
-            let notifications = &state.notifications;
-            let (tx_id,) = ic_cdk::api::call::arg_data::<(Nat,)>();
-
-            if notifications.contains(&tx_id) {
-                ic_cdk::api::call::accept_message();
-            } else {
-                ic_cdk::println!("No pending notification with the given id. Rejecting.");
-            }
-        }
         "runAuction" => {
             // We allow running auction only to the owner or any of the cycle bidders.
             let state = CanisterState::get();
@@ -131,8 +116,10 @@ fn inspect_message() {
             // We reject this message, because a call with cycles cannot be made through ingress,
             // only from the wallet canister.
         }
-        _ => {
-            ic_cdk::println!("The method called is not listed in the access checks. This is probably a code error.");
+
+        "getSignedTransaction" => ic_cdk::api::call::accept_message(),
+        m => {
+            ic_cdk::println!("The method \"{m}\" is not listed in the access checks. This is probably a code error.");
         }
     }
 }

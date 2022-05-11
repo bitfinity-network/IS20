@@ -1,7 +1,8 @@
-use crate::ledger::Ledger;
-use crate::types::{Allowances, AuctionInfo, PendingNotifications, StatsData, Timestamp};
+use crate::{
+    ledger::Ledger,
+    types::{Allowances, AuctionInfo, Metadata, StatsData, Timestamp},
+};
 use candid::{CandidType, Deserialize, Nat, Principal};
-use common::types::Metadata;
 use ic_storage::stable::Versioned;
 use ic_storage::IcStorage;
 use std::collections::HashMap;
@@ -14,7 +15,6 @@ pub struct CanisterState {
     pub(crate) stats: StatsData,
     pub(crate) allowances: Allowances,
     pub(crate) ledger: Ledger,
-    pub notifications: PendingNotifications,
 }
 
 impl CanisterState {
@@ -65,7 +65,7 @@ impl Versioned for CanisterState {
     }
 }
 
-#[derive(Default, CandidType, Deserialize)]
+#[derive(Default, CandidType, Deserialize, Debug)]
 pub struct Balances(pub HashMap<Principal, Nat>);
 
 impl Balances {

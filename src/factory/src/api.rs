@@ -8,7 +8,6 @@ use std::rc::Rc;
 use crate::error::TokenFactoryError;
 use crate::state::State;
 use candid::{Nat, Principal};
-use common::types::Metadata;
 use ic_canister::{init, query, update, Canister};
 use ic_helpers::factory::error::FactoryError;
 use ic_helpers::factory::FactoryState;
@@ -76,7 +75,7 @@ impl TokenFactoryCanister {
     #[update]
     async fn create_token(
         &self,
-        info: Metadata,
+        info: token::types::Metadata,
         owner: Option<Principal>,
     ) -> Result<Principal, TokenFactoryError> {
         if info.name.is_empty() {

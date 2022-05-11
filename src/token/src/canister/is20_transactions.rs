@@ -1,8 +1,9 @@
 use crate::canister::dip20_transactions::{_charge_fee, _transfer};
 use crate::canister::TokenCanister;
 use crate::state::CanisterState;
-use crate::types::{TxError, TxReceipt};
+use crate::types::TxReceipt;
 use candid::{Nat, Principal};
+use ic_helpers::is20::TxError;
 use ic_kit::ic;
 
 /// Transfers `value` amount to the `to` principal, applying American style fee. This means, that
@@ -36,7 +37,6 @@ pub fn transfer_include_fee(canister: &TokenCanister, to: Principal, value: Nat)
     _transfer(balances, from, to, value.clone() - fee.clone());
 
     let id = state.ledger.transfer(from, to, value, fee);
-    state.notifications.insert(id.clone());
 
     Ok(id)
 }
@@ -44,7 +44,7 @@ pub fn transfer_include_fee(canister: &TokenCanister, to: Principal, value: Nat)
 #[cfg(test)]
 mod tests {
     use super::*;
-    use common::types::Metadata;
+    use crate::types::Metadata;
     use ic_canister::Canister;
     use ic_kit::mock_principals::{alice, bob, john};
     use ic_kit::MockContext;
@@ -58,9 +58,9 @@ mod tests {
             name: "".to_string(),
             symbol: "".to_string(),
             decimals: 8,
-            totalSupply: Nat::from(1000),
+            totalSupply: Nat::from(1000u32),
             owner: alice(),
-            fee: Nat::from(0),
+            fee: Nat::from(0u32),
             feeTo: alice(),
             isTestToken: None,
         });
@@ -71,11 +71,13 @@ mod tests {
     #[test]
     fn transfer_without_fee() {
         let canister = test_canister();
-        assert_eq!(Nat::from(1000), canister.balanceOf(alice()));
+        assert_eq!(Nat::from(1000u32), canister.balanceOf(alice()));
 
-        assert!(canister.transferIncludeFee(bob(), Nat::from(100)).is_ok());
-        assert_eq!(canister.balanceOf(bob()), Nat::from(100));
-        assert_eq!(canister.balanceOf(alice()), Nat::from(900));
+        assert!(canister
+            .transferIncludeFee(bob(), Nat::from(100u32))
+            .is_ok());
+        assert_eq!(canister.balanceOf(bob()), Nat::from(100u32));
+        assert_eq!(canister.balanceOf(alice()), Nat::from(900u32));
     }
 
     #[test]
@@ -83,24 +85,26 @@ mod tests {
         let canister = test_canister();
 
         let mut state = canister.state.borrow_mut();
-        state.stats.fee = Nat::from(100);
+        state.stats.fee = Nat::from(100u32);
         state.stats.fee_to = john();
         drop(state);
 
-        assert!(canister.transferIncludeFee(bob(), Nat::from(200)).is_ok());
-        assert_eq!(canister.balanceOf(bob()), Nat::from(100));
-        assert_eq!(canister.balanceOf(alice()), Nat::from(800));
-        assert_eq!(canister.balanceOf(john()), Nat::from(100));
+        assert!(canister
+            .transferIncludeFee(bob(), Nat::from(200u32))
+            .is_ok());
+        assert_eq!(canister.balanceOf(bob()), Nat::from(100u32));
+        assert_eq!(canister.balanceOf(alice()), Nat::from(800u32));
+        assert_eq!(canister.balanceOf(john()), Nat::from(100u32));
     }
 
     #[test]
     fn transfer_insufficient_balance() {
         let canister = test_canister();
         assert_eq!(
-            canister.transferIncludeFee(bob(), Nat::from(1001)),
+            canister.transferIncludeFee(bob(), Nat::from(1001u32)),
             Err(TxError::InsufficientBalance)
         );
-        assert_eq!(canister.balanceOf(alice()), Nat::from(1000));
-        assert_eq!(canister.balanceOf(bob()), Nat::from(0));
+        assert_eq!(canister.balanceOf(alice()), Nat::from(1000u32));
+        assert_eq!(canister.balanceOf(bob()), Nat::from(0u32));
     }
 }

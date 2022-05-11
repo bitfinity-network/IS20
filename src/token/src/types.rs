@@ -1,11 +1,39 @@
 use candid::{CandidType, Deserialize, Nat, Principal};
-use common::types::Metadata;
-use std::collections::{HashMap, HashSet};
+use ic_helpers::is20::TxError;
+use std::collections::HashMap;
 
 mod tx_record;
 pub use tx_record::*;
 
 pub type Timestamp = u64;
+
+#[allow(non_snake_case)]
+#[derive(Deserialize, CandidType, Clone, Debug)]
+pub struct Metadata {
+    pub logo: String,
+    pub name: String,
+    pub symbol: String,
+    pub decimals: u8,
+    pub totalSupply: Nat,
+    pub owner: Principal,
+    pub fee: Nat,
+    pub feeTo: Principal,
+    pub isTestToken: Option<bool>,
+}
+
+#[derive(CandidType, Debug, Clone, Deserialize)]
+pub struct SignedTx {
+    /// Principal of token that called `receive_is20`
+    pub principal: Principal,
+    /// Pubkey associated to a principal.
+    pub publickey: Vec<u8>,
+    /// Transaction signing signature on behalf of `publickey`.
+    pub signature: Vec<u8>,
+    /// Transaction serialized with `serde-cbor`.
+    pub serialized_tx: Vec<u8>,
+    /// Sha256 hash of serialized transaction.
+    pub hash: Vec<u8>,
+}
 
 #[derive(Deserialize, CandidType, Clone, Debug)]
 pub struct StatsData {
@@ -81,33 +109,15 @@ impl Default for StatsData {
 
 pub type Allowances = HashMap<Principal, HashMap<Principal, Nat>>;
 
-#[derive(CandidType, Debug, PartialEq, Deserialize)]
-pub enum TxError {
-    InsufficientBalance,
-    InsufficientAllowance,
-    Unauthorized,
-    AmountTooSmall,
-    FeeExceededLimit,
-    NotificationFailed,
-    AlreadyNotified,
-    TransactionDoesNotExist,
-    BadFee { expected_fee: u64 },
-    InsufficientFunds { balance: u64 },
-    TxTooOld { allowed_window_nanos: u64 },
-    TxCreatedInFuture,
-    TxDuplicate { duplicate_of: u64 },
-}
-
 pub type TxReceipt = Result<Nat, TxError>;
-pub type PendingNotifications = HashSet<Nat>;
 
-#[derive(CandidType, Debug, Clone, Copy, Deserialize, PartialEq)]
+#[derive(CandidType, Debug, Clone, Copy, Deserialize, PartialEq, Hash)]
 pub enum TransactionStatus {
     Succeeded,
     Failed,
 }
 
-#[derive(CandidType, Debug, Clone, Copy, Deserialize, PartialEq)]
+#[derive(CandidType, Debug, Clone, Copy, Deserialize, PartialEq, Hash)]
 pub enum Operation {
     Approve,
     Mint,

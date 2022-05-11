@@ -2,7 +2,7 @@ use crate::types::{Operation, TransactionStatus};
 use candid::{CandidType, Deserialize, Int, Nat, Principal};
 use ic_kit::ic;
 
-#[derive(Deserialize, CandidType, Debug, Clone)]
+#[derive(Deserialize, CandidType, Debug, Clone, Hash)]
 pub struct TxRecord {
     pub caller: Option<Principal>,
     pub index: Nat,
@@ -106,4 +106,18 @@ impl TxRecord {
             operation: Operation::Auction,
         }
     }
+}
+
+pub fn get_key_bytes(key: &Nat) -> Vec<u8> {
+    key.0.to_bytes_be()
+}
+
+pub fn get_tx_bytes(tx: &TxRecord) -> Vec<u8> {
+    use ic_cdk::export::candid::Encode;
+    Encode!(tx).unwrap()
+}
+
+pub fn tx_from_bytes(bytes: &[u8]) -> TxRecord {
+    use ic_cdk::export::candid::Decode;
+    Decode!(bytes, TxRecord).unwrap()
 }

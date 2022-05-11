@@ -11,8 +11,8 @@ fn main() {}
 #[cfg(not(any(target_arch = "wasm32", test)))]
 fn main() {
     use canister::is20_auction::{AuctionError, BiddingInfo};
-    use common::types::Metadata;
     use ic_cdk::export::candid::{Nat, Principal};
+    use ic_helpers::is20::TxError;
     use types::*;
 
     std::print!("{}", ic_canister::generate_idl!());
