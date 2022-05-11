@@ -8,7 +8,7 @@ on:
 
 jobs:
   call-workflow:
-    uses: infinity-swap/.github/.github/workflows/tests-in-dfx.yml@main
+    uses: infinity-swap/ci-wf/.github/workflows/tests-in-dfx.yml@main
     with:
       entrypoint-script: ./scripts/build.sh && ./scripts/test.sh
       ic-module-name: is20
