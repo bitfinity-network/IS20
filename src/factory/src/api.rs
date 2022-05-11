@@ -6,13 +6,12 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 use crate::error::TokenFactoryError;
-use crate::state::{get_token_bytecode, State};
+use crate::state::State;
 use candid::{Nat, Principal};
 use common::types::Metadata;
 use ic_canister::{init, query, update, Canister};
 use ic_helpers::factory::error::FactoryError;
 use ic_helpers::factory::FactoryState;
-use ledger_canister::{account_identifier::Subaccount, DEFAULT_TRANSFER_FEE};
 
 mod inspect_message;
 
@@ -31,6 +30,7 @@ pub struct TokenFactoryCanister {
     state: Rc<RefCell<State>>,
 }
 
+#[allow(dead_code)]
 impl TokenFactoryCanister {
     #[init]
     fn init(&self, controller: Principal, ledger_principal: Option<Principal>) {

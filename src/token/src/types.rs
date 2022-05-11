@@ -85,13 +85,17 @@ pub type Allowances = HashMap<Principal, HashMap<Principal, Nat>>;
 pub enum TxError {
     InsufficientBalance,
     InsufficientAllowance,
-    // Storing owner and caller as strings for better readability
-    Unauthorized { owner: String, caller: String },
+    Unauthorized,
     AmountTooSmall,
     FeeExceededLimit,
-    NotificationFailed { cdk_msg: String },
+    NotificationFailed,
     AlreadyNotified,
     TransactionDoesNotExist,
+    BadFee { expected_fee: u64 },
+    InsufficientFunds { balance: u64 },
+    TxTooOld { allowed_window_nanos: u64 },
+    TxCreatedInFuture,
+    TxDuplicate { duplicate_of: u64 },
 }
 
 pub type TxReceipt = Result<Nat, TxError>;
