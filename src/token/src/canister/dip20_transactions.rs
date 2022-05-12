@@ -735,15 +735,14 @@ mod proptests {
     use proptest::collection::vec;
     use proptest::prelude::*;
     use proptest::sample::Index;
-    use std::borrow::Borrow;
 
     #[derive(Debug, Clone, PartialEq, Eq)]
     enum Action {
         Mint(Nat, Principal),
-        Burn,
-        TransferWithFee,
-        TransferWithoutFee,
-        TransferFrom,
+        Burn(Nat, Principal),
+        TransferWithFee(Principal, Nat),
+        TransferWithoutFee(Principal, Nat, Option<Nat>),
+        TransferFrom(Principal, Principal, Nat),
     }
 
     prop_compose! {
@@ -764,12 +763,33 @@ mod proptests {
 
     fn make_action(principals: Vec<Principal>) -> impl Strategy<Value = Action> {
         prop_oneof![
-            (make_nat(), select_principal(principals))
+            (make_nat(), select_principal(principals.clone()))
                 .prop_map(|(amount, principal)| Action::Mint(amount, principal)),
-            Just(Action::Burn),
-            Just(Action::TransferWithFee),
-            Just(Action::TransferWithoutFee),
-            Just(Action::TransferFrom),
+            (make_nat(), select_principal(principals.clone()))
+                .prop_map(|(amount, principal)| Action::Burn(amount, principal)),
+            (select_principal(principals.clone()), make_nat())
+                .prop_map(|(principal, amount)| Action::TransferWithFee(principal, amount)),
+            (
+                select_principal(principals.clone()),
+                make_nat(),
+                make_option()
+            )
+                .prop_map(|(principal, amount, fee_limit)| Action::TransferWithoutFee(
+                    principal, amount, fee_limit
+                )),
+            (
+                select_principal(principals.clone()),
+                select_principal(principals),
+                make_nat()
+            )
+                .prop_map(|(from, to, amount)| Action::TransferFrom(from, to, amount))
+        ]
+    }
+
+    fn make_option() -> impl Strategy<Value = Option<Nat>> {
+        prop_oneof![
+            Just(None),
+            (make_nat()).prop_map(|fee_limit| Some(fee_limit))
         ]
     }
 
@@ -829,7 +849,8 @@ mod proptests {
         }
     }
 
-    fn canister_and_actions() -> impl Strategy<Value = (TokenCanister, Vec<Principal>, Vec<Action>)> {
+    fn canister_and_actions() -> impl Strategy<Value = (TokenCanister, Vec<Principal>, Vec<Action>)>
+    {
         make_canister().prop_flat_map(|(canister, principals)| {
             let actions = vec(make_action(principals.clone()), 1..7);
             (Just(canister), Just(principals), actions)
@@ -839,32 +860,118 @@ mod proptests {
     proptest! {
         #[test]
         fn generic_proptest(
-            (canister, principals, actions) in canister_and_actions(),
+            (canister, _principals, actions) in canister_and_actions(),
         ) {
             let mut total_minted = Nat::from(0);
-            let mut starting_balance = canister.balanceOf(canister.owner());
+            let starting_balance = canister.balanceOf(canister.owner());
 
             // pick a random action
+            let mut total_burned = Nat::from(0);
+
             for action in actions {
                 use Action::*;
                 match action {
                     Mint(amount, minter) => {
                         let original = canister.balanceOf(canister.owner());
-                        let tx = canister.mint(minter, amount.clone());
+                        let _ = canister.mint(minter, amount.clone());
                         let expected = if minter == canister.owner() {
                             total_minted += amount.clone();
                             original + amount
-                        } else { 
-                            original 
+                        } else {
+                            original
                         };
                         prop_assert_eq!(expected, canister.balanceOf(canister.owner()));
+
+                    },
+                    Burn(amount, burner) => {
+                        let original = canister.balanceOf(canister.owner());
+                        if original >= amount {
+                            let _ = canister.burn(amount.clone());
+                            let expected = if burner == canister.owner() {
+                                total_burned += amount.clone();
+                                original - amount
+
+                            } else {
+                                original
+                            };
+                            prop_assert_eq!(expected, canister.balanceOf(canister.owner()));
+
+                        }
+
+
                     }
-                    _ => {}
+                    TransferFrom(from,to,amount)=> {
+                        // // Transfers value amount of tokens from user from to user to,
+                        // // this method allows canister smart contracts to transfer tokens on your behalf,
+                        // // it returns a TxReceipt which contains the transaction index or an error message.
+                        // //
+                        // // If the fee is set, the from principal is charged with the fee. In this case,
+                        // // the maximum amount that the caller can request to transfer is allowance - fee.
+                        //
+
+                        let original_balance = canister.balanceOf(canister.owner());
+                        let to_balance = canister.balanceOf(to);
+                        let from_balance = canister.balanceOf(from);
+                        let fee = canister.state.borrow().stats.fee.clone();
+                        let from_allowance = canister.state.borrow().allowance(from,canister.owner());
+                        // let balances = canister.state.borrow().balances;
+                        let value_with_fee = amount.clone() + fee.clone();
+                        if from_allowance < value_with_fee.clone() {
+                            // prop_assert!(Err(TxError::InsufficientBalance));
+                        }
+                        if original_balance >= value_with_fee {
+                            let _ = canister.transferFrom(from,to,amount.clone());
+                            prop_assert_eq!(to_balance+amount.clone(),canister.balanceOf(to));
+                            prop_assert_eq!(from_balance - amount.clone()-fee.clone(),canister.balanceOf(from))
+                        }
+
+
+
+                    },
+                    TransferWithoutFee(to,amount,fee_limit) => {
+
+                        // Transfers value amount of tokens
+                        // to user to, returns a TxReceipt which contains the transaction index or an error message.
+                        // The balance of the caller is reduced by value + fee amount.
+                        //
+                        // To protect the caller from unexpected fee amount change, the optional
+                        // fee_limit parameter can be given. If the fee to be applied is larger than this value,
+                        // the transaction will fail with TxError::FeeExceededLimit error.
+
+                        let original = canister.balanceOf(canister.owner());
+                        let fee = canister.state.borrow().stats.fee.clone();
+                        let to_balance = canister.balanceOf(to);
+                        if original > amount.clone() + fee.clone() {
+                            if fee_limit.is_some() && fee.clone() > fee_limit.clone().unwrap() {
+                                prop_assert_eq!(Err(TxError::FeeExceededLimit), canister.transfer(to, amount.clone(), fee_limit.clone()));
+                                prop_assert!(canister.transfer(to, amount.clone(), fee_limit.clone()).is_err());
+                            }
+
+                            if fee_limit.is_none() {
+                                let _ = canister.transfer(to, amount.clone(), fee_limit.clone());
+                                prop_assert_eq!(to_balance+amount.clone(),canister.balanceOf(to));
+                                prop_assert_eq!(original-fee.clone()-amount.clone(),canister.balanceOf(canister.owner()));
+
+                            }
+                        }
+
+                    }
+                   TransferWithFee(_to,_amount) => {
+                        // Transfers value amount to the to principal,
+                        // applying American style fee. This means, that the recipient
+                        // will receive value - fee, and the sender account will be reduced exactly by value.
+                        //
+                        // Note, that the value cannot be less than the fee amount.
+                        // If the value given is too small, transaction will fail with TxError::AmountTooSmall error.
+
+                    }
                 }
             }
 
+
             prop_assert_eq!(total_minted.clone() + starting_balance, canister.balanceOf(canister.owner()));
         }
+
 
     }
 }
