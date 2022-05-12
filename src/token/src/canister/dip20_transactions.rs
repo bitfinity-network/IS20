@@ -466,10 +466,7 @@ mod tests {
         context.update_caller(bob());
         assert_eq!(
             canister.burn(Some(alice()), Nat::from(100)),
-            Err(TxError::Unauthorized {
-                owner: alice().to_string(),
-                caller: bob().to_string()
-            })
+            Err(TxError::Unauthorized)
         );
         assert_eq!(canister.balanceOf(alice()), Nat::from(1000));
         assert_eq!(canister.getMetadata().totalSupply, Nat::from(1000));
