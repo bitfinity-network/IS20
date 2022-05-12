@@ -108,9 +108,9 @@ impl Ledger {
         id
     }
 
-    pub fn burn(&mut self, caller: Principal, amount: Nat) -> Nat {
+    pub fn burn(&mut self, caller: Principal, from: Principal, amount: Nat) -> Nat {
         let id = self.next_id();
-        self.push(TxRecord::burn(id.clone(), caller, amount));
+        self.push(TxRecord::burn(id.clone(), caller, from, amount));
 
         id
     }
