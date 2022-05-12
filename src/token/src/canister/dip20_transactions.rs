@@ -742,7 +742,12 @@ mod proptests {
         Burn(Nat, Principal),
         TransferWithFee(Principal, Nat),
         TransferWithoutFee(Principal, Nat, Option<Nat>),
-        TransferFrom(Principal, Principal, Nat),
+        TransferFrom {
+            from: Principal,
+            to: Principal,
+            on_behalf_of: Principal,
+            amount: Nat,
+        },
     }
 
     prop_compose! {
@@ -751,14 +756,6 @@ mod proptests {
             p[i]
         }
 
-    }
-
-    prop_compose! {
-        fn select_principals(p: Vec<Principal>) (index in any::<Index>()) -> (Principal, Principal) {
-            let i1 = index.index(p.len());
-            let i2 = index.index(p.len());
-            (p[i1], p[i2])
-        }
     }
 
     fn make_action(principals: Vec<Principal>) -> impl Strategy<Value = Action> {
@@ -780,9 +777,10 @@ mod proptests {
             (
                 select_principal(principals.clone()),
                 select_principal(principals),
+                select_principal(principals),
                 make_nat()
             )
-                .prop_map(|(from, to, amount)| Action::TransferFrom(from, to, amount))
+                .prop_map(|(from, to, on_behalf_of, amount)| Action::TransferFrom{ from, to, on_behalf_of, amount })
         ]
     }
 
