@@ -738,7 +738,7 @@ mod proptests {
 
     #[derive(Debug, Clone, PartialEq, Eq)]
     enum Action {
-        Mint(Nat, Principal),
+        Mint {minter: Principal, recipient: Principal, amount: Nat},
         Burn(Nat, Principal),
         TransferWithFee(Principal, Nat),
         TransferWithoutFee(Principal, Nat, Option<Nat>),
@@ -760,27 +760,47 @@ mod proptests {
 
     fn make_action(principals: Vec<Principal>) -> impl Strategy<Value = Action> {
         prop_oneof![
-            (make_nat(), select_principal(principals.clone()))
-                .prop_map(|(amount, principal)| Action::Mint(amount, principal)),
-            (make_nat(), select_principal(principals.clone()))
+            // Mint
+            (
+                make_nat(), 
+                select_principal(principals.clone()),
+                select_principal(principals.clone()),
+            )
+                .prop_map(|(amount, minter, recipient)| Action::Mint { minter, recipient, amount }),
+
+            // Burn
+            (
+                make_nat(), 
+                select_principal(principals.clone())
+            )
                 .prop_map(|(amount, principal)| Action::Burn(amount, principal)),
-            (select_principal(principals.clone()), make_nat())
+
+            // With fee
+            (
+                select_principal(principals.clone()), 
+                make_nat()
+            )
                 .prop_map(|(principal, amount)| Action::TransferWithFee(principal, amount)),
             (
                 select_principal(principals.clone()),
                 make_nat(),
-                make_option()
+                make_option(),
             )
                 .prop_map(|(principal, amount, fee_limit)| Action::TransferWithoutFee(
                     principal, amount, fee_limit
                 )),
             (
                 select_principal(principals.clone()),
-                select_principal(principals),
+                select_principal(principals.clone()),
                 select_principal(principals),
                 make_nat()
             )
-                .prop_map(|(from, to, on_behalf_of, amount)| Action::TransferFrom{ from, to, on_behalf_of, amount })
+                .prop_map(|(from, to, on_behalf_of, amount)| Action::TransferFrom {
+                    from,
+                    to,
+                    on_behalf_of,
+                    amount
+                })
         ]
     }
 
@@ -847,21 +867,20 @@ mod proptests {
         }
     }
 
-    fn canister_and_actions() -> impl Strategy<Value = (TokenCanister, Vec<Principal>, Vec<Action>)>
-    {
+    fn canister_and_actions() -> impl Strategy<Value = (TokenCanister, Vec<Action>)> {
         make_canister().prop_flat_map(|(canister, principals)| {
             let actions = vec(make_action(principals.clone()), 1..7);
-            (Just(canister), Just(principals), actions)
+            (Just(canister), actions)
         })
     }
 
     proptest! {
         #[test]
         fn generic_proptest(
-            (canister, _principals, actions) in canister_and_actions(),
+            (canister, actions) in canister_and_actions(),
         ) {
             let mut total_minted = Nat::from(0);
-            let starting_balance = canister.balanceOf(canister.owner());
+            let starting_supply = canister.totalSupply();
 
             // pick a random action
             let mut total_burned = Nat::from(0);
@@ -869,89 +888,96 @@ mod proptests {
             for action in actions {
                 use Action::*;
                 match action {
-                    Mint(amount, minter) => {
-                        let original = canister.balanceOf(canister.owner());
-                        let _ = canister.mint(minter, amount.clone());
+                    Mint { minter, recipient, amount } => {
+                        MockContext::new().with_caller(minter).inject();
+
+                        let original = canister.totalSupply();
+                        let res = canister.mint(recipient, amount.clone());
                         let expected = if minter == canister.owner() {
                             total_minted += amount.clone();
+                            assert!(matches!(res, Ok(_)));
                             original + amount
                         } else {
+                            assert_eq!(res, Err(TxError::Unauthorized));
                             original
                         };
-                        prop_assert_eq!(expected, canister.balanceOf(canister.owner()));
+
+                        prop_assert_eq!(expected, canister.totalSupply());
 
                     },
                     Burn(amount, burner) => {
-                        let original = canister.balanceOf(canister.owner());
-                        if original >= amount {
-                            let _ = canister.burn(amount.clone());
-                            let expected = if burner == canister.owner() {
-                                total_burned += amount.clone();
-                                original - amount
+                        MockContext::new().with_caller(burner).inject();
+                        // let original = canister.balanceOf(canister.owner());
+                        // let result = canister.burn(amount.clone());
 
-                            } else {
-                                original
-                            };
-                            prop_assert_eq!(expected, canister.balanceOf(canister.owner()));
+                        // if amount > original {
+                        //     assert_eq!(result, Err(TxError::InsufficientBalance));
+                        // } else {
 
-                        }
+                        // }
 
-
+                        // let expected = if burner == canister.owner() {
+                        //     total_burned += amount.clone();
+                        //     original - amount
+                        // } else {
+                        //     original
+                        // };
+                        // prop_assert_eq!(expected, canister.balanceOf(canister.owner()));
                     }
-                    TransferFrom(from,to,amount)=> {
-                        // // Transfers value amount of tokens from user from to user to,
-                        // // this method allows canister smart contracts to transfer tokens on your behalf,
-                        // // it returns a TxReceipt which contains the transaction index or an error message.
-                        // //
-                        // // If the fee is set, the from principal is charged with the fee. In this case,
-                        // // the maximum amount that the caller can request to transfer is allowance - fee.
-                        //
+                    TransferFrom { from, to, on_behalf_of, amount } => {
+                        //// // Transfers value amount of tokens from user from to user to,
+                        //// // this method allows canister smart contracts to transfer tokens on your behalf,
+                        //// // it returns a TxReceipt which contains the transaction index or an error message.
+                        //// //
+                        //// // If the fee is set, the from principal is charged with the fee. In this case,
+                        //// // the maximum amount that the caller can request to transfer is allowance - fee.
+                        ////
 
-                        let original_balance = canister.balanceOf(canister.owner());
-                        let to_balance = canister.balanceOf(to);
-                        let from_balance = canister.balanceOf(from);
-                        let fee = canister.state.borrow().stats.fee.clone();
-                        let from_allowance = canister.state.borrow().allowance(from,canister.owner());
-                        // let balances = canister.state.borrow().balances;
-                        let value_with_fee = amount.clone() + fee.clone();
-                        if from_allowance < value_with_fee.clone() {
-                            // prop_assert!(Err(TxError::InsufficientBalance));
-                        }
-                        if original_balance >= value_with_fee {
-                            let _ = canister.transferFrom(from,to,amount.clone());
-                            prop_assert_eq!(to_balance+amount.clone(),canister.balanceOf(to));
-                            prop_assert_eq!(from_balance - amount.clone()-fee.clone(),canister.balanceOf(from))
-                        }
+                        //let original_balance = canister.balanceOf(canister.owner());
+                        //let to_balance = canister.balanceOf(to);
+                        //let from_balance = canister.balanceOf(from);
+                        //let fee = canister.state.borrow().stats.fee.clone();
+                        //let from_allowance = canister.state.borrow().allowance(from,canister.owner());
+                        //// let balances = canister.state.borrow().balances;
+                        //let value_with_fee = amount.clone() + fee.clone();
+                        //if from_allowance < value_with_fee.clone() {
+                        //    // prop_assert!(Err(TxError::InsufficientBalance));
+                        //}
+                        //if original_balance >= value_with_fee {
+                        //    let _ = canister.transferFrom(from,to,amount.clone());
+                        //    prop_assert_eq!(to_balance+amount.clone(),canister.balanceOf(to));
+                        //    prop_assert_eq!(from_balance - amount.clone()-fee.clone(),canister.balanceOf(from))
+                        //}
 
 
 
                     },
                     TransferWithoutFee(to,amount,fee_limit) => {
 
-                        // Transfers value amount of tokens
-                        // to user to, returns a TxReceipt which contains the transaction index or an error message.
-                        // The balance of the caller is reduced by value + fee amount.
-                        //
-                        // To protect the caller from unexpected fee amount change, the optional
-                        // fee_limit parameter can be given. If the fee to be applied is larger than this value,
-                        // the transaction will fail with TxError::FeeExceededLimit error.
+//                        // Transfers value amount of tokens
+//                        // to user to, returns a TxReceipt which contains the transaction index or an error message.
+//                        // The balance of the caller is reduced by value + fee amount.
+//                        //
+//                        // To protect the caller from unexpected fee amount change, the optional
+//                        // fee_limit parameter can be given. If the fee to be applied is larger than this value,
+//                        // the transaction will fail with TxError::FeeExceededLimit error.
 
-                        let original = canister.balanceOf(canister.owner());
-                        let fee = canister.state.borrow().stats.fee.clone();
-                        let to_balance = canister.balanceOf(to);
-                        if original > amount.clone() + fee.clone() {
-                            if fee_limit.is_some() && fee.clone() > fee_limit.clone().unwrap() {
-                                prop_assert_eq!(Err(TxError::FeeExceededLimit), canister.transfer(to, amount.clone(), fee_limit.clone()));
-                                prop_assert!(canister.transfer(to, amount.clone(), fee_limit.clone()).is_err());
-                            }
+//                        let original = canister.balanceOf(canister.owner());
+//                        let fee = canister.state.borrow().stats.fee.clone();
+//                        let to_balance = canister.balanceOf(to);
+//                        if original > amount.clone() + fee.clone() {
+//                            if fee_limit.is_some() && fee.clone() > fee_limit.clone().unwrap() {
+//                                prop_assert_eq!(Err(TxError::FeeExceededLimit), canister.transfer(to, amount.clone(), fee_limit.clone()));
+//                                prop_assert!(canister.transfer(to, amount.clone(), fee_limit.clone()).is_err());
+//                            }
 
-                            if fee_limit.is_none() {
-                                let _ = canister.transfer(to, amount.clone(), fee_limit.clone());
-                                prop_assert_eq!(to_balance+amount.clone(),canister.balanceOf(to));
-                                prop_assert_eq!(original-fee.clone()-amount.clone(),canister.balanceOf(canister.owner()));
+//                            if fee_limit.is_none() {
+//                                let _ = canister.transfer(to, amount.clone(), fee_limit.clone());
+//                                prop_assert_eq!(to_balance+amount.clone(),canister.balanceOf(to));
+//                                prop_assert_eq!(original-fee.clone()-amount.clone(),canister.balanceOf(canister.owner()));
 
-                            }
-                        }
+//                            }
+//                        }
 
                     }
                    TransferWithFee(_to,_amount) => {
@@ -967,7 +993,7 @@ mod proptests {
             }
 
 
-            prop_assert_eq!(total_minted.clone() + starting_balance, canister.balanceOf(canister.owner()));
+            prop_assert_eq!(total_minted.clone() + starting_supply, canister.totalSupply());
         }
 
 
