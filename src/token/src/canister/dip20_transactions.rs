@@ -176,6 +176,7 @@ pub fn burn(canister: &TokenCanister, amount: Nat) -> TxReceipt {
     state.stats.total_supply -= amount.clone();
 
     let id = state.ledger.burn(caller, amount);
+
     Ok(id)
 }
 
@@ -875,108 +876,98 @@ mod proptests {
     }
 
     proptest! {
-      #[test]
-      fn generic_proptest(
-          (canister, actions) in canister_and_actions(),
-      ) {
-          let mut total_minted = Nat::from(0);
-          let starting_supply = canister.totalSupply();
+        #[test]
+        fn generic_proptest((canister, actions) in canister_and_actions()) {
+            let mut total_minted = Nat::from(0);
+            let mut total_burned = Nat::from(0);
+            let starting_supply = canister.totalSupply();
 
+            for action in actions {
+                use Action::*;
+                match action {
+                    Mint { minter, recipient, amount } => {
+                        MockContext::new().with_caller(minter).inject();
+                        let original = canister.totalSupply();
+                        let res = canister.mint(recipient, amount.clone());
+                        let expected = if minter == canister.owner() {
+                            total_minted += amount.clone();
+                            assert!(matches!(res, Ok(_)));
+                            original + amount
+                        } else {
+                            assert_eq!(res, Err(TxError::Unauthorized));
+                            original
+                        };
 
-          // pick a random action
-          let mut total_burned = Nat::from(0);
+                        assert_eq!(expected, canister.totalSupply());
 
-
-          for action in actions {
-              use Action::*;
-              match action {
-                  Mint { minter, recipient, amount } => {
-                      MockContext::new().with_caller(minter).inject();
-                      let original = canister.totalSupply();
-                      let res = canister.mint(recipient, amount.clone());
-                      let expected = if minter == canister.owner() {
-                          total_minted += amount.clone();
-                          assert!(matches!(res, Ok(_)));
-                          original + amount
-                      } else {
-                          assert_eq!(res, Err(TxError::Unauthorized));
-                          original
-                      };
-
-                      assert_eq!(expected, canister.totalSupply());
-
-                  },
-                  Burn(amount, _burner) => {
-                      MockContext::new().with_caller(canister.owner()).inject();
-                      let original = canister.totalSupply();
-                      let res = canister.burn(amount.clone());
-                      if original >= amount {
-                          prop_assert_eq!(original.clone() - amount.clone(),
-                          canister.totalSupply());
-                          prop_assert!(matches!(res, Ok(_)));
-                          total_burned += amount.clone();
-
-                          // {
-                          //     MockContext::new().with_caller(burner).inject();
-                          //     prop_assert!(matches!(res, Ok(_)));
-                          //     prop_assert_eq!(original.clone() - amount.clone(), canister.totalSupply());
-                          // }
-                      } else {
-                          prop_assert_eq!(res, Err(TxError::InsufficientBalance));
-                          prop_assert_eq!(original, canister.totalSupply());
-                      }
                     },
-                  TransferFrom { from: _, to: _, on_behalf_of: _, amount: _ } => {
-                      // Transfers value amount of tokens from user from to user to,
-                      // this method allows canister smart contracts to transfer tokens on your behalf,
-                      // it returns a TxReceipt which contains the transaction index or an error message.
-                      //
-                      // If the fee is set, the from principal is charged with the fee. In this case,
-                      // the maximum amount that the caller can request to transfer is allowance - fee.
+                    Burn(amount, burner) => {
+                        MockContext::new().with_caller(burner).inject();
+                        let original = canister.totalSupply();
+                        let balance = canister.balanceOf(burner);
+                        let res = canister.burn(amount.clone());
 
-                  },
-                  TransferWithoutFee(_to,_amount,_fee_limit) => {
+                        if balance < amount {
+                            prop_assert_eq!(res, Err(TxError::InsufficientBalance));
+                            prop_assert_eq!(original, canister.totalSupply());
+                        } else {
+                            prop_assert!(matches!(res, Ok(_)));
+                            prop_assert_eq!(original.clone() - amount.clone(), canister.totalSupply());
+                            total_burned += amount.clone();
+                        }
+                    },
+                    TransferFrom { from: _, to: _, on_behalf_of: _, amount: _ } => {
+                        // Transfers value amount of tokens from user from to user to,
+                        // this method allows canister smart contracts to transfer tokens on your behalf,
+                        // it returns a TxReceipt which contains the transaction index or an error message.
+                        //
+                        // If the fee is set, the from principal is charged with the fee. In this case,
+                        // the maximum amount that the caller can request to transfer is allowance - fee.
 
-                     // Transfers value amount of tokens
-                     // to user to, returns a TxReceipt which contains the transaction index or an error message.
-                     // The balance of the caller is reduced by value + fee amount.
-                     //
-                     // To protect the caller from unexpected fee amount change, the optional
-                     // fee_limit parameter can be given. If the fee to be applied is larger than this value,
-                     // the transaction will fail with TxError::FeeExceededLimit error.
-                    //   let original_balance = canister.balanceOf(canister.owner());
-                    //   let to_balance = canister.balanceOf(to);
-                    //   let fee = canister.state.borrow().stats.fee.clone();
-                    //   let value_with_fee = amount.clone() + fee.clone();
-                    //   let res = canister.transfer(to, amount.clone(), fee_limit.clone());
+                    },
+                    TransferWithoutFee(_to,_amount,_fee_limit) => {
+
+                        // Transfers value amount of tokens
+                        // to user to, returns a TxReceipt which contains the transaction index or an error message.
+                        // The balance of the caller is reduced by value + fee amount.
+                        //
+                        // To protect the caller from unexpected fee amount change, the optional
+                        // fee_limit parameter can be given. If the fee to be applied is larger than this value,
+                        // the transaction will fail with TxError::FeeExceededLimit error.
+                        //   let original_balance = canister.balanceOf(canister.owner());
+                        //   let to_balance = canister.balanceOf(to);
+                        //   let fee = canister.state.borrow().stats.fee.clone();
+                        //   let value_with_fee = amount.clone() + fee.clone();
+                        //   let res = canister.transfer(to, amount.clone(), fee_limit.clone());
 
 
-                    // if fee_limit.is_some() {
-                    //     if  fee > fee_limit.unwrap() {
-                    //         prop_assert_eq!(res, Err(TxError::FeeExceededLimit));
-                    //     } else if original_balance >= value_with_fee {
-                    //         // println!("RESS{:?}", res.unwrap().0);
-                    //         prop_assert!(matches!(res, Ok(_)));
-                    //         prop_assert_eq!(original_balance.clone() - value_with_fee.clone(), canister.totalSupply());
-                    //     }
-                    // } else {
+                        // if fee_limit.is_some() {
+                        //     if  fee > fee_limit.unwrap() {
+                        //         prop_assert_eq!(res, Err(TxError::FeeExceededLimit));
+                        //     } else if original_balance >= value_with_fee {
+                        //         // println!("RESS{:?}", res.unwrap().0);
+                        //         prop_assert!(matches!(res, Ok(_)));
+                        //         prop_assert_eq!(original_balance.clone() - value_with_fee.clone(), canister.totalSupply());
+                        //     }
+                        // } else {
 
-                    // }
-                  }
-                 TransferWithFee(_to,_amount) => {
-                      // Transfers value amount to the to principal,
-                      // applying American style fee. This means, that the recipient
-                      // will receive value - fee, and the sender account will be reduced exactly by value.
-                      //
-                      // Note, that the value cannot be less than the fee amount.
-                      // If the value given is too small, transaction will fail with TxError::AmountTooSmall error.
+                        // }
+                    }
+                    TransferWithFee(_to,_amount) => {
+                        // Transfers value amount to the to principal,
+                        // applying American style fee. This means, that the recipient
+                        // will receive value - fee, and the sender account will be reduced exactly by value.
+                        //
+                        // Note, that the value cannot be less than the fee amount.
+                        // If the value given is too small, transaction will fail with TxError::AmountTooSmall error.
 
-                  }
+                    }
 
-              }
-               // prop_assert_eq!(total_minted.clone() + starting_supply, canister.totalSupply());
-          }
-      }
+                }
+            }
+
+            prop_assert_eq!(total_minted.clone() + starting_supply - total_burned.clone(), canister.totalSupply());
+        }
 
     }
 }
