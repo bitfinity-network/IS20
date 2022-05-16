@@ -73,16 +73,29 @@ fn inspect_message() {
             ic_cdk::println!("Owner method is called not by an owner. Rejecting.")
         }
         m if TRANSACTION_METHODS.contains(&m) => {
-            // These methods require the caller to have some balance, so we check if the caller
-            // has any token to their name.
+            // These methods requires that the caller have tokens.
             let state = CanisterState::get();
             let state = state.borrow();
             let balances = &state.balances;
-            if balances.0.contains_key(&caller) {
-                ic_cdk::api::call::accept_message();
-            } else {
-                ic_cdk::println!("Transaction method is called not by a stakeholder. Rejecting.");
+            if !balances.0.contains_key(&caller) {
+                ic_cdk::println!("Transaction method is not called by a stakeholder. Rejecting.");
+                return;
             }
+
+            // Anything but the `burn` method
+            if caller == state.stats.owner || m != "burn" {
+                ic_cdk::api::call::accept_message();
+                return;
+            }
+
+            // It's the `burn` method and the caller isn't the owner.
+            let from = ic_cdk::api::call::arg_data::<(Option<Principal>, Nat)>().0;
+            if from.is_some() {
+                ic_cdk::println!("Only the owner can burn other's tokens. Rejecting.");
+                return;
+            }
+
+            ic_cdk::api::call::accept_message();
         }
         "transferFrom" => {
             // Check if the caller has allowance for this transfer.
