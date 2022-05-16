@@ -22,10 +22,10 @@ jobs:
         ic-cdk-optimizer target/wasm32-unknown-unknown/release/token.wasm -o src/factory/src/token.wasm
         cargo build --target wasm32-unknown-unknown --package token-factory --release
         
-        ic-cdk-optimizer target/wasm32-unknown-unknown/release/token-factory.wasm -o .artifact/token-factory.wasm
-
-        cargo run -p token > .artifact/token.did
-        cargo run -p token-factory > .artifact/token-factory.did
+        cp src/factory/src/token.wasm .artifact/is20_token.wasm
+        ic-cdk-optimizer target/wasm32-unknown-unknown/release/token-factory.wasm -o .artifact/is20_factory.wasm
+        cargo run -p token > .artifact/is20_token.did
+        cargo run -p token-factory > .artifact/is20_factory.did
 
     secrets:
       gh_token: ${{ secrets.GH_PKG_TOKEN }}
