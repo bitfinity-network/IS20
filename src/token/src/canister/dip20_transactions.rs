@@ -994,21 +994,21 @@ mod proptests {
 
                         // if amount is less than fee: `TxError::AmountTooSmall`
                         // if balance of from is less than amount: `TxError::InsufficientBalance`
-                        eprintln!("{res:?}");
 
-                        // if amount.clone() < fee.clone() {
-                        //     prop_assert_eq!(res, Err(TxError::AmountTooSmall));
-                        // } else {
-                        //     if original_balance > amount.clone() {
-                        //         prop_assert!(matches!(res, Ok(_)));
-                        //         prop_assert_eq!(original_balance - amount.clone() , canister.balanceOf(canister.owner()));
-                        //         prop_assert_eq!(to_balance + amount.clone() - fee.clone() , canister.balanceOf(to));
-                        //     } else {
-                        //         prop_assert_eq!(res, Err(TxError::InsufficientBalance));
-                        //         prop_assert_eq!(original_balance, canister.balanceOf(canister.owner()));
-                        //     }
-                        // }
+                        if amount.clone() < fee.clone() {
+                            prop_assert_eq!(res, Err(TxError::AmountTooSmall));
+                            return Ok(());
+                        }
 
+                        if original_balance < amount {
+                            prop_assert_eq!(res, Err(TxError::InsufficientBalance));
+                            prop_assert_eq!(original_balance, canister.balanceOf(from));
+                            return Ok(());
+                        }
+
+                        prop_assert!(res.is_ok());
+                        prop_assert_eq!(original_balance - amount.clone() , canister.balanceOf(from));
+                        prop_assert_eq!(to_balance + amount.clone() - fee.clone() , canister.balanceOf(to));
                     }
 
                 }
