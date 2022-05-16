@@ -11,12 +11,39 @@ on:
     branches: [main]
 
 jobs:
-  build-modules:
+  build-test:
     uses: infinity-swap/ci-wf/.github/workflows/build-n-test.yml@main
     with:
       test-script: |
         cargo test
+      output-artifact: is20-artifact
+      artifact-script: |
+        cargo build --target wasm32-unknown-unknown --package token --release
+        ic-cdk-optimizer target/wasm32-unknown-unknown/release/token.wasm -o src/factory/src/token.wasm
+        cargo build --target wasm32-unknown-unknown --package token-factory --release
+        
+        ic-cdk-optimizer target/wasm32-unknown-unknown/release/token-factory.wasm -o .artifact/token-factory.wasm
+
+        cargo run -p token > .artifact/token.did
+        cargo run -p token-factory > .artifact/token-factory.did
+
     secrets:
       gh_token: ${{ secrets.GH_PKG_TOKEN }}
       gh_login: ${{ secrets.GH_PKG_LOGIN }}
       
+  publishing:
+    needs: [build-test]
+    uses: infinity-swap/.github/.github/workflows/publish-wrapped-artifact.yml@main
+    with:
+      input-artifact: is20-artifact
+      output-image-name: is20-dev
+      # Condition to use latest tag
+      output-image-tag-latest: true
+      # output-image-tag-latest: ${{ github.ref_type == 'branch' && github.ref == 'refs/heads/main' }}
+      # Condition to publish docker image
+      push-image: true
+      # push-image: ${{ github.event_name != 'pull_request' && github.ref == 'refs/heads/main' }}
+
+    secrets:
+      gh_token: ${{ secrets.GH_PKG_TOKEN }}
+      gh_login: ${{ secrets.GH_PKG_LOGIN }}
