@@ -745,9 +745,10 @@ mod proptests {
             amount: Nat,
         },
         Burn(Nat, Principal),
-        TransferWithFee(Principal, Nat),
+        TransferWithFee { caller: Principal, from: Principal, to: Principal, amount: Nat},
         TransferWithoutFee(Principal, Nat, Option<Nat>),
         TransferFrom {
+            caller: Principal,
             from: Principal,
             to: Principal,
             on_behalf_of: Principal,
@@ -779,9 +780,17 @@ mod proptests {
             // Burn
             (make_nat(), select_principal(principals.clone()))
                 .prop_map(|(amount, principal)| Action::Burn(amount, principal)),
+
             // With fee
-            (select_principal(principals.clone()), make_nat())
-                .prop_map(|(principal, amount)| Action::TransferWithFee(principal, amount)),
+            (
+                select_principal(principals.clone()),
+                select_principal(principals.clone()),
+                select_principal(principals.clone()),
+                make_nat()
+            )
+                .prop_map(|(caller, from, to, amount)| Action::TransferWithFee { caller, from, to, amount }),
+
+            // Without fee
             (
                 select_principal(principals.clone()),
                 make_nat(),
@@ -790,13 +799,17 @@ mod proptests {
                 .prop_map(|(principal, amount, fee_limit)| Action::TransferWithoutFee(
                     principal, amount, fee_limit
                 )),
+
+            // Transfer from
             (
+                select_principal(principals.clone()),
                 select_principal(principals.clone()),
                 select_principal(principals.clone()),
                 select_principal(principals),
                 make_nat()
             )
-                .prop_map(|(from, to, on_behalf_of, amount)| Action::TransferFrom {
+                .prop_map(|(caller, from, to, on_behalf_of, amount)| Action::TransferFrom {
+                    caller,
                     from,
                     to,
                     on_behalf_of,
@@ -824,7 +837,7 @@ mod proptests {
     }
 
     prop_compose! {
-        fn make_nat() (num in "[0-9]{1,4}") -> Nat {
+        fn make_nat() (num in "[0-9]{1,1000}") -> Nat {
             let nat = Nat::parse(num.as_bytes()).unwrap();
             nat
         }
@@ -916,7 +929,7 @@ mod proptests {
                             total_burned += amount.clone();
                         }
                     },
-                    TransferFrom { from: _, to: _, on_behalf_of: _, amount: _ } => {
+                    TransferFrom { caller, from, to, on_behalf_of, amount } => {
                         // Transfers value amount of tokens from user from to user to,
                         // this method allows canister smart contracts to transfer tokens on your behalf,
                         // it returns a TxReceipt which contains the transaction index or an error message.
@@ -924,54 +937,77 @@ mod proptests {
                         // If the fee is set, the from principal is charged with the fee. In this case,
                         // the maximum amount that the caller can request to transfer is allowance - fee.
 
+                        MockContext::new().with_caller(caller).inject();
+                        let res = canister.transferFrom(from, to, amount);
+                        // eprintln!("{res:?}");
                     },
                     TransferWithoutFee(to,amount,fee_limit) => {
-                        // Transfers value amount of tokens from user from to user to,
-                        let _to_balance = canister.balanceOf(to);
-                        let original_balance = canister.balanceOf(canister.owner());
-                        let res = canister.transfer(to, amount.clone(),
-                        fee_limit.clone());
-                        let fee = canister.state.borrow().stats.fee.clone();
-                        let value_with_fee = amount.clone() + fee.clone();
 
+//                        // Transfers value amount of tokens from user from to user to,
+//                        let _to_balance = canister.balanceOf(to);
+//                        let original_balance = canister.balanceOf(canister.owner());
+//                        let res = canister.transfer(to, amount.clone(),
+//                        fee_limit.clone());
+//                        let fee = canister.state.borrow().stats.fee.clone();
+//                        let value_with_fee = amount.clone() + fee.clone();
 
-                        if fee_limit.is_some() && fee.clone() > fee_limit.unwrap() {
-                            prop_assert_eq!(res, Err(TxError::FeeExceededLimit));
-                            prop_assert_eq!(original_balance, canister.balanceOf(canister.owner()));
+//                        // Transfers value amount of tokens
+//                        // to user to, returns a TxReceipt which contains the transaction index or an error message.
+//                        // The balance of the caller is reduced by value + fee amount.
+//                        //
+//                        // To protect the caller from unexpected fee amount change, the optional
+//                        // fee_limit parameter can be given. If the fee to be applied is larger than this value,
+//                        // the transaction will fail with TxError::FeeExceededLimit error.
+//                        //   let original_balance = canister.balanceOf(canister.owner());
+//                        //   let to_balance = canister.balanceOf(to);
+//                        //   let fee = canister.state.borrow().stats.fee.clone();
+//                        //   let value_with_fee = amount.clone() + fee.clone();
+//                        //   let res = canister.transfer(to, amount.clone(), fee_limit.clone());
 
-                        } else if original_balance < value_with_fee {
-                            prop_assert_eq!(res, Err(TxError::InsufficientBalance));
-                            prop_assert_eq!(original_balance, canister.balanceOf(canister.owner()));
-                        } else {
-                            prop_assert!(matches!(res, Ok(_)));
-                            prop_assert_eq!(original_balance - value_with_fee, canister.balanceOf(canister.owner()));
-                            prop_assert_eq!(canister.balanceOf(to) + amount, canister.balanceOf(to));
-                        }
+//                        if fee_limit.is_some() && fee.clone() > fee_limit.unwrap() {
+//                            prop_assert_eq!(res, Err(TxError::FeeExceededLimit));
+//                            prop_assert_eq!(original_balance, canister.balanceOf(canister.owner()));
+//                        } else if original_balance < value_with_fee {
+//                            prop_assert_eq!(res, Err(TxError::InsufficientBalance));
+//                            prop_assert_eq!(original_balance, canister.balanceOf(canister.owner()));
+//                        } else {
+//                            prop_assert!(matches!(res, Ok(_)));
+//                            prop_assert_eq!(original_balance - value_with_fee, canister.balanceOf(canister.owner()));
+//                            prop_assert_eq!(canister.balanceOf(to) + amount, canister.balanceOf(to));
+//                        }
+
                     }
-                    TransferWithFee(to,amount) => {
+                    TransferWithFee { caller, from, to, amount } => {
                         // Transfers value amount to the to principal,
                         // applying American style fee. This means, that the recipient
                         // will receive value - fee, and the sender account will be reduced exactly by value.
                         //
                         // Note, that the value cannot be less than the fee amount.
                         // If the value given is too small, transaction will fail with TxError::AmountTooSmall error.
-                        let original_balance = canister.balanceOf(canister.owner());
+
+                        MockContext::new().with_caller(caller).inject();
+
+                        let original_balance = canister.balanceOf(from);
                         let to_balance = canister.balanceOf(to);
                         let fee = canister.state.borrow().stats.fee.clone();
                         let res = canister.transferIncludeFee(to, amount.clone());
 
-                        if amount.clone() < fee.clone() {
-                            prop_assert_eq!(res, Err(TxError::AmountTooSmall));
-                        } else {
-                            if original_balance > amount.clone() {
-                                prop_assert!(matches!(res, Ok(_)));
-                                prop_assert_eq!(original_balance - amount.clone() , canister.balanceOf(canister.owner()));
-                                prop_assert_eq!(to_balance + amount.clone() - fee.clone() , canister.balanceOf(to));
-                            } else {
-                                prop_assert_eq!(res, Err(TxError::InsufficientBalance));
-                                prop_assert_eq!(original_balance, canister.balanceOf(canister.owner()));
-                            }
-                        }
+                        // if amount is less than fee: `TxError::AmountTooSmall`
+                        // if balance of from is less than amount: `TxError::InsufficientBalance`
+                        eprintln!("{res:?}");
+
+                        // if amount.clone() < fee.clone() {
+                        //     prop_assert_eq!(res, Err(TxError::AmountTooSmall));
+                        // } else {
+                        //     if original_balance > amount.clone() {
+                        //         prop_assert!(matches!(res, Ok(_)));
+                        //         prop_assert_eq!(original_balance - amount.clone() , canister.balanceOf(canister.owner()));
+                        //         prop_assert_eq!(to_balance + amount.clone() - fee.clone() , canister.balanceOf(to));
+                        //     } else {
+                        //         prop_assert_eq!(res, Err(TxError::InsufficientBalance));
+                        //         prop_assert_eq!(original_balance, canister.balanceOf(canister.owner()));
+                        //     }
+                        // }
 
                     }
 
