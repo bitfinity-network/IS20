@@ -121,11 +121,28 @@ fn inspect_message() {
             let notifications = &state.notifications;
             let (tx_id,) = ic_cdk::api::call::arg_data::<(Nat,)>();
 
-            if notifications.contains(&tx_id) {
-                ic_cdk::api::call::accept_message();
-            } else {
-                ic_cdk::println!("No pending notification with the given id. Rejecting.");
-            }
+            match notifications.get(&tx_id) {
+                Some(false) => ic_cdk::api::call::accept_message(),
+                _ => ic_cdk::println!("No pending notification with the given id. Rejecting."),
+            };
+        }
+        "notifyResponded" => {
+            // This method can only be called if the notification id is in the pending notifications
+            // list and the caller is notified canister.
+            let notifications = &state.notifications;
+            let (tx_id,) = ic_cdk::api::call::arg_data::<(Nat,)>();
+
+            match notifications.get(&tx_id) {
+                Some(true) => {
+                    let to = state.ledger.get(&tx_id).map_or_else(|| Principal::from_text("aaaaa-aa").unwrap(), |s| s.to);
+                    if caller == to {
+                        ic_cdk::api::call::accept_message();
+                    } else {
+                        ic_cdk::println!("Caller is not allowed to respond notify with given id");
+                    }
+                }
+                _ => ic_cdk::println!("No pending notification with the given id or it doesn't send notify. Rejecting."),
+            };
         }
         "runAuction" => {
             // We allow running auction only to the owner or any of the cycle bidders.

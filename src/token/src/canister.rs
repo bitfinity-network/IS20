@@ -14,6 +14,8 @@ use num_traits::ToPrimitive;
 use std::cell::RefCell;
 use std::rc::Rc;
 
+use self::is20_notify::notify_responded;
+
 mod dip20_transactions;
 mod inspect;
 pub mod is20_auction;
@@ -366,8 +368,13 @@ impl TokenCanister {
     /// If a notification request is made for a transaction that was already notified, a
     /// [TxError::AlreadyNotified] error is returned.
     #[update]
-    async fn notify(&self, transaction_id: Nat) -> TxReceipt {
-        notify(self, transaction_id).await
+    fn notify(&self, transaction_id: Nat) -> TxReceipt {
+        notify(self, transaction_id)
+    }
+
+    #[update]
+    fn notifyResponded(&self, transaction_id: Nat) -> TxReceipt {
+        notify_responded(self, transaction_id)
     }
 
     /// Convenience method to make a transaction and notify the receiver with just one call.
@@ -376,13 +383,13 @@ impl TokenCanister {
     /// marked as not notified, so a [notify] call can be done later to re-request the notification of
     /// this transaction.
     #[update]
-    async fn transferAndNotify(
+    fn transferAndNotify(
         &self,
         to: Principal,
         amount: Nat,
         fee_limit: Option<Nat>,
     ) -> TxReceipt {
-        transfer_and_notify(self, to, amount, fee_limit).await
+        transfer_and_notify(self, to, amount, fee_limit)
     }
 }
 
