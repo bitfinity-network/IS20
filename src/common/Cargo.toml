@@ -5,5 +5,5 @@ version = "0.1.0"
 
 [dependencies]
 candid = "0.7"
-ic-cdk = "0.3"
+ic-cdk = "0.5"
 serde = "1.0"
