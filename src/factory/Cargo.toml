@@ -18,12 +18,10 @@ ic-helpers = {git = "https://github.com/infinity-swap/ic-helpers.git", package =
 ic-canister = { git = "https://github.com/infinity-swap/ic-helpers.git", package = "ic-canister" }
 
 dfn_core = {git = "https://github.com/infinity-swap/ic", branch = "rebased-2022-02-17"}
-dfn_protobuf = {git = "https://github.com/infinity-swap/ic", branch = "rebased-2022-02-17"}
 
 serde = "1.0"
-ic-types = {git = "https://github.com/infinity-swap/ic"}
 ledger-canister = {git = "https://github.com/infinity-swap/ic", branch = "rebased-2022-02-17"}
 thiserror = "1.0"
 
 [dev-dependencies]
-tokio = { version = "1", features = ["macros"] }
+tokio = { version = "1", features = ["rt", "macros"] }
