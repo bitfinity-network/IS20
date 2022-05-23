@@ -35,7 +35,6 @@ pub fn transfer(
 
     let mut state = canister.state.borrow_mut();
     let id = state.ledger.transfer(from, to, value, fee);
-    state.notifications.insert(id.clone(), false);
     Ok(id)
 }
 

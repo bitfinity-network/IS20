@@ -2,7 +2,7 @@ use crate::canister::dip20_transactions::{approve, burn, mint, transfer, transfe
 use crate::canister::is20_auction::{
     auction_info, bid_cycles, bidding_info, run_auction, AuctionError, BiddingInfo,
 };
-use crate::canister::is20_notify::{notify, transfer_and_notify};
+use crate::canister::is20_notify::approve_and_notify;
 use crate::canister::is20_transactions::transfer_include_fee;
 use crate::state::CanisterState;
 use crate::types::{AuctionInfo, StatsData, Timestamp, TokenInfo, TxError, TxReceipt, TxRecord};
@@ -13,8 +13,6 @@ use ic_cdk::export::candid::Principal;
 use num_traits::ToPrimitive;
 use std::cell::RefCell;
 use std::rc::Rc;
-
-use self::is20_notify::notify_responded;
 
 mod dip20_transactions;
 mod inspect;
@@ -266,6 +264,11 @@ impl TokenCanister {
     }
 
     #[update]
+    fn approveAndNotify(&self, spender: Principal, value: Nat) -> TxReceipt {
+        approve_and_notify(self, spender, value)
+    }
+
+    #[update]
     fn mint(&self, to: Principal, amount: Nat) -> TxReceipt {
         if !self.isTestToken() {
             check_caller(self.owner())?;
@@ -352,44 +355,6 @@ impl TokenCanister {
         // IC timestamp is in nanoseconds, thus multiplying
         self.state.borrow_mut().bidding_state.auction_period = period_sec * 1_000_000;
         Ok(())
-    }
-
-    /*********************** NOTIFY **********************/
-
-    /// Notifies the transaction receiver about a previously performed transaction.
-    ///
-    /// This method guarantees that a notification for the same transaction id can be sent only once.
-    /// It allows to use this method to reliably inform the transaction receiver without danger of
-    /// duplicate transaction attack.
-    ///
-    /// In case the notification call fails, an [TxError::NotificationFailed] error is returned and
-    /// the transaction will still be marked as not notified.
-    ///
-    /// If a notification request is made for a transaction that was already notified, a
-    /// [TxError::AlreadyNotified] error is returned.
-    #[update]
-    fn notify(&self, transaction_id: Nat) -> TxReceipt {
-        notify(self, transaction_id)
-    }
-
-    #[update]
-    fn notifyResponded(&self, transaction_id: Nat) -> TxReceipt {
-        notify_responded(self, transaction_id)
-    }
-
-    /// Convenience method to make a transaction and notify the receiver with just one call.
-    ///
-    /// If the notification fails for any reason, the transaction is still completed, but it will be
-    /// marked as not notified, so a [notify] call can be done later to re-request the notification of
-    /// this transaction.
-    #[update]
-    fn transferAndNotify(
-        &self,
-        to: Principal,
-        amount: Nat,
-        fee_limit: Option<Nat>,
-    ) -> TxReceipt {
-        transfer_and_notify(self, to, amount, fee_limit)
     }
 }
 
