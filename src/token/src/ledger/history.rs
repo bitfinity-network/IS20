@@ -53,7 +53,7 @@ impl History {
         }
 
         let witness = self.tree.value_range(
-            &get_key_bytes(&start.clone()),
+            &get_key_bytes(start),
             &get_key_bytes(&(start.clone() + limit.clone() - 1)),
         );
         let mut result = vec![];
