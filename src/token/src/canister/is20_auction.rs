@@ -1,6 +1,6 @@
 //! This module contains APIs from IS20 standard providing cycle auction related functionality.
 
-use crate::canister::dip20_transactions::_transfer;
+use crate::canister::erc20_transactions::_transfer;
 use crate::canister::TokenCanister;
 use crate::ledger::Ledger;
 use crate::state::{AuctionHistory, Balances, BiddingState, CanisterState};

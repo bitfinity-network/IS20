@@ -1,4 +1,4 @@
-use crate::canister::dip20_transactions::{approve, burn, mint, transfer, transfer_from};
+use crate::canister::erc20_transactions::{approve, burn, mint, transfer, transfer_from};
 use crate::canister::is20_auction::{
     auction_info, bid_cycles, bidding_info, run_auction, AuctionError, BiddingInfo,
 };
@@ -17,7 +17,7 @@ use num_traits::ToPrimitive;
 use std::cell::RefCell;
 use std::rc::Rc;
 
-mod dip20_transactions;
+mod erc20_transactions;
 #[cfg(not(feature = "no_api"))]
 mod inspect;
 pub mod is20_auction;

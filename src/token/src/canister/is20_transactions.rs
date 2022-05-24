@@ -1,4 +1,4 @@
-use crate::canister::dip20_transactions::{_charge_fee, _transfer};
+use crate::canister::erc20_transactions::{_charge_fee, _transfer};
 use crate::canister::TokenCanister;
 use crate::state::CanisterState;
 use crate::types::{TxError, TxReceipt};
