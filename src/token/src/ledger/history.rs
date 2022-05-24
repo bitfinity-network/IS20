@@ -46,9 +46,7 @@ impl History {
                     extract_values(&boxed.as_ref().0, aggr);
                     extract_values(&boxed.as_ref().1, aggr);
                 }
-                HashTree::Leaf(v) => {
-                    aggr.push(tx_from_bytes(&v.to_vec()));
-                }
+                HashTree::Leaf(v) => aggr.push(tx_from_bytes(v)),                
                 HashTree::Labeled(_, child) => extract_values(child, aggr),
                 _ => {}
             }
