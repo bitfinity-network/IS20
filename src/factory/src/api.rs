@@ -1,5 +1,5 @@
 //! Module     : factory
-//! Copyright  : 2021 InfinitySwap Team
+//! Copyright  : 2022 InfinitySwap Team
 //! Stability  : Experimental
 
 use std::cell::RefCell;
@@ -120,6 +120,20 @@ impl TokenFactoryCanister {
         state_ref.factory.register(key, canister);
 
         Ok(principal)
+    }
+
+    /// Delete a token.
+    /// The token must be owned by the caller.
+    /// The token will be deleted from the factory and the canister will be destroyed.
+    #[update]
+    async fn delete_token(&self, canister: Principal) -> Result<(), TokenFactoryError> {
+        //    Check controller access
+        let state_ref = &mut *self.state.borrow_mut();
+        state_ref.check_controller_access()?;
+
+        state_ref.factory().drop(canister).await?;
+
+        Ok(())
     }
 }
 
