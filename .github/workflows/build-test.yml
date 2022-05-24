@@ -1,4 +1,4 @@
-name: Build-Test
+name: Validate and Bump
 
 on:
   push:
@@ -7,11 +7,27 @@ on:
     branches: [main]
 
 jobs:
-  call-workflow:
-    uses: infinity-swap/ci-wf/.github/workflows/tests-in-dfx.yml@main
+  build-test:
+    uses: infinity-swap/.github/.github/workflows/build-n-test.yml@main
     with:
-      entrypoint-script: ./scripts/build.sh && ./scripts/test.sh
-      ic-module-name: is20
+      skip-test: ${{ github.ref_type == 'tag' }}
+      test-script: |
+        ./scripts/build.sh
+        ./scripts/test.sh
+
     secrets:
       gh_token: ${{ secrets.GH_PKG_TOKEN }}
       gh_login: ${{ secrets.GH_PKG_LOGIN }}
+
+  version-bump:
+    needs: [build-test]
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+      with:
+        fetch-depth: '0'
+    - name: Bump version and push tag
+      uses: anothrNick/github-tag-action@1.36.0
+      env:
+        GITHUB_TOKEN: ${{ secrets.GH_PKG_TOKEN }}
+        WITH_V: true
