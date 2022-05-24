@@ -72,11 +72,8 @@ impl History {
     }
 
     pub fn get_witness(&self, id: &Nat) -> Option<HashTree> {
-        if self.tree.get(&get_key_bytes(id)).is_some() {
-            Some(self.tree.witness(&get_key_bytes(id)))
-        } else {
-            None
-        }
+        let bytes = get_key_bytes(id);
+        self.tree.get(&bytes).is_some().then(|| self.tree.witness(&bytes))
     }
 }
 
