@@ -28,8 +28,25 @@ impl Ledger {
         self.history.get_range(start, limit)
     }
 
-    pub fn iter(&self) -> impl Iterator<Item = TxRecord> + '_ {
+    pub fn iter(&self) -> impl DoubleEndedIterator<Item = &TxRecord> {
         self.history.iter()
+    }
+
+    fn get_index(&self, id: &Nat) -> Option<usize> {
+        if *id < self.vec_offset {
+            None
+        } else {
+            let index = id.clone() - self.vec_offset.clone();
+            index.0.to_usize()
+        }
+    }
+
+    pub fn get_len_user_history(&self, user: Principal) -> Nat {
+        self.history
+            .iter()
+            .filter(|tx| tx.to == user || tx.from == user || tx.caller == Some(user))
+            .count()
+            .into()
     }
 
     pub fn transfer(&mut self, from: Principal, to: Principal, amount: Nat, fee: Nat) -> Nat {
@@ -74,9 +91,9 @@ impl Ledger {
         id
     }
 
-    pub fn burn(&mut self, caller: Principal, amount: Nat) -> Nat {
+    pub fn burn(&mut self, caller: Principal, from: Principal, amount: Nat) -> Nat {
         let id = self.next_id();
-        self.push(TxRecord::burn(id.clone(), caller, amount));
+        self.push(TxRecord::burn(id.clone(), caller, from, amount));
 
         id
     }

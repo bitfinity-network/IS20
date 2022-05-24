@@ -351,13 +351,7 @@ mod tests {
     fn setting_min_cycles_not_authorized() {
         let (context, canister) = test_context();
         context.update_caller(bob());
-        assert_eq!(
-            canister.setMinCycles(100500),
-            Err(TxError::Unauthorized {
-                owner: alice().to_string(),
-                caller: ic_kit::ic::caller().to_string()
-            })
-        );
+        assert_eq!(canister.setMinCycles(100500), Err(TxError::Unauthorized));
     }
 
     #[test]
@@ -373,10 +367,7 @@ mod tests {
         context.update_caller(bob());
         assert_eq!(
             canister.setAuctionPeriod(100500),
-            Err(TxError::Unauthorized {
-                owner: alice().to_string(),
-                caller: ic_kit::ic::caller().to_string()
-            })
+            Err(TxError::Unauthorized)
         );
     }
 }

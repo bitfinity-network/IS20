@@ -1,6 +1,6 @@
 use candid::{CandidType, Deserialize, Nat, Principal};
 use common::types::Metadata;
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 
 mod tx_record;
 pub use tx_record::*;
@@ -85,17 +85,22 @@ pub type Allowances = HashMap<Principal, HashMap<Principal, Nat>>;
 pub enum TxError {
     InsufficientBalance,
     InsufficientAllowance,
-    // Storing owner and caller as strings for better readability
-    Unauthorized { owner: String, caller: String },
+    Unauthorized,
     AmountTooSmall,
     FeeExceededLimit,
-    NotificationFailed { cdk_msg: String },
+    NotificationFailed,
     AlreadyNotified,
     TransactionDoesNotExist,
+    BadFee { expected_fee: u64 },
+    InsufficientFunds { balance: u64 },
+    TxTooOld { allowed_window_nanos: u64 },
+    TxCreatedInFuture,
+    TxDuplicate { duplicate_of: u64 },
 }
 
 pub type TxReceipt = Result<Nat, TxError>;
-pub type PendingNotifications = HashSet<Nat>;
+// false -> the notify are not send; true -> the notify are send; if received the send, it will be delete.
+pub type PendingNotifications = HashMap<Nat, bool>;
 
 #[derive(CandidType, Debug, Clone, Copy, Deserialize, PartialEq)]
 pub enum TransactionStatus {
