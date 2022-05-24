@@ -1,5 +1,6 @@
 use crate::canister::dip20_transactions::{_charge_fee, _transfer};
 use crate::canister::TokenCanister;
+use crate::state::CanisterState;
 use crate::types::{TxError, TxReceipt};
 use candid::{Nat, Principal};
 use ic_kit::ic;
@@ -11,26 +12,32 @@ use ic_kit::ic;
 /// transaction will fail with `TxError::AmountTooSmall` error.
 pub fn transfer_include_fee(canister: &TokenCanister, to: Principal, value: Nat) -> TxReceipt {
     let from = ic::caller();
-    let (fee, fee_to) = canister.state.borrow().stats.fee_info();
-    let fee_ratio = canister.bidding_state.borrow().fee_ratio;
+    let mut state = canister.state.borrow_mut();
+
+    let CanisterState {
+        ref mut balances,
+        ref bidding_state,
+        ref stats,
+        ..
+    } = &mut *state;
+
+    let (fee, fee_to) = stats.fee_info();
+    let fee_ratio = bidding_state.fee_ratio;
 
     if value <= fee {
         return Err(TxError::AmountTooSmall);
     }
 
-    if canister.balanceOf(from) < value {
+    if balances.balance_of(&from) < value {
         return Err(TxError::InsufficientBalance);
     }
 
-    {
-        let mut balances = canister.balances.borrow_mut();
-        _charge_fee(&mut *balances, from, fee_to, fee.clone(), fee_ratio);
-        _transfer(&mut *balances, from, to, value.clone() - fee.clone());
-    }
+    _charge_fee(balances, from, fee_to, fee.clone(), fee_ratio);
+    _transfer(balances, from, to, value.clone() - fee.clone());
 
-    let mut state = canister.state.borrow_mut();
-    let id = state.ledger_mut().transfer(from, to, value, fee);
+    let id = state.ledger.transfer(from, to, value, fee);
     state.notifications.insert(id.clone());
+
     Ok(id)
 }
 
@@ -74,8 +81,11 @@ mod tests {
     #[test]
     fn transfer_with_fee() {
         let canister = test_canister();
-        canister.state.borrow_mut().stats.fee = Nat::from(100);
-        canister.state.borrow_mut().stats.fee_to = john();
+
+        let mut state = canister.state.borrow_mut();
+        state.stats.fee = Nat::from(100);
+        state.stats.fee_to = john();
+        drop(state);
 
         assert!(canister.transferIncludeFee(bob(), Nat::from(200)).is_ok());
         assert_eq!(canister.balanceOf(bob()), Nat::from(100));

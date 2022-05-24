@@ -81,13 +81,17 @@ impl Default for StatsData {
 
 pub type Allowances = HashMap<Principal, HashMap<Principal, Nat>>;
 
-#[derive(CandidType, Debug, PartialEq)]
+#[derive(CandidType, Debug, PartialEq, Deserialize)]
 pub enum TxError {
     InsufficientBalance,
     InsufficientAllowance,
-    Unauthorized,
+    // Storing owner and caller as strings for better readability
+    Unauthorized { owner: String, caller: String },
     AmountTooSmall,
     FeeExceededLimit,
+    NotificationFailed { cdk_msg: String },
+    AlreadyNotified,
+    TransactionDoesNotExist,
 }
 
 pub type TxReceipt = Result<Nat, TxError>;

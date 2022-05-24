@@ -1,6 +1,6 @@
 use super::TokenCanister;
 use crate::canister::is20_auction::auction_principal;
-use crate::state::Balances;
+use crate::state::{Balances, CanisterState};
 use crate::types::{TxError, TxReceipt};
 use candid::Nat;
 use ic_cdk::export::Principal;
@@ -20,21 +20,21 @@ pub fn transfer(
         }
     }
 
-    let fee_ratio = canister.bidding_state.borrow().fee_ratio;
+    let fee_ratio = canister.state.borrow().bidding_state.fee_ratio;
 
     {
-        let mut balances = canister.balances.borrow_mut();
+        let balances = &mut canister.state.borrow_mut().balances;
 
         if balances.balance_of(&from) < value.clone() + fee.clone() {
             return Err(TxError::InsufficientBalance);
         }
 
-        _charge_fee(&mut balances, from, fee_to, fee.clone(), fee_ratio);
-        _transfer(&mut balances, from, to, value.clone());
+        _charge_fee(balances, from, fee_to, fee.clone(), fee_ratio);
+        _transfer(balances, from, to, value.clone());
     }
 
     let mut state = canister.state.borrow_mut();
-    let id = state.ledger_mut().transfer(from, to, value, fee);
+    let id = state.ledger.transfer(from, to, value, fee);
     state.notifications.insert(id.clone());
     Ok(id)
 }
@@ -46,29 +46,32 @@ pub fn transfer_from(
     value: Nat,
 ) -> TxReceipt {
     let owner = ic_kit::ic::caller();
-    let from_allowance = canister.state.borrow().allowance(from, owner);
-    let (fee, fee_to) = canister.state.borrow().stats.fee_info();
-    let fee_ratio = canister.bidding_state.borrow().fee_ratio;
+    let mut state = canister.state.borrow_mut();
+    let from_allowance = state.allowance(from, owner);
+    let CanisterState {
+        ref mut balances,
+        ref bidding_state,
+        ref stats,
+        ..
+    } = &mut *state;
+
+    let (fee, fee_to) = stats.fee_info();
+    let fee_ratio = bidding_state.fee_ratio;
 
     let value_with_fee = value.clone() + fee.clone();
     if from_allowance < value_with_fee {
         return Err(TxError::InsufficientAllowance);
     }
 
-    {
-        let mut balances = canister.balances.borrow_mut();
-
-        let from_balance = balances.balance_of(&from);
-        if from_balance < value_with_fee {
-            return Err(TxError::InsufficientBalance);
-        }
-
-        _charge_fee(&mut balances, from, fee_to, fee.clone(), fee_ratio);
-        _transfer(&mut balances, from, to, value.clone());
+    let from_balance = balances.balance_of(&from);
+    if from_balance < value_with_fee {
+        return Err(TxError::InsufficientBalance);
     }
 
-    let mut state = canister.state.borrow_mut();
-    let allowances = state.allowances_mut();
+    _charge_fee(balances, from, fee_to, fee.clone(), fee_ratio);
+    _transfer(balances, from, to, value.clone());
+
+    let allowances = &mut state.allowances;
     match allowances.get(&from) {
         Some(inner) => {
             let result = inner.get(&owner).unwrap().clone();
@@ -85,76 +88,71 @@ pub fn transfer_from(
                 }
             }
         }
-        None => {
-            panic!()
-        }
+        None => panic!(),
     }
 
-    let id = state
-        .ledger_mut()
-        .transfer_from(owner, from, to, value, fee);
+    let id = state.ledger.transfer_from(owner, from, to, value, fee);
     Ok(id)
 }
 
 pub fn approve(canister: &TokenCanister, spender: Principal, value: Nat) -> TxReceipt {
     let owner = ic_kit::ic::caller();
-    let (fee, fee_to) = canister.state.borrow().stats.fee_info();
-    let fee_ratio = canister.bidding_state.borrow().fee_ratio;
-    if canister.balances.borrow().balance_of(&owner) < fee {
+    let mut state = canister.state.borrow_mut();
+
+    let CanisterState {
+        ref mut bidding_state,
+        ref mut balances,
+        ref stats,
+        ..
+    } = &mut *state;
+
+    let (fee, fee_to) = stats.fee_info();
+    let fee_ratio = bidding_state.fee_ratio;
+    if balances.balance_of(&owner) < fee {
         return Err(TxError::InsufficientBalance);
     }
 
-    _charge_fee(
-        &mut *canister.balances.borrow_mut(),
-        owner,
-        fee_to,
-        fee.clone(),
-        fee_ratio,
-    );
+    _charge_fee(balances, owner, fee_to, fee.clone(), fee_ratio);
     let v = value.clone() + fee.clone();
 
-    let mut state = canister.state.borrow_mut();
-    let allowances = state.allowances_mut();
-    match allowances.get(&owner) {
+    match state.allowances.get(&owner) {
         Some(inner) => {
             let mut temp = inner.clone();
             if v != 0 {
                 temp.insert(spender, v);
-                allowances.insert(owner, temp);
+                state.allowances.insert(owner, temp);
             } else {
                 temp.remove(&spender);
                 if temp.is_empty() {
-                    allowances.remove(&owner);
+                    state.allowances.remove(&owner);
                 } else {
-                    allowances.insert(owner, temp);
+                    state.allowances.insert(owner, temp);
                 }
             }
         }
-        None => {
-            if v != 0 {
-                let mut inner = HashMap::new();
-                inner.insert(spender, v);
-                let allowances = state.allowances_mut();
-                allowances.insert(owner, inner);
-            }
+        None if v != 0 => {
+            let mut inner = HashMap::new();
+            inner.insert(spender, v);
+            state.allowances.insert(owner, inner);
         }
+        None => {}
     }
 
-    let id = state.ledger_mut().approve(owner, spender, value, fee);
+    let id = state.ledger.approve(owner, spender, value, fee);
     Ok(id)
 }
 
 pub fn mint(canister: &TokenCanister, to: Principal, amount: Nat) -> TxReceipt {
     let caller = ic_kit::ic::caller();
     {
-        let mut balances = canister.balances.borrow_mut();
+        let balances = &mut canister.state.borrow_mut().balances;
         let to_balance = balances.balance_of(&to);
         balances.0.insert(to, to_balance + amount.clone());
     }
 
     let mut state = canister.state.borrow_mut();
     state.stats.total_supply += amount.clone();
-    let id = state.ledger_mut().mint(caller, to, amount);
+    let id = state.ledger.mint(caller, to, amount);
 
     Ok(id)
 }
@@ -162,19 +160,22 @@ pub fn mint(canister: &TokenCanister, to: Principal, amount: Nat) -> TxReceipt {
 pub fn burn(canister: &TokenCanister, amount: Nat) -> TxReceipt {
     let caller = ic_kit::ic::caller();
     {
-        let mut balances = canister.balances.borrow_mut();
-        let caller_balance = balances.balance_of(&caller);
+        let mut state = canister.state.borrow_mut();
+        let caller_balance = state.balances.balance_of(&caller);
         if caller_balance < amount {
             return Err(TxError::InsufficientBalance);
         }
 
-        balances.0.insert(caller, caller_balance - amount.clone());
+        state
+            .balances
+            .0
+            .insert(caller, caller_balance - amount.clone());
     }
 
     let mut state = canister.state.borrow_mut();
     state.stats.total_supply -= amount.clone();
 
-    let id = state.ledger_mut().burn(caller, amount);
+    let id = state.ledger.burn(caller, amount);
     Ok(id)
 }
 
@@ -223,8 +224,8 @@ mod tests {
     use crate::canister::MAX_TRANSACTION_QUERY_LEN;
     use ic_canister::Canister;
 
-    fn test_canister() -> TokenCanister {
-        MockContext::new().with_caller(alice()).inject();
+    fn test_context() -> (&'static MockContext, TokenCanister) {
+        let context = MockContext::new().with_caller(alice()).inject();
 
         let canister = TokenCanister::init_instance();
         canister.init(Metadata {
@@ -239,8 +240,14 @@ mod tests {
             isTestToken: None,
         });
 
+        (context, canister)
+    }
+
+    fn test_canister() -> TokenCanister {
+        let (_, canister) = test_context();
         canister
     }
+
     #[test]
     fn transfer_without_fee() {
         let canister = test_canister();
@@ -283,7 +290,7 @@ mod tests {
         let canister = test_canister();
         canister.state.borrow_mut().stats.fee = Nat::from(50);
         canister.state.borrow_mut().stats.fee_to = john();
-        canister.bidding_state.borrow_mut().fee_ratio = 0.5;
+        canister.state.borrow_mut().bidding_state.fee_ratio = 0.5;
 
         canister.transfer(bob(), Nat::from(100), None).unwrap();
         assert_eq!(canister.balanceOf(bob()), Nat::from(100));
@@ -331,7 +338,7 @@ mod tests {
 
     #[test]
     fn transfer_saved_into_history() {
-        let canister = test_canister();
+        let (ctx, canister) = test_context();
         canister.state.borrow_mut().stats.fee = Nat::from(10);
 
         canister.transfer(bob(), Nat::from(1001), None).unwrap_err();
@@ -340,6 +347,7 @@ mod tests {
         const COUNT: usize = 5;
         let mut ts = ic_kit::ic::time().into();
         for i in 0..COUNT {
+            ctx.add_time(10);
             let id = canister.transfer(bob(), Nat::from(100 + i), None).unwrap();
             assert_eq!(canister.historySize(), 2 + i);
             let tx = canister.getTransaction(id);
@@ -360,8 +368,11 @@ mod tests {
         let canister = test_canister();
         MockContext::new().with_caller(bob()).inject();
         assert_eq!(
-            canister.mint(alice(), Nat::from(100)),
-            Err(TxError::Unauthorized)
+            canister.mint(alice(), Nat::from(100u32)),
+            Err(TxError::Unauthorized {
+                owner: alice().to_string(),
+                caller: bob().to_string(),
+            })
         );
 
         canister.state.borrow_mut().stats.is_test_token = true;
@@ -384,7 +395,7 @@ mod tests {
 
     #[test]
     fn mint_saved_into_history() {
-        let canister = test_canister();
+        let (ctx, canister) = test_context();
         canister.state.borrow_mut().stats.fee = Nat::from(10);
 
         assert_eq!(canister.historySize(), 1);
@@ -392,6 +403,7 @@ mod tests {
         const COUNT: usize = 5;
         let mut ts = ic_kit::ic::time().into();
         for i in 0..COUNT {
+            ctx.add_time(10);
             let id = canister.mint(bob(), Nat::from(100 + i)).unwrap();
             assert_eq!(canister.historySize(), 2 + i);
             let tx = canister.getTransaction(id);
@@ -441,7 +453,7 @@ mod tests {
 
     #[test]
     fn burn_saved_into_history() {
-        let canister = test_canister();
+        let (ctx, canister) = test_context();
         canister.state.borrow_mut().stats.fee = Nat::from(10);
 
         canister.burn(Nat::from(1001)).unwrap_err();
@@ -450,6 +462,7 @@ mod tests {
         const COUNT: usize = 5;
         let mut ts = ic_kit::ic::time().into();
         for i in 0..COUNT {
+            ctx.add_time(10);
             let id = canister.burn(Nat::from(100 + i)).unwrap();
             assert_eq!(canister.historySize(), 2 + i);
             let tx = canister.getTransaction(id);
@@ -520,7 +533,7 @@ mod tests {
 
     #[test]
     fn transfer_from_saved_into_history() {
-        let canister = test_canister();
+        let (ctx, canister) = test_context();
         let context = MockContext::new().with_caller(alice()).inject();
         canister.state.borrow_mut().stats.fee = Nat::from(10);
 
@@ -535,6 +548,7 @@ mod tests {
         const COUNT: usize = 5;
         let mut ts = ic_kit::ic::time().into();
         for i in 0..COUNT {
+            ctx.add_time(10);
             let id = canister
                 .transferFrom(alice(), john(), Nat::from(100 + i))
                 .unwrap();
@@ -619,13 +633,14 @@ mod tests {
 
     #[test]
     fn approve_saved_into_history() {
-        let canister = test_canister();
+        let (ctx, canister) = test_context();
         canister.state.borrow_mut().stats.fee = Nat::from(10);
         assert_eq!(canister.historySize(), 1);
 
         const COUNT: usize = 5;
         let mut ts = ic_kit::ic::time().into();
         for i in 0..COUNT {
+            ctx.add_time(10);
             let id = canister.approve(bob(), Nat::from(100 + i)).unwrap();
             assert_eq!(canister.historySize(), 2 + i);
             let tx = canister.getTransaction(id);
