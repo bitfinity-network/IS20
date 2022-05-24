@@ -8,7 +8,7 @@ on:
 
 jobs:
   build-test:
-    uses: infinity-swap/.github/.github/workflows/build-n-test.yml@main
+    uses: infinity-swap/ci-wf/.github/workflows/build-n-test.yml@main
     with:
       skip-test: ${{ github.ref_type == 'tag' }}
       test-script: |
@@ -20,6 +20,7 @@ jobs:
       gh_login: ${{ secrets.GH_PKG_LOGIN }}
 
   version-bump:
+    if: ${{ github.ref_type == 'branch' && github.ref == 'refs/heads/main' }}
     needs: [build-test]
     runs-on: ubuntu-latest
     steps:
