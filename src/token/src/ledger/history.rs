@@ -1,5 +1,6 @@
 use crate::types::TxRecord;
 use candid::types::{Compound, Serializer, Type};
+use candid::Principal;
 use ic_cdk::export::candid::{CandidType, Deserialize, Nat};
 use ic_certified_map::{HashTree, RbTree};
 use serde::de::{SeqAccess, Visitor};
@@ -158,15 +159,16 @@ mod tests {
         MockContext::new().inject();
         let mut history = History::default();
         history.insert(TxRecord::mint(
-            Nat::from(0),
+            Nat::from(0u8),
             Principal::anonymous(),
             Principal::management_canister(),
-            Nat::from(100500),
+            Nat::from(100500u64),
         ));
         history.insert(TxRecord::burn(
-            Nat::from(1),
+            Nat::from(1u8),
             Principal::anonymous(),
-            Nat::from(1234),
+            Principal::anonymous(),
+            Nat::from(1234u64),
         ));
 
         let serialized = ic_cdk::export::candid::encode_args((history.clone(),))
@@ -193,13 +195,13 @@ mod tests {
                 Nat::from(i),
                 Principal::anonymous(),
                 Principal::management_canister(),
-                Nat::from(100500),
+                Nat::from(100500u64),
             ));
             vector_history.push(TxRecord::mint(
                 Nat::from(i),
                 Principal::anonymous(),
                 Principal::management_canister(),
-                Nat::from(100500),
+                Nat::from(100500u64),
             ));
         }
 
@@ -246,23 +248,24 @@ mod tests {
         MockContext::new().inject();
         let mut history = History::default();
         history.insert(TxRecord::mint(
-            Nat::from(0),
+            Nat::from(0u64),
             Principal::anonymous(),
             Principal::management_canister(),
-            Nat::from(100500),
+            Nat::from(100500u64),
         ));
         history.insert(TxRecord::burn(
-            Nat::from(1),
+            Nat::from(1u64),
             Principal::anonymous(),
-            Nat::from(1234),
+            Principal::anonymous(),
+            Nat::from(1234u64),
         ));
 
         assert_eq!(
-            history.get(&Nat::from(0)).unwrap().operation,
+            history.get(&Nat::from(0u64)).unwrap().operation,
             Operation::Mint
         );
         assert_eq!(
-            history.get(&Nat::from(1)).unwrap().operation,
+            history.get(&Nat::from(1u64)).unwrap().operation,
             Operation::Burn
         );
     }
@@ -278,11 +281,11 @@ mod tests {
                 Nat::from(i),
                 Principal::anonymous(),
                 Principal::management_canister(),
-                Nat::from(100500),
+                Nat::from(100500u64),
             ));
         }
 
-        let range = history.get_range(&Nat::from(10), &Nat::from(20));
+        let range = history.get_range(&Nat::from(10u64), &Nat::from(20u64));
         assert_eq!(range.len(), 20);
 
         for i in 0..20 {
@@ -301,7 +304,7 @@ mod tests {
                 Nat::from(i * 2),
                 Principal::anonymous(),
                 Principal::management_canister(),
-                Nat::from(100500),
+                Nat::from(100500u64),
             ));
         }
 
@@ -310,17 +313,17 @@ mod tests {
                 Nat::from(i * 2 + 1),
                 Principal::anonymous(),
                 Principal::management_canister(),
-                Nat::from(100500),
+                Nat::from(100500u64),
             ));
         }
 
         assert_eq!(history.tree_size, 40);
-        assert!(history.get(&Nat::from(0)).is_some());
+        assert!(history.get(&Nat::from(0u64)).is_some());
 
         history.remove_oldest_tx();
 
         assert_eq!(history.tree_size, 39);
-        assert!(history.get(&Nat::from(0)).is_none());
-        assert!(history.get(&Nat::from(1)).is_some());
+        assert!(history.get(&Nat::from(0u64)).is_none());
+        assert!(history.get(&Nat::from(1u64)).is_some());
     }
 }

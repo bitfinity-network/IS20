@@ -28,17 +28,8 @@ impl Ledger {
         self.history.get_range(start, limit)
     }
 
-    pub fn iter(&self) -> impl DoubleEndedIterator<Item = &TxRecord> {
-        self.history.iter()
-    }
-
-    fn get_index(&self, id: &Nat) -> Option<usize> {
-        if *id < self.vec_offset {
-            None
-        } else {
-            let index = id.clone() - self.vec_offset.clone();
-            index.0.to_usize()
-        }
+    pub fn to_vec(&self) -> Vec<TxRecord> {
+        self.history.iter().collect::<Vec<TxRecord>>()
     }
 
     pub fn get_len_user_history(&self, user: Principal) -> Nat {

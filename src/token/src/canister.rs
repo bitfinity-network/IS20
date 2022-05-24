@@ -247,6 +247,7 @@ impl TokenCanister {
         self.state
             .borrow()
             .ledger
+            .to_vec()
             .iter()
             .filter(|tx| tx.from == who || tx.to == who || tx.caller == Some(who))
             .rev()
