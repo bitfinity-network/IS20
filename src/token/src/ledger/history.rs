@@ -46,7 +46,7 @@ impl History {
                     extract_values(&boxed.as_ref().0, aggr);
                     extract_values(&boxed.as_ref().1, aggr);
                 }
-                HashTree::Leaf(v) => aggr.push(tx_from_bytes(v)),                
+                HashTree::Leaf(v) => aggr.push(tx_from_bytes(v)),
                 HashTree::Labeled(_, child) => extract_values(child, aggr),
                 _ => {}
             }
@@ -73,7 +73,10 @@ impl History {
 
     pub fn get_witness(&self, id: &Nat) -> Option<HashTree> {
         let bytes = get_key_bytes(id);
-        self.tree.get(&bytes).is_some().then(|| self.tree.witness(&bytes))
+        self.tree
+            .get(&bytes)
+            .is_some()
+            .then(|| self.tree.witness(&bytes))
     }
 }
 
@@ -83,12 +86,12 @@ fn get_key_bytes(key: &Nat) -> Vec<u8> {
 
 fn get_tx_bytes(tx: &TxRecord) -> Vec<u8> {
     use ic_cdk::export::candid::Encode;
-    Encode!(tx).unwrap()
+    Encode!(tx).expect("Transaction should encode to bytes")
 }
 
 fn tx_from_bytes(bytes: &[u8]) -> TxRecord {
     use ic_cdk::export::candid::Decode;
-    Decode!(bytes, TxRecord).unwrap()
+    Decode!(bytes, TxRecord).expect("bytes should decode to transaction record")
 }
 
 impl CandidType for History {

@@ -248,12 +248,11 @@ impl TokenCanister {
             .borrow()
             .ledger
             .to_vec()
-            .iter()
+            .into_iter()
             .filter(|tx| tx.from == who || tx.to == who || tx.caller == Some(who))
             .rev()
             .skip(start)
             .take(limit)
-            .cloned()
             .collect()
     }
     /// Returns the total number of transactions related to the user `who`.
