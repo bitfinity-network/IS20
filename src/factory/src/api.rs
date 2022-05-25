@@ -128,7 +128,7 @@ impl TokenFactoryCanister {
     #[update]
     async fn delete_token(&self, name: String) -> Result<(), TokenFactoryError> {
         //    Check controller access
-        let state_ref = &mut *self.state.borrow_mut();
+        let mut state_ref = self.state.borrow_mut();
         state_ref.check_controller_access()?;
 
         let token = match self.get_token(name.clone()).await {
