@@ -136,10 +136,7 @@ impl TokenFactoryCanister {
             None => return Err(TokenFactoryError::FactoryError(FactoryError::NotFound)),
         };
 
-        state_ref
-            .factory()
-            .drop(token)
-            .await?;
+        state_ref.factory().drop(token).await?;
         state_ref.factory_mut().forget(&name)?;
 
         Ok(())
