@@ -131,15 +131,14 @@ impl TokenFactoryCanister {
         let state_ref = &mut *self.state.borrow_mut();
         state_ref.check_controller_access()?;
 
-        let token = self.get_token(name.clone()).await;
-
-        if token.is_none() {
-            return Err(TokenFactoryError::FactoryError(FactoryError::NotFound));
-        }
+        let token = match self.get_token(name.clone()).await {
+            Some(token) => token,
+            None => return Err(TokenFactoryError::FactoryError(FactoryError::NotFound)),
+        };
 
         state_ref
             .factory()
-            .drop(token.expect("token exists, checked above"))
+            .drop(token)
             .await?;
         state_ref.factory_mut().forget(&name)?;
 
