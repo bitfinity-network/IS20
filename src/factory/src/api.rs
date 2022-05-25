@@ -124,14 +124,24 @@ impl TokenFactoryCanister {
 
     /// Delete a token.
     /// The token must be owned by the caller.
-    /// The token will be deleted from the factory and the canister will be destroyed.
+    /// The token will be deleted from the factory and the removed from the canister registry.
     #[update]
-    async fn delete_token(&self, canister: Principal) -> Result<(), TokenFactoryError> {
+    async fn delete_token(&self, name: String) -> Result<(), TokenFactoryError> {
         //    Check controller access
         let state_ref = &mut *self.state.borrow_mut();
         state_ref.check_controller_access()?;
 
-        state_ref.factory().drop(canister).await?;
+        let token = self.get_token(name.clone()).await;
+
+        if token.is_none() {
+            return Err(TokenFactoryError::FactoryError(FactoryError::NotFound));
+        }
+
+        state_ref
+            .factory()
+            .drop(token.expect("token exists, checked above"))
+            .await?;
+        state_ref.factory_mut().forget(&name)?;
 
         Ok(())
     }
