@@ -1,4 +1,4 @@
-use crate::types::TxRecord;
+use crate::types::{PendingNotifications, TxRecord};
 use candid::{CandidType, Deserialize, Nat, Principal};
 use num_traits::ToPrimitive;
 
@@ -9,6 +9,7 @@ const HISTORY_REMOVAL_BATCH_SIZE: usize = 10_000;
 pub struct Ledger {
     history: Vec<TxRecord>,
     vec_offset: Nat,
+    pub notifications: PendingNotifications,
 }
 
 impl Ledger {
@@ -121,12 +122,17 @@ impl Ledger {
     }
 
     fn push(&mut self, record: TxRecord) {
-        self.history.push(record);
+        self.history.push(record.clone());
+        self.notifications.insert(record.index.clone(), None);
+
         if self.len() > MAX_HISTORY_LENGTH + HISTORY_REMOVAL_BATCH_SIZE {
             // We remove first `HISTORY_REMOVAL_BATCH_SIZE` from the history at one go, to prevent
             // often relocation of the history vec.
             // This removal code can later be changed to moving old history records into another
             // storage.
+            self.history[..HISTORY_REMOVAL_BATCH_SIZE]
+                .into_iter()
+                .map(|record| self.notifications.remove(&record.index.clone()));
             self.history = self.history[HISTORY_REMOVAL_BATCH_SIZE..].into();
             self.vec_offset += HISTORY_REMOVAL_BATCH_SIZE;
         }

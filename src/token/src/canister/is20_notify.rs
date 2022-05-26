@@ -19,13 +19,16 @@ pub(crate) fn approve_and_notify(
     })
 }
 
-pub(crate) async fn consume(canister: &TokenCanister, transaction_id: Nat) -> TxReceipt {
+pub(crate) async fn consume_notification(
+    canister: &TokenCanister,
+    transaction_id: Nat,
+) -> TxReceipt {
     let mut state = canister.state.borrow_mut();
 
-    match state.notifications.get(&transaction_id) {
+    match state.ledger.notifications.get(&transaction_id) {
         Some(Some(x)) if *x != ic_kit::ic::caller() => return Err(TxError::Unauthorized),
         Some(x) => {
-            if state.notifications.remove(&transaction_id).is_none() {
+            if state.ledger.notifications.remove(&transaction_id).is_none() {
                 return Err(TxError::AlreadyActioned);
             }
         }
@@ -47,7 +50,7 @@ pub(crate) fn notify(canister: &TokenCanister, transaction_id: Nat, to: Principa
         return Err(TxError::Unauthorized);
     }
 
-    match state.notifications.get_mut(&transaction_id) {
+    match state.ledger.notifications.get_mut(&transaction_id) {
         Some(Some(dest)) if *dest != to => return Err(TxError::Unauthorized),
         Some(x) => *x = Some(to),
         None => return Err(TxError::AlreadyActioned),
