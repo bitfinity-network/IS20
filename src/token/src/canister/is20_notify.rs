@@ -3,8 +3,43 @@
 use crate::canister::TokenCanister;
 use crate::types::{TxError, TxReceipt, TxRecord};
 use candid::{CandidType, Deserialize, Nat, Principal};
-use ic_canister::virtual_canister_call_oneway;
-use ic_cdk::api::call::CallResult;
+use ic_canister::canister_notify;
+use ic_storage::{stable::Versioned, IcStorage};
+use ic_canister::{update, query, Canister};
+use std::cell::RefCell;
+
+#[derive(Default, CandidType, Deserialize, IcStorage)]
+struct State {
+    value: Nat,
+}
+
+impl Versioned for State {
+    type Previous = ();
+
+    fn upgrade((): ()) -> Self {
+        Self::default()
+    }
+}
+
+#[derive(Clone, Canister)]
+pub struct TestCanister {
+    #[id]
+    principal: Principal,
+    #[state(stable_store = true)]
+    state: std::rc::Rc<RefCell<State>>,
+}
+
+impl TestCanister {  
+    #[update]
+    fn transaction_notification(&mut self, tx: TxRecord) {
+        RefCell::borrow_mut(&self.state).value += tx.amount;
+    }
+    #[query]
+    fn get_value(&self) -> Nat {
+        self.state.borrow().value.clone()
+    }
+}
+
 
 pub(crate) fn approve_and_notify(
     canister: &TokenCanister,
@@ -56,7 +91,8 @@ pub(crate) fn notify(canister: &TokenCanister, transaction_id: Nat, to: Principa
         None => return Err(TxError::AlreadyActioned),
     }
 
-    match virtual_canister_call_oneway!(to, "transaction_notification", (tx,), ()) {
+    let mut canister_to = TestCanister::from_principal(to);
+    match canister_notify!(canister_to.transaction_notification(tx.clone()), ()) {
         Ok(()) => Ok(tx.index),
         Err(e) => Err(TxError::NotificationFailed { transaction_id }),
     }
@@ -66,13 +102,10 @@ pub(crate) fn notify(canister: &TokenCanister, transaction_id: Nat, to: Principa
 mod tests {
     use super::*;
     use common::types::Metadata;
-    use ic_canister::{register_virtual_responder, Canister};
-    use ic_kit::mock_principals::{alice, bob};
+    use ic_kit::mock_principals::alice;
     use ic_kit::MockContext;
-    use std::rc::Rc;
-    use std::sync::atomic::{AtomicBool, Ordering};
 
-    fn test_canister() -> TokenCanister {
+    fn token_canister() -> TokenCanister {
         MockContext::new().with_caller(alice()).inject();
 
         let canister = TokenCanister::init_instance();
@@ -95,20 +128,10 @@ mod tests {
     async fn approve_notify() {
         const AMOUNT: u128 = 100;
 
-        let is_notified = Rc::new(AtomicBool::new(false));
-        let is_notified_clone = is_notified.clone();
-        register_virtual_responder(
-            bob(),
-            "transaction_notification",
-            move |(notification,): (TxRecord,)| {
-                is_notified.swap(true, Ordering::Relaxed);
-                assert_eq!(notification.amount, AMOUNT);
-            },
-        );
+        let canister1 = token_canister();
+        let canister2 = TestCanister::init_instance();
 
-        let canister = test_canister();
-
-        canister.approveAndNotify(bob(), Nat::from(AMOUNT)).unwrap();
-        assert!(!is_notified_clone.load(Ordering::Relaxed));
+        assert_eq!(canister1.approveAndNotify(canister2.principal(), Nat::from(AMOUNT)).unwrap(), Nat::from(1));
+        assert_eq!(canister2.__get_value().await.unwrap(), Nat::from(AMOUNT));
     }
 }
