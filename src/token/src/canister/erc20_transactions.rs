@@ -35,6 +35,8 @@ pub fn transfer(
 
     let mut state = canister.state.borrow_mut();
     let id = state.ledger.transfer(from, to, value, fee);
+    state.notifications.insert(id.clone(), None);
+
     Ok(id)
 }
 
@@ -138,6 +140,7 @@ pub fn approve(canister: &TokenCanister, spender: Principal, value: Nat) -> TxRe
     }
 
     let id = state.ledger.approve(owner, spender, value, fee);
+    state.notifications.insert(id.clone(), None);
     Ok(id)
 }
 
@@ -152,7 +155,7 @@ pub fn mint(canister: &TokenCanister, to: Principal, amount: Nat) -> TxReceipt {
     let mut state = canister.state.borrow_mut();
     state.stats.total_supply += amount.clone();
     let id = state.ledger.mint(caller, to, amount);
-
+    state.notifications.insert(id.clone(), None);
     Ok(id)
 }
 
@@ -173,6 +176,7 @@ pub fn burn(canister: &TokenCanister, from: Option<Principal>, amount: Nat) -> T
     state.stats.total_supply -= amount.clone();
 
     let id = state.ledger.burn(caller, from, amount);
+    state.notifications.insert(id.clone(), None);
     Ok(id)
 }
 

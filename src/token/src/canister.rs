@@ -1,4 +1,4 @@
-use crate::canister::dip20_transactions::{approve, burn, mint, transfer, transfer_from};
+use crate::canister::erc20_transactions::{approve, burn, mint, transfer, transfer_from};
 use crate::canister::is20_auction::{
     auction_info, bid_cycles, bidding_info, run_auction, AuctionError, BiddingInfo,
 };
@@ -14,7 +14,7 @@ use num_traits::ToPrimitive;
 use std::cell::RefCell;
 use std::rc::Rc;
 
-mod dip20_transactions;
+mod erc20_transactions;
 mod inspect;
 pub mod is20_auction;
 pub mod is20_notify;
