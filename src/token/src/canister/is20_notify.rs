@@ -12,7 +12,11 @@ pub(crate) fn approve_and_notify(
     value: Nat,
 ) -> TxReceipt {
     let transaction_id = canister.approve(spender, value)?;
-    notify(canister, transaction_id.clone(), spender)
+    notify(canister, transaction_id.clone(), spender).map_err(|e| {
+        TxError::ApproveSucceededButNotifyFailed {
+            tx_error: Box::from(e),
+        }
+    })
 }
 
 pub(crate) async fn consume(canister: &TokenCanister, transaction_id: Nat) -> TxReceipt {
