@@ -70,7 +70,7 @@ mod tests {
     use ic_kit::mock_principals::{alice, bob};
     use ic_kit::MockContext;
     use std::rc::Rc;
-    use std::sync::atomic::{AtomicBool, Ordering};
+    use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 
     fn test_canister() -> TokenCanister {
         MockContext::new().with_caller(alice()).inject();
@@ -95,13 +95,13 @@ mod tests {
     async fn approve_notify() {
         const AMOUNT: u128 = 100;
 
-        let is_notified = Rc::new(AtomicBool::new(false));
-        let is_notified_clone = is_notified.clone();
+        let counter = Rc::new(AtomicU32::new(0));
+        let counter_copy = counter.clone();
         register_virtual_responder(
             bob(),
             "transaction_notification",
             move |(notification,): (TxRecord,)| {
-                is_notified.swap(true, Ordering::Relaxed);
+                counter.fetch_add(1, Ordering::Relaxed);
                 assert_eq!(notification.amount, AMOUNT);
             },
         );
@@ -109,6 +109,6 @@ mod tests {
         let canister = test_canister();
 
         canister.approveAndNotify(bob(), Nat::from(AMOUNT)).unwrap();
-        assert!(!is_notified_clone.load(Ordering::Relaxed));
+        assert_eq!(counter_copy.load(Ordering::Relaxed), 1);
     }
 }
