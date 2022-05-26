@@ -88,8 +88,10 @@ pub enum TxError {
     Unauthorized,
     AmountTooSmall,
     FeeExceededLimit,
-    NotificationFailed,
-    AlreadyNotified,
+    ApproveSucceededButNotifyFailed { tx_error: Box<TxError> },
+    NotificationFailed { transaction_id: Nat },
+    AlreadyActioned,
+    NotificationDoesNotExist,
     TransactionDoesNotExist,
     BadFee { expected_fee: u64 },
     InsufficientFunds { balance: u64 },
@@ -99,8 +101,9 @@ pub enum TxError {
 }
 
 pub type TxReceipt = Result<Nat, TxError>;
-// false -> the notify are not send; true -> the notify are send; if received the send, it will be delete.
-pub type PendingNotifications = HashMap<Nat, bool>;
+
+// Notification receiver not set if None
+pub type PendingNotifications = HashMap<Nat, Option<Principal>>;
 
 #[derive(CandidType, Debug, Clone, Copy, Deserialize, PartialEq)]
 pub enum TransactionStatus {

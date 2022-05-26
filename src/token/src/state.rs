@@ -1,5 +1,5 @@
 use crate::ledger::Ledger;
-use crate::types::{Allowances, AuctionInfo, StatsData, Timestamp};
+use crate::types::{Allowances, AuctionInfo, PendingNotifications, StatsData, Timestamp};
 use candid::{CandidType, Deserialize, Nat, Principal};
 use common::types::Metadata;
 use ic_storage::stable::Versioned;
@@ -14,6 +14,7 @@ pub struct CanisterState {
     pub(crate) stats: StatsData,
     pub(crate) allowances: Allowances,
     pub(crate) ledger: Ledger,
+    pub(crate) notifications: PendingNotifications,
 }
 
 impl CanisterState {

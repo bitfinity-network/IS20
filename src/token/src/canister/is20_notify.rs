@@ -12,43 +12,47 @@ pub(crate) fn approve_and_notify(
     value: Nat,
 ) -> TxReceipt {
     let transaction_id = canister.approve(spender, value)?;
-    let state = canister.state.borrow_mut();
+    notify(canister, transaction_id.clone(), spender)
+}
+
+pub(crate) async fn consume(canister: &TokenCanister, transaction_id: Nat) -> TxReceipt {
+    let mut state = canister.state.borrow_mut();
+
+    match state.notifications.get(&transaction_id) {
+        Some(Some(x)) if *x != ic_kit::ic::caller() => return Err(TxError::Unauthorized),
+        Some(x) => {
+            if state.notifications.remove(&transaction_id).is_none() {
+                return Err(TxError::AlreadyActioned);
+            }
+        }
+        None => return Err(TxError::NotificationDoesNotExist),
+    }
+
+    Ok(transaction_id)
+}
+
+/// This is a one-way call
+pub(crate) fn notify(canister: &TokenCanister, transaction_id: Nat, to: Principal) -> TxReceipt {
+    let mut state = canister.state.borrow_mut();
     let tx = state
         .ledger
         .get(&transaction_id)
         .ok_or(TxError::TransactionDoesNotExist)?;
-    match send_notification(&tx) {
-        Ok(()) => Ok(tx.index),
-        Err((_, _)) => Err(TxError::NotificationFailed),
+
+    if ic_kit::ic::caller() != tx.from {
+        return Err(TxError::Unauthorized);
     }
-}
 
-#[derive(CandidType, Deserialize, Debug, PartialEq)]
-pub struct ApproveNotification {
-    /// Transaction id.
-    pub tx_id: Nat,
+    match state.notifications.get_mut(&transaction_id) {
+        Some(Some(dest)) if *dest != to => return Err(TxError::Unauthorized),
+        Some(x) => *x = Some(to),
+        None => return Err(TxError::AlreadyActioned),
+    }
 
-    /// Id of the principal (user, canister) that approve the tokens being transferred.
-    pub from: Principal,
-
-    /// Id of the token canister.
-    pub token_id: Principal,
-
-    /// Approved amount of tokens being transferred.
-    pub amount: Nat,
-}
-
-#[allow(unused_variables)]
-fn send_notification(tx: &TxRecord) -> CallResult<()> {
-    let notification = ApproveNotification {
-        tx_id: tx.index.clone(),
-        from: tx.from,
-        token_id: ic_kit::ic::id(),
-        amount: tx.amount.clone(),
-    };
-
-    virtual_canister_call_oneway!(tx.to, "approve_notification", (notification,), ())
-        .map_err(|e| (e, String::from("Rejected before send.")))
+    match virtual_canister_call_oneway!(to, "transaction_notification", (tx,), ()) {
+        Ok(()) => Ok(tx.index),
+        Err(e) => Err(TxError::NotificationFailed { transaction_id }),
+    }
 }
 
 #[cfg(test)]
@@ -88,8 +92,8 @@ mod tests {
         let is_notified_clone = is_notified.clone();
         register_virtual_responder(
             bob(),
-            "approve_notification",
-            move |(notification,): (ApproveNotification,)| {
+            "transaction_notification",
+            move |(notification,): (TxRecord,)| {
                 is_notified.swap(true, Ordering::Relaxed);
                 assert_eq!(notification.amount, AMOUNT);
             },

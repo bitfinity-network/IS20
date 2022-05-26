@@ -45,6 +45,7 @@ static TRANSACTION_METHODS: &[&str] = &[
     "burn",
     "transfer",
     "transferIncludeFee",
+    "notify",
 ];
 
 /// This function checks if the canister should accept ingress message or not. We allow query

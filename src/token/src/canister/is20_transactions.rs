@@ -36,6 +36,8 @@ pub fn transfer_include_fee(canister: &TokenCanister, to: Principal, value: Nat)
     _transfer(balances, from, to, value.clone() - fee.clone());
 
     let id = state.ledger.transfer(from, to, value, fee);
+    state.notifications.insert(id.clone(), None);
+
     Ok(id)
 }
 
