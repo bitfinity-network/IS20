@@ -70,7 +70,7 @@ fn inspect_message() {
         }
         // Not owner
         m if OWNER_METHODS.contains(&m) => {
-            ic_cdk::println!("Owner method is called not by an owner. Rejecting.")
+            ic_cdk::trap("Owner method is called not by an owner. Rejecting.")
         }
         m if TRANSACTION_METHODS.contains(&m) => {
             // These methods requires that the caller have tokens.
@@ -78,8 +78,7 @@ fn inspect_message() {
             let state = state.borrow();
             let balances = &state.balances;
             if !balances.0.contains_key(&caller) {
-                ic_cdk::println!("Transaction method is not called by a stakeholder. Rejecting.");
-                return;
+                ic_cdk::trap("Transaction method is not called by a stakeholder. Rejecting.");
             }
 
             // Anything but the `burn` method
@@ -92,7 +91,7 @@ fn inspect_message() {
             let from = ic_cdk::api::call::arg_data::<(Option<Principal>, Nat)>().0;
             if from.is_some() {
                 ic_cdk::println!("Only the owner can burn other's tokens. Rejecting.");
-                return;
+                ic_cdk::trap("Only the owner can burn other's tokens. Rejecting.");
             }
 
             ic_cdk::api::call::accept_message();
@@ -106,13 +105,13 @@ fn inspect_message() {
                     if value <= *allowance {
                         ic_cdk::api::call::accept_message();
                     } else {
-                        ic_cdk::println!("Allowance amount is less then the requested transfer amount. Rejecting.");
+                        ic_cdk::trap("Allowance amount is less then the requested transfer amount. Rejecting.");
                     }
                 } else {
-                    ic_cdk::println!("Caller is not allowed to transfer tokens for the requested principal. Rejecting.");
+                    ic_cdk::trap("Caller is not allowed to transfer tokens for the requested principal. Rejecting.");
                 }
             } else {
-                ic_cdk::println!("Caller is not allowed to transfer tokens for the requested principal. Rejecting.");
+                ic_cdk::trap("Caller is not allowed to transfer tokens for the requested principal. Rejecting.");
             }
         }
         "notify" => {
@@ -124,7 +123,7 @@ fn inspect_message() {
             if notifications.contains_key(&tx_id) {
                 ic_cdk::api::call::accept_message();
             } else {
-                ic_cdk::println!("No pending notification with the given id. Rejecting.");
+                ic_cdk::trap("No pending notification with the given id. Rejecting.");
             }
         }
         "runAuction" => {
@@ -137,7 +136,7 @@ fn inspect_message() {
             {
                 ic_cdk::api::call::accept_message();
             } else {
-                ic_cdk::println!("Auction is not due yet or auction run method is called not by owner or bidder. Rejecting.");
+                ic_cdk::trap("Auction is not due yet or auction run method is called not by owner or bidder. Rejecting.");
             }
         }
         "bidCycles" => {
@@ -145,7 +144,7 @@ fn inspect_message() {
             // only from the wallet canister.
         }
         _ => {
-            ic_cdk::println!("The method called is not listed in the access checks. This is probably a code error.");
+            ic_cdk::trap("The method called is not listed in the access checks. This is probably a code error.");
         }
     }
 }
