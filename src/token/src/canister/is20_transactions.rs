@@ -1,4 +1,4 @@
-use crate::canister::dip20_transactions::{_charge_fee, _transfer};
+use crate::canister::erc20_transactions::{_charge_fee, _transfer};
 use crate::canister::TokenCanister;
 use crate::state::CanisterState;
 use crate::types::{TxError, TxReceipt};
@@ -36,8 +36,6 @@ pub fn transfer_include_fee(canister: &TokenCanister, to: Principal, value: Nat)
     _transfer(balances, from, to, value.clone() - fee.clone());
 
     let id = state.ledger.transfer(from, to, value, fee);
-    state.notifications.insert(id.clone());
-
     Ok(id)
 }
 

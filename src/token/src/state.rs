@@ -14,7 +14,6 @@ pub struct CanisterState {
     pub(crate) stats: StatsData,
     pub(crate) allowances: Allowances,
     pub(crate) ledger: Ledger,
-    pub notifications: PendingNotifications,
 }
 
 impl CanisterState {

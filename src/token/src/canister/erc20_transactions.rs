@@ -35,7 +35,6 @@ pub fn transfer(
 
     let mut state = canister.state.borrow_mut();
     let id = state.ledger.transfer(from, to, value, fee);
-    state.notifications.insert(id.clone());
     Ok(id)
 }
 
@@ -153,7 +152,6 @@ pub fn mint(canister: &TokenCanister, to: Principal, amount: Nat) -> TxReceipt {
     let mut state = canister.state.borrow_mut();
     state.stats.total_supply += amount.clone();
     let id = state.ledger.mint(caller, to, amount);
-
     Ok(id)
 }
 

@@ -3,81 +3,74 @@
 use crate::canister::TokenCanister;
 use crate::types::{TxError, TxReceipt, TxRecord};
 use candid::{CandidType, Deserialize, Nat, Principal};
-use ic_canister::virtual_canister_call;
-use ic_cdk::api::call::CallResult;
+use ic_canister::virtual_canister_notify;
+use ic_canister::{query, update, Canister};
+use ic_storage::{stable::Versioned, IcStorage};
+use std::cell::RefCell;
 
-pub(crate) async fn notify(canister: &TokenCanister, transaction_id: Nat) -> TxReceipt {
-    let tx = {
-        let mut state = canister.state.borrow_mut();
-        let tx = state
-            .ledger
-            .get(&transaction_id)
-            .ok_or(TxError::TransactionDoesNotExist)?;
-
-        // We remove the notification here to prevent a concurrent call from being able to send the
-        // notification again (while this call is await'ing). If the notification fails, we add the id
-        // backed into the pending notifications list.
-        if !state.notifications.remove(&transaction_id) {
-            return Err(TxError::AlreadyNotified);
-        }
-
-        tx
-    };
-
-    match send_notification(&tx).await {
-        Ok(()) => Ok(tx.index),
-        Err((_, _)) => {
-            canister
-                .state
-                .borrow_mut()
-                .notifications
-                .insert(transaction_id);
-            Err(TxError::NotificationFailed)
-        }
-    }
-}
-
-pub(crate) async fn transfer_and_notify(
+pub(crate) async fn approve_and_notify(
     canister: &TokenCanister,
-    to: Principal,
-    amount: Nat,
-    fee_limit: Option<Nat>,
+    spender: Principal,
+    value: Nat,
 ) -> TxReceipt {
-    let id = canister.transfer(to, amount, fee_limit)?;
-    notify(canister, id).await
+    let transaction_id = canister.approve(spender, value)?;
+    notify(canister, transaction_id.clone(), spender)
+        .await
+        .map_err(|e| TxError::ApproveSucceededButNotifyFailed {
+            tx_error: Box::from(e),
+        })
 }
 
-#[derive(CandidType, Deserialize, Debug, PartialEq)]
-pub struct TransactionNotification {
-    /// Transaction id.
-    pub tx_id: Nat,
+pub(crate) async fn consume_notification(
+    canister: &TokenCanister,
+    transaction_id: Nat,
+) -> TxReceipt {
+    let mut state = canister.state.borrow_mut();
 
-    /// Id of the principal (user, canister) that owns the tokens being transferred.
-    pub from: Principal,
+    match state.ledger.notifications.get(&transaction_id) {
+        Some(Some(x)) if *x != ic_kit::ic::caller() => return Err(TxError::Unauthorized),
+        Some(x) => {
+            if state.ledger.notifications.remove(&transaction_id).is_none() {
+                return Err(TxError::AlreadyActioned);
+            }
+        }
+        None => return Err(TxError::NotificationDoesNotExist),
+    }
 
-    /// Id of the token canister.
-    pub token_id: Principal,
-
-    /// Amount of tokens being transferred.
-    pub amount: Nat,
+    Ok(transaction_id)
 }
 
-async fn send_notification(tx: &TxRecord) -> CallResult<()> {
-    let notification = TransactionNotification {
-        tx_id: tx.index.clone(),
-        from: tx.from,
-        token_id: ic_kit::ic::id(),
-        amount: tx.amount.clone(),
-    };
+/// This is a one-way call
+pub(crate) async fn notify(
+    canister: &TokenCanister,
+    transaction_id: Nat,
+    to: Principal,
+) -> TxReceipt {
+    let mut state = canister.state.borrow_mut();
+    let tx = state
+        .ledger
+        .get(&transaction_id)
+        .ok_or(TxError::TransactionDoesNotExist)?;
 
-    virtual_canister_call!(tx.to, "transaction_notification", (notification,), ()).await
+    if ic_kit::ic::caller() != tx.from {
+        return Err(TxError::Unauthorized);
+    }
+
+    match state.ledger.notifications.get_mut(&transaction_id) {
+        Some(Some(dest)) if *dest != to => return Err(TxError::Unauthorized),
+        Some(x) => *x = Some(to),
+        None => return Err(TxError::AlreadyActioned),
+    }
+
+    virtual_canister_notify!(to, "transaction_notification", (tx,), ()).await;
+    Ok(transaction_id)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use common::types::Metadata;
-    use ic_canister::{register_failing_virtual_responder, register_virtual_responder, Canister};
+    use ic_canister::{register_virtual_responder, Canister};
     use ic_kit::mock_principals::{alice, bob};
     use ic_kit::MockContext;
     use std::rc::Rc;
@@ -85,7 +78,6 @@ mod tests {
 
     fn test_canister() -> TokenCanister {
         MockContext::new().with_caller(alice()).inject();
-
         let canister = TokenCanister::init_instance();
         canister.init(Metadata {
             logo: "".to_string(),
@@ -98,101 +90,33 @@ mod tests {
             feeTo: alice(),
             isTestToken: None,
         });
-
         canister
     }
-
     #[tokio::test]
-    async fn notify_transaction() {
+    async fn approve_notify() {
         const AMOUNT: u128 = 100;
 
         let is_notified = Rc::new(AtomicBool::new(false));
         let is_notified_clone = is_notified.clone();
+        let counter = Rc::new(AtomicU32::new(0));
+        let counter_copy = counter.clone();
         register_virtual_responder(
             bob(),
             "transaction_notification",
-            move |(notification,): (TransactionNotification,)| {
+            move |(notification,): (TxRecord,)| {
                 is_notified.swap(true, Ordering::Relaxed);
+                counter.fetch_add(1, Ordering::Relaxed);
                 assert_eq!(notification.amount, AMOUNT);
             },
         );
 
         let canister = test_canister();
 
-        let id = canister.transfer(bob(), Nat::from(AMOUNT), None).unwrap();
-        canister.notify(id).await.unwrap();
-        assert!(is_notified_clone.load(Ordering::Relaxed));
-    }
-
-    #[tokio::test]
-    async fn notify_non_existing() {
-        let canister = test_canister();
-        let response = canister.notify(Nat::from(10)).await;
-        assert_eq!(response, Err(TxError::TransactionDoesNotExist));
-    }
-
-    #[tokio::test]
-    async fn double_notification() {
-        let counter = Rc::new(AtomicU32::new(0));
-        let counter_copy = counter.clone();
-        register_virtual_responder(
-            bob(),
-            "transaction_notification",
-            move |_: (TransactionNotification,)| {
-                counter.fetch_add(1, Ordering::Relaxed);
-            },
-        );
-        let canister = test_canister();
-        let id = canister.transfer(bob(), Nat::from(100), None).unwrap();
-        canister.notify(id.clone()).await.unwrap();
-
-        let response = canister.notify(id).await;
-        assert_eq!(response, Err(TxError::AlreadyNotified));
-        assert_eq!(counter_copy.load(Ordering::Relaxed), 1);
-    }
-
-    #[tokio::test]
-    async fn notification_failure() {
-        register_failing_virtual_responder(
-            bob(),
-            "transaction_notification",
-            "something's wrong".into(),
-        );
-
-        let canister = test_canister();
-        let id = canister.transfer(bob(), Nat::from(100u32), None).unwrap();
-        let response = canister.notify(id.clone()).await;
-        assert!(response.is_err());
-
-        register_virtual_responder(
-            bob(),
-            "transaction_notification",
-            move |_: (TransactionNotification,)| {},
-        );
-        let response = canister.notify(id.clone()).await;
-        assert!(response.is_ok())
-    }
-
-    #[tokio::test]
-    async fn transfer_and_notify_success() {
-        let is_notified = Rc::new(AtomicBool::new(false));
-        let is_notified_clone = is_notified.clone();
-        register_virtual_responder(
-            bob(),
-            "transaction_notification",
-            move |_: (TransactionNotification,)| {
-                is_notified.swap(true, Ordering::Relaxed);
-            },
-        );
-
-        let canister = test_canister();
-        let id = canister
-            .transferAndNotify(bob(), Nat::from(100), None)
+        canister
+            .approveAndNotify(bob(), Nat::from(AMOUNT))
             .await
             .unwrap();
         assert!(is_notified_clone.load(Ordering::Relaxed));
-
-        let response = canister.notify(id.clone()).await;
-        assert_eq!(response, Err(TxError::AlreadyNotified));
+        assert_eq!(counter_copy.load(Ordering::Relaxed), 1);
     }
 }

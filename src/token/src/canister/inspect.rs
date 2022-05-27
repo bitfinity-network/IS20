@@ -41,9 +41,9 @@ static OWNER_METHODS: &[&str] = &[
 
 static TRANSACTION_METHODS: &[&str] = &[
     "approve",
+    "approveAndNotify",
     "burn",
     "transfer",
-    "transferAndNotify",
     "transferIncludeFee",
 ];
 
@@ -117,10 +117,10 @@ fn inspect_message() {
         "notify" => {
             // This method can only be called if the notification id is in the pending notifications
             // list.
-            let notifications = &state.notifications;
+            let notifications = &state.ledger.notifications;
             let (tx_id,) = ic_cdk::api::call::arg_data::<(Nat,)>();
 
-            if notifications.contains(&tx_id) {
+            if notifications.contains_key(&tx_id) {
                 ic_cdk::api::call::accept_message();
             } else {
                 ic_cdk::trap("No pending notification with the given id. Rejecting.");
