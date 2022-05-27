@@ -264,8 +264,8 @@ impl TokenCanister {
     }
 
     #[update]
-    fn approveAndNotify(&self, spender: Principal, value: Nat) -> TxReceipt {
-        approve_and_notify(self, spender, value)
+    async fn approveAndNotify(&self, spender: Principal, value: Nat) -> TxReceipt {
+        approve_and_notify(self, spender, value).await
     }
 
     #[update]

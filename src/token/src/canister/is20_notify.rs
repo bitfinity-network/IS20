@@ -3,55 +3,22 @@
 use crate::canister::TokenCanister;
 use crate::types::{TxError, TxReceipt, TxRecord};
 use candid::{CandidType, Deserialize, Nat, Principal};
-use ic_canister::canister_notify;
+use ic_canister::virtual_canister_notify;
+use ic_canister::{query, update, Canister};
 use ic_storage::{stable::Versioned, IcStorage};
-use ic_canister::{update, query, Canister};
 use std::cell::RefCell;
 
-#[derive(Default, CandidType, Deserialize, IcStorage)]
-struct State {
-    value: Nat,
-}
-
-impl Versioned for State {
-    type Previous = ();
-
-    fn upgrade((): ()) -> Self {
-        Self::default()
-    }
-}
-
-#[derive(Clone, Canister)]
-pub struct TestCanister {
-    #[id]
-    principal: Principal,
-    #[state(stable_store = true)]
-    state: std::rc::Rc<RefCell<State>>,
-}
-
-impl TestCanister {  
-    #[update]
-    fn transaction_notification(&mut self, tx: TxRecord) {
-        RefCell::borrow_mut(&self.state).value += tx.amount;
-    }
-    #[query]
-    fn get_value(&self) -> Nat {
-        self.state.borrow().value.clone()
-    }
-}
-
-
-pub(crate) fn approve_and_notify(
+pub(crate) async fn approve_and_notify(
     canister: &TokenCanister,
     spender: Principal,
     value: Nat,
 ) -> TxReceipt {
     let transaction_id = canister.approve(spender, value)?;
-    notify(canister, transaction_id.clone(), spender).map_err(|e| {
-        TxError::ApproveSucceededButNotifyFailed {
+    notify(canister, transaction_id.clone(), spender)
+        .await
+        .map_err(|e| TxError::ApproveSucceededButNotifyFailed {
             tx_error: Box::from(e),
-        }
-    })
+        })
 }
 
 pub(crate) async fn consume_notification(
@@ -74,7 +41,11 @@ pub(crate) async fn consume_notification(
 }
 
 /// This is a one-way call
-pub(crate) fn notify(canister: &TokenCanister, transaction_id: Nat, to: Principal) -> TxReceipt {
+pub(crate) async fn notify(
+    canister: &TokenCanister,
+    transaction_id: Nat,
+    to: Principal,
+) -> TxReceipt {
     let mut state = canister.state.borrow_mut();
     let tx = state
         .ledger
@@ -91,23 +62,22 @@ pub(crate) fn notify(canister: &TokenCanister, transaction_id: Nat, to: Principa
         None => return Err(TxError::AlreadyActioned),
     }
 
-    let mut canister_to = TestCanister::from_principal(to);
-    match canister_notify!(canister_to.transaction_notification(tx.clone()), ()) {
-        Ok(()) => Ok(tx.index),
-        Err(e) => Err(TxError::NotificationFailed { transaction_id }),
-    }
+    virtual_canister_notify!(to, "transaction_notification", (tx,), ()).await;
+    Ok(transaction_id)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use common::types::Metadata;
-    use ic_kit::mock_principals::alice;
+    use ic_canister::{register_virtual_responder, Canister};
+    use ic_kit::mock_principals::{alice, bob};
     use ic_kit::MockContext;
+    use std::rc::Rc;
+    use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 
-    fn token_canister() -> TokenCanister {
+    fn test_canister() -> TokenCanister {
         MockContext::new().with_caller(alice()).inject();
-
         let canister = TokenCanister::init_instance();
         canister.init(Metadata {
             logo: "".to_string(),
@@ -120,18 +90,33 @@ mod tests {
             feeTo: alice(),
             isTestToken: None,
         });
-
         canister
     }
-
     #[tokio::test]
     async fn approve_notify() {
         const AMOUNT: u128 = 100;
 
-        let canister1 = token_canister();
-        let canister2 = TestCanister::init_instance();
+        let is_notified = Rc::new(AtomicBool::new(false));
+        let is_notified_clone = is_notified.clone();
+        let counter = Rc::new(AtomicU32::new(0));
+        let counter_copy = counter.clone();
+        register_virtual_responder(
+            bob(),
+            "transaction_notification",
+            move |(notification,): (TxRecord,)| {
+                is_notified.swap(true, Ordering::Relaxed);
+                counter.fetch_add(1, Ordering::Relaxed);
+                assert_eq!(notification.amount, AMOUNT);
+            },
+        );
 
-        assert_eq!(canister1.approveAndNotify(canister2.principal(), Nat::from(AMOUNT)).unwrap(), Nat::from(1));
-        assert_eq!(canister2.__get_value().await.unwrap(), Nat::from(AMOUNT));
+        let canister = test_canister();
+
+        canister
+            .approveAndNotify(bob(), Nat::from(AMOUNT))
+            .await
+            .unwrap();
+        assert!(is_notified_clone.load(Ordering::Relaxed));
+        assert_eq!(counter_copy.load(Ordering::Relaxed), 1);
     }
 }
