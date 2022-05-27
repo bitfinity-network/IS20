@@ -116,6 +116,7 @@ pub enum Operation {
     Approve,
     Mint,
     Transfer,
+    BatchTransfer,
     TransferFrom,
     Burn,
     Auction,

@@ -39,6 +39,51 @@ pub fn transfer_include_fee(canister: &TokenCanister, to: Principal, value: Nat)
     Ok(id)
 }
 
+/// batchTransfer method that accepts a list of (to, value) transfer args.
+/// Transfers `value` amount to the `to` principal, applying American style fee. This means, that the recipient will receive `value - fee`, and the sender account will be reduced exactly by `value`.
+/// Note, that the `value` cannot be less than the `fee` amount. If the value given is too small, transaction will fail with `TxError::AmountTooSmall` error.
+///
+
+pub fn batch_transfer(
+    canister: &TokenCanister,
+    transfers: Vec<(Principal, Nat)>,
+) -> Result<Vec<TxReceipt>, TxError> {
+    // TODO: calculate the total amount of the transfers and check if the sender has enough balance with the fee included.
+    let from = ic_kit::ic::caller();
+    let mut state = canister.state.borrow_mut();
+    let mut total_value = Nat::default().0;
+
+    transfers.iter().for_each(|(_, value)| {
+        total_value += value.0.clone();
+    });
+
+    let CanisterState {
+        ref mut balances,
+        ref bidding_state,
+        ref stats,
+        ..
+    } = &mut *state;
+
+    let (fee, fee_to) = stats.fee_info();
+    let fee_ratio = bidding_state.fee_ratio;
+
+    let total_fee = fee.clone() * transfers.len() as u64;
+
+    if balances.balance_of(&from) < Nat::from(total_value) + total_fee {
+        return Err(TxError::InsufficientBalance);
+    }
+
+    _charge_fee(balances, from, fee_to, fee.clone(), fee_ratio);
+
+    let mut receipts = Vec::new();
+    for (to, value) in transfers {
+        let id = state.ledger.transfer(from, to, value, fee.clone());
+        receipts.push(id);
+    }
+
+    todo!();
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

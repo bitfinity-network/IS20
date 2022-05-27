@@ -74,6 +74,26 @@ impl Ledger {
         id
     }
 
+    pub fn batch_transfer(
+        &mut self,
+        from: Principal,
+        transfers: Vec<(Principal, Nat)>,
+        fee: Nat,
+    ) -> Nat {
+        let id = self.next_id();
+        for (to, amount) in transfers {
+            self.push(TxRecord::transfer(
+                id.clone(),
+                from,
+                to,
+                amount,
+                fee.clone(),
+            ));
+        }
+
+        id
+    }
+
     pub fn transfer_from(
         &mut self,
         caller: Principal,
