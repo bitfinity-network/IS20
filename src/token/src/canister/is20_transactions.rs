@@ -39,16 +39,11 @@ pub fn transfer_include_fee(canister: &TokenCanister, to: Principal, value: Nat)
     Ok(id)
 }
 
-/// batchTransfer method that accepts a list of (to, value) transfer args.
-/// Transfers `value` amount to the `to` principal, applying American style fee. This means, that the recipient will receive `value - fee`, and the sender account will be reduced exactly by `value`.
-/// Note, that the `value` cannot be less than the `fee` amount. If the value given is too small, transaction will fail with `TxError::AmountTooSmall` error.
-///
-
+/// TODO: add description
 pub fn batch_transfer(
     canister: &TokenCanister,
     transfers: Vec<(Principal, Nat)>,
-) -> Result<Vec<TxReceipt>, TxError> {
-    // TODO: calculate the total amount of the transfers and check if the sender has enough balance with the fee included.
+) -> Result<Vec<Nat>,TxError> {
     let from = ic_kit::ic::caller();
     let mut state = canister.state.borrow_mut();
     let mut total_value = Nat::default().0;
@@ -73,15 +68,17 @@ pub fn batch_transfer(
         return Err(TxError::InsufficientBalance);
     }
 
-    _charge_fee(balances, from, fee_to, fee.clone(), fee_ratio);
-
-    let mut receipts = Vec::new();
-    for (to, value) in transfers {
-        let id = state.ledger.transfer(from, to, value, fee.clone());
-        receipts.push(id);
+    {
+        transfers.iter().for_each(|(to, value)| {
+            _charge_fee(balances, from, fee_to, fee.clone(), fee_ratio);
+            _transfer(balances, from, *to, value.clone() - fee.clone());
+        });
     }
 
-    todo!();
+
+    let id = state.ledger.batch_transfer(from, transfers, fee);
+    Ok(id)
+    
 }
 
 #[cfg(test)]
@@ -89,7 +86,7 @@ mod tests {
     use super::*;
     use common::types::Metadata;
     use ic_canister::Canister;
-    use ic_kit::mock_principals::{alice, bob, john};
+    use ic_kit::mock_principals::{alice, bob, john,xtc};
     use ic_kit::MockContext;
 
     fn test_canister() -> TokenCanister {
@@ -109,6 +106,47 @@ mod tests {
         });
 
         canister
+    }
+
+    #[test]
+    fn batch_transfer_without_fee() {
+        let canister = test_canister();
+        assert_eq!(Nat::from(1000), canister.balanceOf(alice()));
+        let transfers = vec![(bob(), Nat::from(100)), (john(), Nat::from(200))];
+        let receipt = canister.batchTransfer(transfers).unwrap();
+        assert_eq!(receipt.len(), 2);
+        assert_eq!(canister.balanceOf(alice()), Nat::from(700));
+        assert_eq!(canister.balanceOf(bob()), Nat::from(100));
+        assert_eq!(canister.balanceOf(john()), Nat::from(200));
+    }
+
+    #[test]
+    fn batch_transfer_with_fee() {
+        let canister = test_canister();
+        let mut state = canister.state.borrow_mut();
+        state.stats.fee = Nat::from(50);
+        state.stats.fee_to = john();
+        drop(state);
+        assert_eq!(Nat::from(1000), canister.balanceOf(alice()));
+        let transfers = vec![(bob(), Nat::from(100)), (xtc(), Nat::from(200))];
+        let receipt = canister.batchTransfer(transfers).unwrap();
+        assert_eq!(receipt.len(), 2);
+        assert_eq!(canister.balanceOf(alice()), Nat::from(700));
+        assert_eq!(canister.balanceOf(bob()), Nat::from(50));
+        assert_eq!(canister.balanceOf(xtc()), Nat::from(150));
+        assert_eq!(canister.balanceOf(john()), Nat::from(100));
+    }
+
+    #[test]
+    fn batch_transfer_insufficient_balance() {
+        let canister = test_canister();
+        let transfers = vec![(bob(), Nat::from(500)), (john(), Nat::from(600))];
+        let receipt = canister.batchTransfer(transfers);
+        assert!(receipt.is_err());
+        assert_eq!(receipt.unwrap_err(), TxError::InsufficientBalance);
+        assert_eq!(canister.balanceOf(alice()), Nat::from(1000));
+        assert_eq!(canister.balanceOf(bob()), Nat::from(0));
+        assert_eq!(canister.balanceOf(john()), Nat::from(0));
     }
 
     #[test]

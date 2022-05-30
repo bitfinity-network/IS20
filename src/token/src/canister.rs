@@ -3,7 +3,7 @@ use crate::canister::is20_auction::{
     auction_info, bid_cycles, bidding_info, run_auction, AuctionError, BiddingInfo,
 };
 use crate::canister::is20_notify::approve_and_notify;
-use crate::canister::is20_transactions::transfer_include_fee;
+use crate::canister::is20_transactions::{batch_transfer, transfer_include_fee};
 use crate::state::CanisterState;
 use crate::types::{AuctionInfo, StatsData, Timestamp, TokenInfo, TxError, TxReceipt, TxRecord};
 use candid::Nat;
@@ -256,6 +256,11 @@ impl TokenCanister {
     #[update]
     fn transferIncludeFee(&self, to: Principal, value: Nat) -> TxReceipt {
         transfer_include_fee(self, to, value)
+    }
+
+    #[update]
+    fn batchTransfer(&self, transfers: Vec<(Principal,Nat)>) -> Result<Vec<Nat>, TxError> {
+        batch_transfer(self,  transfers)
     }
 
     #[update]
