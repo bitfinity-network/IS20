@@ -45,11 +45,11 @@ pub fn batch_transfer(
 ) -> Result<Vec<Nat>, TxError> {
     let from = ic_kit::ic::caller();
     let mut state = canister.state.borrow_mut();
-    let mut total_value = Nat::default().0;
 
-    transfers.iter().for_each(|(_, value)| {
-        total_value += value.0.clone();
-    });
+    let total_value = transfers
+        .iter()
+        .map(|(_, value)| value.clone())
+        .fold(Nat::from(0), |acc, val| acc + val);
 
     let CanisterState {
         ref mut balances,
@@ -63,14 +63,12 @@ pub fn batch_transfer(
 
     let total_fee = fee.clone() * transfers.len() as u64;
 
-    if balances.balance_of(&from) < Nat::from(total_value) + total_fee {
+    if balances.balance_of(&from) < total_value + total_fee {
         return Err(TxError::InsufficientBalance);
     }
 
     {
         transfers.iter().for_each(|(to, value)| {
-            // _charge_fee(balances, from, fee_to, fee.clone(), fee_ratio);
-            // _transfer(balances, from, *to, value.clone() - fee.clone());
             _charge_fee(balances, from, fee_to, fee.clone(), fee_ratio);
             _transfer(balances, from, *to, value.clone());
         });
@@ -113,7 +111,6 @@ mod tests {
         assert_eq!(Nat::from(1000), canister.balanceOf(alice()));
         let transfers = vec![(bob(), Nat::from(100)), (john(), Nat::from(200))];
         let receipt = canister.batchTransfer(transfers).unwrap();
-        println!("{:?}", receipt);
         assert_eq!(receipt.len(), 2);
         assert_eq!(canister.balanceOf(alice()), Nat::from(700));
         assert_eq!(canister.balanceOf(bob()), Nat::from(100));
