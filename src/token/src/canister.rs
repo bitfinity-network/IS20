@@ -259,8 +259,8 @@ impl TokenCanister {
     }
 
     #[update]
-    fn batchTransfer(&self, transfers: Vec<(Principal,Nat)>) -> Result<Vec<Nat>, TxError> {
-        batch_transfer(self,  transfers)
+    fn batchTransfer(&self, transfers: Vec<(Principal, Nat)>) -> Result<Vec<Nat>, TxError> {
+        batch_transfer(self, transfers)
     }
 
     #[update]

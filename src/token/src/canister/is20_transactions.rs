@@ -43,7 +43,7 @@ pub fn transfer_include_fee(canister: &TokenCanister, to: Principal, value: Nat)
 pub fn batch_transfer(
     canister: &TokenCanister,
     transfers: Vec<(Principal, Nat)>,
-) -> Result<Vec<Nat>,TxError> {
+) -> Result<Vec<Nat>, TxError> {
     let from = ic_kit::ic::caller();
     let mut state = canister.state.borrow_mut();
     let mut total_value = Nat::default().0;
@@ -75,10 +75,8 @@ pub fn batch_transfer(
         });
     }
 
-
     let id = state.ledger.batch_transfer(from, transfers, fee);
     Ok(id)
-    
 }
 
 #[cfg(test)]
@@ -86,7 +84,7 @@ mod tests {
     use super::*;
     use common::types::Metadata;
     use ic_canister::Canister;
-    use ic_kit::mock_principals::{alice, bob, john,xtc};
+    use ic_kit::mock_principals::{alice, bob, john, xtc};
     use ic_kit::MockContext;
 
     fn test_canister() -> TokenCanister {
