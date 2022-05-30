@@ -80,19 +80,10 @@ impl Ledger {
         transfers: Vec<(Principal, Nat)>,
         fee: Nat,
     ) -> Vec<Nat> {
-        let id = self.next_id();
-
-        transfers.iter().for_each(|(to, amount)| {
-            self.push(TxRecord::transfer(
-                id.clone(),
-                from,
-                *to,
-                amount.clone(),
-                fee.clone(),
-            ));
-        });
-
-        transfers.iter().map(|_| id.clone()).collect()
+        transfers
+            .into_iter()
+            .map(|(to, amount)| self.transfer(from, to, amount, fee.clone()))
+            .collect()
     }
 
     pub fn transfer_from(
