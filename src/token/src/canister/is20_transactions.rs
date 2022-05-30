@@ -39,7 +39,6 @@ pub fn transfer_include_fee(canister: &TokenCanister, to: Principal, value: Nat)
     Ok(id)
 }
 
-/// TODO: add description
 pub fn batch_transfer(
     canister: &TokenCanister,
     transfers: Vec<(Principal, Nat)>,
@@ -70,8 +69,10 @@ pub fn batch_transfer(
 
     {
         transfers.iter().for_each(|(to, value)| {
+            // _charge_fee(balances, from, fee_to, fee.clone(), fee_ratio);
+            // _transfer(balances, from, *to, value.clone() - fee.clone());
             _charge_fee(balances, from, fee_to, fee.clone(), fee_ratio);
-            _transfer(balances, from, *to, value.clone() - fee.clone());
+            _transfer(balances, from, *to, value.clone());
         });
     }
 
@@ -112,6 +113,7 @@ mod tests {
         assert_eq!(Nat::from(1000), canister.balanceOf(alice()));
         let transfers = vec![(bob(), Nat::from(100)), (john(), Nat::from(200))];
         let receipt = canister.batchTransfer(transfers).unwrap();
+        println!("{:?}", receipt);
         assert_eq!(receipt.len(), 2);
         assert_eq!(canister.balanceOf(alice()), Nat::from(700));
         assert_eq!(canister.balanceOf(bob()), Nat::from(100));
@@ -129,9 +131,9 @@ mod tests {
         let transfers = vec![(bob(), Nat::from(100)), (xtc(), Nat::from(200))];
         let receipt = canister.batchTransfer(transfers).unwrap();
         assert_eq!(receipt.len(), 2);
-        assert_eq!(canister.balanceOf(alice()), Nat::from(700));
-        assert_eq!(canister.balanceOf(bob()), Nat::from(50));
-        assert_eq!(canister.balanceOf(xtc()), Nat::from(150));
+        assert_eq!(canister.balanceOf(alice()), Nat::from(600));
+        assert_eq!(canister.balanceOf(bob()), Nat::from(100));
+        assert_eq!(canister.balanceOf(xtc()), Nat::from(200));
         assert_eq!(canister.balanceOf(john()), Nat::from(100));
     }
 

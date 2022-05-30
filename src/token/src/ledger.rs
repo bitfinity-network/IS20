@@ -86,7 +86,7 @@ impl Ledger {
             self.push(TxRecord::transfer(
                 id.clone(),
                 from,
-                to.clone(),
+                *to,
                 amount.clone(),
                 fee.clone(),
             ));
