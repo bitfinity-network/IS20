@@ -4,11 +4,11 @@ use crate::canister::is20_auction::{
 };
 use crate::canister::is20_notify::approve_and_notify;
 use crate::canister::is20_transactions::transfer_include_fee;
-use crate::state::CanisterState;
+use crate::state::{CanisterState, Metrics};
 use crate::types::{AuctionInfo, StatsData, Timestamp, TokenInfo, TxError, TxReceipt, TxRecord};
 use candid::Nat;
 use common::types::Metadata;
-use ic_canister::{init, query, update, Canister};
+use ic_canister::{init, query, update, Canister, MetricsMap};
 use ic_cdk::export::candid::Principal;
 use num_traits::ToPrimitive;
 use std::cell::RefCell;
@@ -32,6 +32,9 @@ pub struct TokenCanister {
 
     #[state]
     state: Rc<RefCell<CanisterState>>,
+
+    #[metrics]
+    metrics: Rc<RefCell<MetricsMap<Metrics>>>,
 }
 
 #[allow(non_snake_case)]
@@ -355,6 +358,13 @@ impl TokenCanister {
         // IC timestamp is in nanoseconds, thus multiplying
         self.state.borrow_mut().bidding_state.auction_period = period_sec * 1_000_000;
         Ok(())
+    }
+
+    #[update]
+    async fn new_metric_snapshot(&self) -> Metrics {
+        Metrics {
+            cycles: ic_kit::ic::balance(),
+        }
     }
 }
 

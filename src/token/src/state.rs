@@ -106,3 +106,8 @@ impl BiddingState {
 
 #[derive(Default, CandidType, Deserialize)]
 pub struct AuctionHistory(pub Vec<AuctionInfo>);
+
+#[derive(IcStorage, Clone, Debug, Default, CandidType)]
+pub struct Metrics {
+    pub cycles: u64,
+}
