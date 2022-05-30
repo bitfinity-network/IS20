@@ -258,6 +258,11 @@ impl TokenCanister {
         transfer_include_fee(self, to, value)
     }
 
+    /// Takes a list of transfers, each of which is a pair of `to` and `value` fields, it returns a `TxReceipt` which contains
+    /// a vec of transaction index or an error message. The list of transfers is processed in the order they are given. if the `fee`
+    /// is set, the `fee` amount is applied to each transfer.
+    /// The balance of the caller is reduced by sum of `value + fee` amount for each transfer. If the total sum of `value + fee` for all transfers,
+    /// is less than the `balance` of the caller, the transaction will fail with `TxError::InsufficientBalance` error.
     #[update]
     fn batchTransfer(&self, transfers: Vec<(Principal, Nat)>) -> Result<Vec<Nat>, TxError> {
         batch_transfer(self, transfers)
