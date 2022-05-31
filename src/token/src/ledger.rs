@@ -74,6 +74,18 @@ impl Ledger {
         id
     }
 
+    pub fn batch_transfer(
+        &mut self,
+        from: Principal,
+        transfers: Vec<(Principal, Nat)>,
+        fee: Nat,
+    ) -> Vec<Nat> {
+        transfers
+            .into_iter()
+            .map(|(to, amount)| self.transfer(from, to, amount, fee.clone()))
+            .collect()
+    }
+
     pub fn transfer_from(
         &mut self,
         caller: Principal,

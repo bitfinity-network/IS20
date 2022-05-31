@@ -90,7 +90,6 @@ fn inspect_message() {
             // It's the `burn` method and the caller isn't the owner.
             let from = ic_cdk::api::call::arg_data::<(Option<Principal>, Nat)>().0;
             if from.is_some() {
-                ic_cdk::println!("Only the owner can burn other's tokens. Rejecting.");
                 ic_cdk::trap("Only the owner can burn other's tokens. Rejecting.");
             }
 
