@@ -68,10 +68,10 @@ pub fn batch_transfer(
     }
 
     {
-        transfers.iter().for_each(|(to, value)| {
+        for (to, value) in transfers.clone() {
             _charge_fee(balances, from, fee_to, fee.clone(), fee_ratio);
-            _transfer(balances, from, *to, value.clone());
-        });
+            _transfer(balances, from, to, value.clone());
+        }
     }
 
     let id = state.ledger.batch_transfer(from, transfers, fee);
