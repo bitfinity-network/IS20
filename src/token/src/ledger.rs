@@ -1,6 +1,7 @@
-use crate::types::TxRecord;
 use candid::{CandidType, Deserialize, Nat, Principal};
 use num_traits::ToPrimitive;
+
+use crate::types::TxRecord;
 
 const MAX_HISTORY_LENGTH: usize = 1_000_000;
 const HISTORY_REMOVAL_BATCH_SIZE: usize = 10_000;

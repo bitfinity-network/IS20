@@ -1,10 +1,14 @@
-use super::TokenCanister;
-use crate::canister::is20_auction::auction_principal;
-use crate::state::{Balances, CanisterState};
-use crate::types::{TxError, TxReceipt};
+use std::collections::HashMap;
+
 use candid::Nat;
 use ic_cdk::export::Principal;
-use std::collections::HashMap;
+
+use crate::canister::is20_auction::auction_principal;
+use crate::principal::{CheckedPrincipal, Owner, TestNet};
+use crate::state::{Balances, CanisterState};
+use crate::types::{TxError, TxReceipt};
+
+use super::TokenCanister;
 
 pub fn transfer(
     canister: &TokenCanister,
@@ -142,8 +146,7 @@ pub fn approve(canister: &TokenCanister, spender: Principal, value: Nat) -> TxRe
     Ok(id)
 }
 
-pub fn mint(canister: &TokenCanister, to: Principal, amount: Nat) -> TxReceipt {
-    let caller = ic_kit::ic::caller();
+fn mint(canister: &TokenCanister, caller: Principal, to: Principal, amount: Nat) -> TxReceipt {
     {
         let balances = &mut canister.state.borrow_mut().balances;
         let to_balance = balances.balance_of(&to);
@@ -157,9 +160,20 @@ pub fn mint(canister: &TokenCanister, to: Principal, amount: Nat) -> TxReceipt {
     Ok(id)
 }
 
-pub fn burn(canister: &TokenCanister, from: Option<Principal>, amount: Nat) -> TxReceipt {
-    let caller = ic_kit::ic::caller();
-    let from = from.unwrap_or(caller);
+pub(crate) fn mint_test_token(canister: &TokenCanister, caller: CheckedPrincipal<TestNet>, to: Principal, amount: Nat) -> TxReceipt {
+    mint(canister, caller.inner(), to, amount)
+}
+
+pub(crate) fn mint_as_owner(
+    canister: &TokenCanister,
+    caller: CheckedPrincipal<Owner>,
+    to: Principal,
+    amount: Nat,
+) -> TxReceipt {
+    mint(canister, caller.inner(), to, amount)
+}
+
+fn burn(canister: &TokenCanister, caller: Principal, from: Principal, amount: Nat) -> TxReceipt {
     {
         let mut state = canister.state.borrow_mut();
         let balance = state.balances.balance_of(&from);
@@ -175,6 +189,20 @@ pub fn burn(canister: &TokenCanister, from: Option<Principal>, amount: Nat) -> T
 
     let id = state.ledger.burn(caller, from, amount);
     Ok(id)
+}
+
+pub fn burn_own_tokens(canister: &TokenCanister, amount: Nat) -> TxReceipt {
+    let caller = ic_kit::ic::caller();
+    burn(canister, caller, caller, amount)
+}
+
+pub fn burn_as_owner(
+    canister: &TokenCanister,
+    caller: CheckedPrincipal<Owner>,
+    from: Principal,
+    amount: Nat,
+) -> TxReceipt {
+    burn(canister, caller.inner(), from, amount)
 }
 
 pub fn _transfer(balances: &mut Balances, from: Principal, to: Principal, value: Nat) {

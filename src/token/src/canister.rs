@@ -1,29 +1,44 @@
-use crate::canister::dip20_transactions::{approve, burn, mint, transfer, transfer_from};
-use crate::canister::is20_auction::{
-    auction_info, bid_cycles, bidding_info, run_auction, AuctionError, BiddingInfo,
-};
-use crate::canister::is20_notify::{notify, transfer_and_notify};
-use crate::canister::is20_transactions::transfer_include_fee;
-use crate::state::CanisterState;
-use crate::types::{AuctionInfo, StatsData, Timestamp, TokenInfo, TxError, TxReceipt, TxRecord};
+use std::cell::RefCell;
+use std::rc::Rc;
+
 use candid::Nat;
 use common::types::Metadata;
 use ic_canister::{init, query, update, Canister};
 use ic_cdk::export::candid::Principal;
 use num_traits::ToPrimitive;
-use std::cell::RefCell;
-use std::rc::Rc;
+
+use crate::canister::dip20_transactions::{approve, burn_own_tokens, burn_as_owner, mint_as_owner, mint_test_token, transfer, transfer_from};
+use crate::canister::is20_auction::{
+    auction_info, bid_cycles, bidding_info, run_auction, AuctionError, BiddingInfo,
+};
+use crate::canister::is20_notify::{notify, transfer_and_notify};
+use crate::canister::is20_transactions::transfer_include_fee;
+use crate::principal::{Owner, CheckedPrincipal};
+use crate::state::CanisterState;
+use crate::types::{AuctionInfo, StatsData, Timestamp, TokenInfo, TxError, TxReceipt, TxRecord};
 
 mod dip20_transactions;
 mod inspect;
+mod is20_transactions;
+
 pub mod is20_auction;
 pub mod is20_notify;
-mod is20_transactions;
 
 // 1 day in nanoseconds.
 const DEFAULT_AUCTION_PERIOD: Timestamp = 24 * 60 * 60 * 1_000_000;
 
 const MAX_TRANSACTION_QUERY_LEN: usize = 1000;
+
+enum CanisterUpdate {
+    Name(String),
+    Logo(String),
+    Fee(Nat),
+    FeeTo(Principal),
+    Owner(Principal),
+    MinCycles(u64),
+    AuctionPeriod(u64)
+}
+
 
 #[derive(Clone, Canister)]
 pub struct TokenCanister {
@@ -31,7 +46,7 @@ pub struct TokenCanister {
     principal: Principal,
 
     #[state]
-    state: Rc<RefCell<CanisterState>>,
+    pub(crate) state: Rc<RefCell<CanisterState>>,
 }
 
 #[allow(non_snake_case)]
@@ -43,11 +58,13 @@ impl TokenCanister {
             .balances
             .0
             .insert(metadata.owner, metadata.totalSupply.clone());
+
         self.state.borrow_mut().ledger.mint(
             metadata.owner,
             metadata.owner,
             metadata.totalSupply.clone(),
         );
+
         self.state.borrow_mut().stats = metadata.into();
         self.state.borrow_mut().bidding_state.auction_period = DEFAULT_AUCTION_PERIOD;
     }
@@ -87,14 +104,6 @@ impl TokenCanister {
     #[query]
     fn isTestToken(&self) -> bool {
         self.state.borrow().stats.is_test_token
-    }
-
-    #[update]
-    fn toggleTest(&self) -> bool {
-        check_caller(self.owner()).unwrap();
-        let stats = &mut self.state.borrow_mut().stats;
-        stats.is_test_token = !stats.is_test_token;
-        stats.is_test_token
     }
 
     #[query]
@@ -167,34 +176,53 @@ impl TokenCanister {
             .to_vec()
     }
 
-    #[update]
-    fn setName(&self, name: String) {
-        check_caller(self.owner()).unwrap();
-        self.state.borrow_mut().stats.name = name;
+    // This function can only be called with 
+    fn update_stats(&self, _caller: CheckedPrincipal<Owner>, update: CanisterUpdate) {
+        use CanisterUpdate::*;
+        match update {
+            Name(name) => self.state.borrow_mut().stats.name = name,
+            Logo(logo) => self.state.borrow_mut().stats.logo = logo,
+            Fee(fee) => self.state.borrow_mut().stats.fee = fee,
+            FeeTo(fee_to) => self.state.borrow_mut().stats.fee_to = fee_to,
+            Owner(owner) => self.state.borrow_mut().stats.owner = owner,
+            MinCycles(min_cycles) => self.state.borrow_mut().stats.min_cycles = min_cycles,
+            AuctionPeriod(period_sec) => self.state.borrow_mut().bidding_state.auction_period = period_sec * 1_000_000,
+        }
     }
 
     #[update]
-    fn setLogo(&self, logo: String) {
-        check_caller(self.owner()).unwrap();
-        self.state.borrow_mut().stats.logo = logo;
+    fn setName(&self, name: String) -> Result<(), TxError> {
+        let caller = CheckedPrincipal::owner(&self.state.borrow_mut().stats)?;
+        self.update_stats(caller, CanisterUpdate::Name(name));
+        Ok(())
     }
 
     #[update]
-    fn setFee(&self, fee: Nat) {
-        check_caller(self.owner()).unwrap();
-        self.state.borrow_mut().stats.fee = fee;
+    fn setLogo(&self, logo: String) -> Result<(), TxError> {
+        let caller = CheckedPrincipal::owner(&self.state.borrow_mut().stats)?;
+        self.update_stats(caller, CanisterUpdate::Logo(logo));
+        Ok(())
     }
 
     #[update]
-    fn setFeeTo(&self, fee_to: Principal) {
-        check_caller(self.owner()).unwrap();
-        self.state.borrow_mut().stats.fee_to = fee_to;
+    fn setFee(&self, fee: Nat) -> Result<(), TxError> {
+        let caller = CheckedPrincipal::owner(&self.state.borrow_mut().stats)?;
+        self.update_stats(caller, CanisterUpdate::Fee(fee));
+        Ok(())
     }
 
     #[update]
-    fn setOwner(&self, owner: Principal) {
-        check_caller(self.owner()).unwrap();
-        self.state.borrow_mut().stats.owner = owner;
+    fn setFeeTo(&self, fee_to: Principal) -> Result<(), TxError> {
+        let caller = CheckedPrincipal::owner(&self.state.borrow_mut().stats)?;
+        self.update_stats(caller, CanisterUpdate::FeeTo(fee_to));
+        Ok(())
+    }
+
+    #[update]
+    fn setOwner(&self, owner: Principal) -> Result<(), TxError> {
+        let caller = CheckedPrincipal::owner(&self.state.borrow_mut().stats)?;
+        self.update_stats(caller, CanisterUpdate::Owner(owner));
+        Ok(())
     }
 
     #[query]
@@ -265,11 +293,13 @@ impl TokenCanister {
 
     #[update]
     fn mint(&self, to: Principal, amount: Nat) -> TxReceipt {
-        if !self.isTestToken() {
-            check_caller(self.owner())?;
+        if self.isTestToken() {
+            let test_user = CheckedPrincipal::test_user(&self.state.borrow().stats)?;
+            mint_test_token(self, test_user, to, amount)
+        } else {
+            let owner = CheckedPrincipal::owner(&self.state.borrow().stats)?;
+            mint_as_owner(self, owner, to, amount)
         }
-
-        mint(self, to, amount)
     }
 
     /// Burn `amount` of tokens from `from` principal.
@@ -278,11 +308,14 @@ impl TokenCanister {
     /// If owner calls this method and `from` is Some(who), then who's tokens will be burned.
     #[update]
     fn burn(&self, from: Option<Principal>, amount: Nat) -> TxReceipt {
-        if from.is_some() {
-            check_caller(self.owner())?;
+        match from {
+            None => burn_own_tokens(self, amount),
+            Some(from) if from == ic_kit::ic::caller() => burn_own_tokens(self, amount),
+            Some(from) => {
+                let caller = CheckedPrincipal::owner(&self.state.borrow().stats)?;
+                burn_as_owner(self, caller, from, amount)
+            }
         }
-
-        burn(self, from, amount)
     }
 
     /********************** AUCTION ***********************/
@@ -336,8 +369,8 @@ impl TokenCanister {
     /// Only the owner is allowed to call this method.
     #[update]
     fn setMinCycles(&self, min_cycles: u64) -> Result<(), TxError> {
-        check_caller(self.owner())?;
-        self.state.borrow_mut().stats.min_cycles = min_cycles;
+        let caller = CheckedPrincipal::owner(&self.state.borrow_mut().stats)?;
+        self.update_stats(caller, CanisterUpdate::MinCycles(min_cycles));
         Ok(())
     }
 
@@ -346,9 +379,8 @@ impl TokenCanister {
     /// Only the owner is allowed to call this method.
     #[update]
     fn setAuctionPeriod(&self, period_sec: u64) -> Result<(), TxError> {
-        check_caller(self.owner())?;
-        // IC timestamp is in nanoseconds, thus multiplying
-        self.state.borrow_mut().bidding_state.auction_period = period_sec * 1_000_000;
+        let caller = CheckedPrincipal::owner(&self.state.borrow_mut().stats)?;
+        self.update_stats(caller, CanisterUpdate::AuctionPeriod(period_sec));
         Ok(())
     }
 
@@ -383,14 +415,6 @@ impl TokenCanister {
         fee_limit: Option<Nat>,
     ) -> TxReceipt {
         transfer_and_notify(self, to, amount, fee_limit).await
-    }
-}
-
-fn check_caller(owner: Principal) -> Result<(), TxError> {
-    if ic_kit::ic::caller() == owner {
-        Ok(())
-    } else {
-        Err(TxError::Unauthorized)
     }
 }
 
