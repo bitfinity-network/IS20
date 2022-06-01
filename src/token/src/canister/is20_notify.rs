@@ -25,8 +25,9 @@ pub(crate) async fn notify(
     transaction_id: Nat,
     to: Principal,
 ) -> TxReceipt {
-    let mut state = canister.state.borrow_mut();
-    let tx = state
+    let tx = canister
+        .state
+        .borrow()
         .ledger
         .get(&transaction_id)
         .ok_or(TxError::TransactionDoesNotExist)?;
@@ -35,7 +36,13 @@ pub(crate) async fn notify(
         return Err(TxError::Unauthorized);
     }
 
-    match state.ledger.notifications.get_mut(&transaction_id) {
+    match canister
+        .state
+        .borrow_mut()
+        .ledger
+        .notifications
+        .get_mut(&transaction_id)
+    {
         Some(Some(dest)) if *dest != to => return Err(TxError::Unauthorized),
         Some(x) => *x = Some(to),
         None => return Err(TxError::AlreadyActioned),
