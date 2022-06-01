@@ -1,5 +1,5 @@
 //! Module     : factory
-//! Copyright  : 2021 InfinitySwap Team
+//! Copyright  : 2022 InfinitySwap Team
 //! Stability  : Experimental
 
 use std::cell::RefCell;
@@ -7,14 +7,18 @@ use std::rc::Rc;
 
 use crate::error::TokenFactoryError;
 use crate::state::State;
-use candid::{Nat, Principal};
+use candid::Principal;
 use common::types::Metadata;
 use ic_canister::{init, query, update, Canister};
 use ic_helpers::factory::error::FactoryError;
 use ic_helpers::factory::FactoryState;
 
+#[cfg(target_arch = "wasm32")]
+use candid::Nat;
+
 mod inspect_message;
 
+#[cfg(target_arch = "wasm32")]
 ic_helpers::extend_with_factory_api!(
     TokenFactoryCanister,
     state,
@@ -120,6 +124,26 @@ impl TokenFactoryCanister {
         state_ref.factory.register(key, canister);
 
         Ok(principal)
+    }
+
+    /// Delete a token.
+    /// The token must be owned by the caller.
+    /// The token will be deleted from the factory and the removed from the canister registry.
+    #[update]
+    async fn forget_token(&self, name: String) -> Result<(), TokenFactoryError> {
+        //    Check controller access
+        let mut state_ref = self.state.borrow_mut();
+        state_ref.check_controller_access()?;
+
+        let token = self
+            .get_token(name.clone())
+            .await
+            .ok_or(TokenFactoryError::FactoryError(FactoryError::NotFound))?;
+
+        state_ref.factory().drop(token).await?;
+        state_ref.factory_mut().forget(&name)?;
+
+        Ok(())
     }
 }
 

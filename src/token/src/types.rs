@@ -1,6 +1,6 @@
 use candid::{CandidType, Deserialize, Nat, Principal};
 use common::types::Metadata;
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 
 mod tx_record;
 pub use tx_record::*;
@@ -88,8 +88,10 @@ pub enum TxError {
     Unauthorized,
     AmountTooSmall,
     FeeExceededLimit,
-    NotificationFailed,
-    AlreadyNotified,
+    ApproveSucceededButNotifyFailed { tx_error: Box<TxError> },
+    NotificationFailed { transaction_id: Nat },
+    AlreadyActioned,
+    NotificationDoesNotExist,
     TransactionDoesNotExist,
     BadFee { expected_fee: u64 },
     InsufficientFunds { balance: u64 },
@@ -99,7 +101,9 @@ pub enum TxError {
 }
 
 pub type TxReceipt = Result<Nat, TxError>;
-pub type PendingNotifications = HashSet<Nat>;
+
+// Notification receiver not set if None
+pub type PendingNotifications = HashMap<Nat, Option<Principal>>;
 
 #[derive(CandidType, Debug, Clone, Copy, Deserialize, PartialEq)]
 pub enum TransactionStatus {

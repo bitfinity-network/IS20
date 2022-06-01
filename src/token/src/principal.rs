@@ -2,7 +2,6 @@ use std::marker::PhantomData;
 use candid::Principal;
 
 use crate::types::{StatsData, TxError};
-use common::types::Metadata;
 
 /// Canister owner
 pub struct Owner;
@@ -27,10 +26,6 @@ impl CheckedPrincipal<Owner> {
         } else {
             Err(TxError::Unauthorized)
         }
-    }
-
-    pub(crate) fn from_meta(meta: &Metadata) -> Self {
-        Self(meta.owner, PhantomData)
     }
 }
 

@@ -1,7 +1,6 @@
+use crate::types::{PendingNotifications, TxRecord};
 use candid::{CandidType, Deserialize, Nat, Principal};
 use num_traits::ToPrimitive;
-
-use crate::types::TxRecord;
 
 const MAX_HISTORY_LENGTH: usize = 1_000_000;
 const HISTORY_REMOVAL_BATCH_SIZE: usize = 10_000;
@@ -10,6 +9,7 @@ const HISTORY_REMOVAL_BATCH_SIZE: usize = 10_000;
 pub struct Ledger {
     history: Vec<TxRecord>,
     vec_offset: Nat,
+    pub notifications: PendingNotifications,
 }
 
 impl Ledger {
@@ -74,6 +74,18 @@ impl Ledger {
         id
     }
 
+    pub fn batch_transfer(
+        &mut self,
+        from: Principal,
+        transfers: Vec<(Principal, Nat)>,
+        fee: Nat,
+    ) -> Vec<Nat> {
+        transfers
+            .into_iter()
+            .map(|(to, amount)| self.transfer(from, to, amount, fee.clone()))
+            .collect()
+    }
+
     pub fn transfer_from(
         &mut self,
         caller: Principal,
@@ -122,12 +134,17 @@ impl Ledger {
     }
 
     fn push(&mut self, record: TxRecord) {
-        self.history.push(record);
+        self.history.push(record.clone());
+        self.notifications.insert(record.index.clone(), None);
+
         if self.len() > MAX_HISTORY_LENGTH + HISTORY_REMOVAL_BATCH_SIZE {
             // We remove first `HISTORY_REMOVAL_BATCH_SIZE` from the history at one go, to prevent
             // often relocation of the history vec.
             // This removal code can later be changed to moving old history records into another
             // storage.
+            self.history[..HISTORY_REMOVAL_BATCH_SIZE]
+                .into_iter()
+                .for_each(|record| { self.notifications.remove(&record.index.clone()); });
             self.history = self.history[HISTORY_REMOVAL_BATCH_SIZE..].into();
             self.vec_offset += HISTORY_REMOVAL_BATCH_SIZE;
         }

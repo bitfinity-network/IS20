@@ -7,22 +7,21 @@ use ic_canister::{init, query, update, Canister};
 use ic_cdk::export::candid::Principal;
 use num_traits::ToPrimitive;
 
-use crate::canister::dip20_transactions::{approve, burn_own_tokens, burn_as_owner, mint_as_owner, mint_test_token, transfer, transfer_from};
+use crate::canister::erc20_transactions::{approve, burn_own_tokens, burn_as_owner, mint_as_owner, mint_test_token, transfer, transfer_from};
 use crate::canister::is20_auction::{
     auction_info, bid_cycles, bidding_info, run_auction, AuctionError, BiddingInfo,
 };
-use crate::canister::is20_notify::{notify, transfer_and_notify};
-use crate::canister::is20_transactions::transfer_include_fee;
+use crate::canister::is20_notify::approve_and_notify;
+use crate::canister::is20_transactions::{batch_transfer, transfer_include_fee};
 use crate::principal::{Owner, CheckedPrincipal};
 use crate::state::CanisterState;
 use crate::types::{AuctionInfo, StatsData, Timestamp, TokenInfo, TxError, TxReceipt, TxRecord};
 
-mod dip20_transactions;
+mod erc20_transactions;
 mod inspect;
-mod is20_transactions;
-
 pub mod is20_auction;
 pub mod is20_notify;
+mod is20_transactions;
 
 // 1 day in nanoseconds.
 const DEFAULT_AUCTION_PERIOD: Timestamp = 24 * 60 * 60 * 1_000_000;
@@ -176,7 +175,7 @@ impl TokenCanister {
             .to_vec()
     }
 
-    // This function can only be called with 
+    // This function can only be called as the owner  
     fn update_stats(&self, _caller: CheckedPrincipal<Owner>, update: CanisterUpdate) {
         use CanisterUpdate::*;
         match update {
@@ -286,9 +285,24 @@ impl TokenCanister {
         transfer_include_fee(self, to, value)
     }
 
+    /// Takes a list of transfers, each of which is a pair of `to` and `value` fields, it returns a `TxReceipt` which contains
+    /// a vec of transaction index or an error message. The list of transfers is processed in the order they are given. if the `fee`
+    /// is set, the `fee` amount is applied to each transfer.
+    /// The balance of the caller is reduced by sum of `value + fee` amount for each transfer. If the total sum of `value + fee` for all transfers,
+    /// is less than the `balance` of the caller, the transaction will fail with `TxError::InsufficientBalance` error.
+    #[update]
+    fn batchTransfer(&self, transfers: Vec<(Principal, Nat)>) -> Result<Vec<Nat>, TxError> {
+        batch_transfer(self, transfers)
+    }
+
     #[update]
     fn approve(&self, spender: Principal, value: Nat) -> TxReceipt {
         approve(self, spender, value)
+    }
+
+    #[update]
+    async fn approveAndNotify(&self, spender: Principal, value: Nat) -> TxReceipt {
+        approve_and_notify(self, spender, value).await
     }
 
     #[update]
@@ -380,41 +394,9 @@ impl TokenCanister {
     #[update]
     fn setAuctionPeriod(&self, period_sec: u64) -> Result<(), TxError> {
         let caller = CheckedPrincipal::owner(&self.state.borrow_mut().stats)?;
-        self.update_stats(caller, CanisterUpdate::AuctionPeriod(period_sec));
+        // IC timestamp is in nanoseconds, thus multiplying
+	self.update_stats(caller, CanisterUpdate::AuctionPeriod(period_sec));
         Ok(())
-    }
-
-    /*********************** NOTIFY **********************/
-
-    /// Notifies the transaction receiver about a previously performed transaction.
-    ///
-    /// This method guarantees that a notification for the same transaction id can be sent only once.
-    /// It allows to use this method to reliably inform the transaction receiver without danger of
-    /// duplicate transaction attack.
-    ///
-    /// In case the notification call fails, an [TxError::NotificationFailed] error is returned and
-    /// the transaction will still be marked as not notified.
-    ///
-    /// If a notification request is made for a transaction that was already notified, a
-    /// [TxError::AlreadyNotified] error is returned.
-    #[update]
-    async fn notify(&self, transaction_id: Nat) -> TxReceipt {
-        notify(self, transaction_id).await
-    }
-
-    /// Convenience method to make a transaction and notify the receiver with just one call.
-    ///
-    /// If the notification fails for any reason, the transaction is still completed, but it will be
-    /// marked as not notified, so a [notify] call can be done later to re-request the notification of
-    /// this transaction.
-    #[update]
-    async fn transferAndNotify(
-        &self,
-        to: Principal,
-        amount: Nat,
-        fee_limit: Option<Nat>,
-    ) -> TxReceipt {
-        transfer_and_notify(self, to, amount, fee_limit).await
     }
 }
 

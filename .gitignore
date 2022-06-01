@@ -7,3 +7,5 @@ Cargo.lock
 token.did
 token-factory.did
 token.wasm
+
+/.DS_Store
