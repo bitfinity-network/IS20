@@ -57,8 +57,8 @@ mod tests {
     use ic_kit::mock_principals::{alice, bob};
     use ic_kit::MockContext;
 
-    use crate::types::TxRecord;
     use super::*;
+    use crate::types::TxRecord;
 
     fn test_canister() -> TokenCanister {
         MockContext::new().with_caller(alice()).inject();

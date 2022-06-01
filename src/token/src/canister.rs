@@ -7,13 +7,16 @@ use ic_canister::{init, query, update, Canister};
 use ic_cdk::export::candid::Principal;
 use num_traits::ToPrimitive;
 
-use crate::canister::erc20_transactions::{approve, burn_own_tokens, burn_as_owner, mint_as_owner, mint_test_token, transfer, transfer_from};
+use crate::canister::erc20_transactions::{
+    approve, burn_as_owner, burn_own_tokens, mint_as_owner, mint_test_token, transfer,
+    transfer_from,
+};
 use crate::canister::is20_auction::{
     auction_info, bid_cycles, bidding_info, run_auction, AuctionError, BiddingInfo,
 };
 use crate::canister::is20_notify::approve_and_notify;
 use crate::canister::is20_transactions::{batch_transfer, transfer_include_fee};
-use crate::principal::{Owner, CheckedPrincipal};
+use crate::principal::{CheckedPrincipal, Owner};
 use crate::state::CanisterState;
 use crate::types::{AuctionInfo, StatsData, Timestamp, TokenInfo, TxError, TxReceipt, TxRecord};
 
@@ -35,9 +38,8 @@ enum CanisterUpdate {
     FeeTo(Principal),
     Owner(Principal),
     MinCycles(u64),
-    AuctionPeriod(u64)
+    AuctionPeriod(u64),
 }
-
 
 #[derive(Clone, Canister)]
 pub struct TokenCanister {
@@ -175,7 +177,7 @@ impl TokenCanister {
             .to_vec()
     }
 
-    // This function can only be called as the owner  
+    // This function can only be called as the owner
     fn update_stats(&self, _caller: CheckedPrincipal<Owner>, update: CanisterUpdate) {
         use CanisterUpdate::*;
         match update {
@@ -185,7 +187,9 @@ impl TokenCanister {
             FeeTo(fee_to) => self.state.borrow_mut().stats.fee_to = fee_to,
             Owner(owner) => self.state.borrow_mut().stats.owner = owner,
             MinCycles(min_cycles) => self.state.borrow_mut().stats.min_cycles = min_cycles,
-            AuctionPeriod(period_sec) => self.state.borrow_mut().bidding_state.auction_period = period_sec * 1_000_000,
+            AuctionPeriod(period_sec) => {
+                self.state.borrow_mut().bidding_state.auction_period = period_sec * 1_000_000
+            }
         }
     }
 
@@ -395,7 +399,7 @@ impl TokenCanister {
     fn setAuctionPeriod(&self, period_sec: u64) -> Result<(), TxError> {
         let caller = CheckedPrincipal::owner(&self.state.borrow_mut().stats)?;
         // IC timestamp is in nanoseconds, thus multiplying
-	self.update_stats(caller, CanisterUpdate::AuctionPeriod(period_sec));
+        self.update_stats(caller, CanisterUpdate::AuctionPeriod(period_sec));
         Ok(())
     }
 }

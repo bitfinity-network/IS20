@@ -144,7 +144,9 @@ impl Ledger {
             // storage.
             self.history[..HISTORY_REMOVAL_BATCH_SIZE]
                 .into_iter()
-                .for_each(|record| { self.notifications.remove(&record.index.clone()); });
+                .for_each(|record| {
+                    self.notifications.remove(&record.index.clone());
+                });
             self.history = self.history[HISTORY_REMOVAL_BATCH_SIZE..].into();
             self.vec_offset += HISTORY_REMOVAL_BATCH_SIZE;
         }

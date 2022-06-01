@@ -1,5 +1,5 @@
-use std::marker::PhantomData;
 use candid::Principal;
+use std::marker::PhantomData;
 
 use crate::types::{StatsData, TxError};
 
@@ -39,4 +39,3 @@ impl CheckedPrincipal<TestNet> {
         }
     }
 }
-

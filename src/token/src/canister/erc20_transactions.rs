@@ -158,7 +158,12 @@ fn mint(canister: &TokenCanister, caller: Principal, to: Principal, amount: Nat)
     Ok(id)
 }
 
-pub(crate) fn mint_test_token(canister: &TokenCanister, caller: CheckedPrincipal<TestNet>, to: Principal, amount: Nat) -> TxReceipt {
+pub(crate) fn mint_test_token(
+    canister: &TokenCanister,
+    caller: CheckedPrincipal<TestNet>,
+    to: Principal,
+    amount: Nat,
+) -> TxReceipt {
     mint(canister, caller.inner(), to, amount)
 }
 
