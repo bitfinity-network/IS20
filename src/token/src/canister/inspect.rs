@@ -125,6 +125,24 @@ fn inspect_message() {
                 ic_cdk::trap("No pending notification with the given id. Rejecting.");
             }
         }
+        "ConsumeNotification" => {
+            // This method can only be called if the notification id is in the pending notifications
+            // list and the caller is notified canister.
+            let notifications = &state.ledger.notifications;
+            let (tx_id,) = ic_cdk::api::call::arg_data::<(Nat,)>();
+
+            match notifications.get(&tx_id) {
+                Some(Some(x)) if *x != ic_kit::ic::caller() => ic_cdk::trap("Unauthorized"),
+                Some(x) => {
+                    if state.ledger.notifications.get(&tx_id).is_none() {
+                        ic_cdk::trap("Already removed");
+                    }
+                }
+                None => ic_cdk::trap("Transaction does not exist"),
+            }
+
+            ic_cdk::api::call::accept_message();
+        }
         "runAuction" => {
             // We allow running auction only to the owner or any of the cycle bidders.
             let state = CanisterState::get();
