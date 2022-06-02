@@ -147,7 +147,9 @@ pub fn approve(
         None => {}
     }
 
-    let id = state.ledger.approve(caller.inner(), caller.recipient(), value, fee);
+    let id = state
+        .ledger
+        .approve(caller.inner(), caller.recipient(), value, fee);
     Ok(id)
 }
 
