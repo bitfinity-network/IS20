@@ -20,6 +20,25 @@ pub(crate) async fn approve_and_notify(
         })
 }
 
+pub(crate) async fn consume_notification(
+    canister: &TokenCanister,
+    transaction_id: Nat,
+) -> TxReceipt {
+    let mut state = canister.state.borrow_mut();
+
+    match state.ledger.notifications.get(&transaction_id) {
+        Some(Some(x)) if *x != ic_kit::ic::caller() => return Err(TxError::Unauthorized),
+        Some(_) => {
+            if state.ledger.notifications.remove(&transaction_id).is_none() {
+                return Err(TxError::AlreadyActioned);
+            }
+        }
+        None => return Err(TxError::NotificationDoesNotExist),
+    }
+
+    Ok(transaction_id)
+}
+
 /// This is a one-way call
 pub(crate) async fn notify(
     canister: &TokenCanister,
@@ -70,6 +89,7 @@ mod tests {
 
     fn test_canister() -> TokenCanister {
         MockContext::new().with_caller(alice()).inject();
+
         let canister = TokenCanister::init_instance();
         canister.init(Metadata {
             logo: "".to_string(),
@@ -82,8 +102,10 @@ mod tests {
             feeTo: alice(),
             isTestToken: None,
         });
+
         canister
     }
+
     #[tokio::test]
     async fn approve_notify() {
         const AMOUNT: u128 = 100;

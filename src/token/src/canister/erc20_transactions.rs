@@ -163,6 +163,7 @@ fn mint(canister: &TokenCanister, caller: Principal, to: Principal, amount: Nat)
     let mut state = canister.state.borrow_mut();
     state.stats.total_supply += amount.clone();
     let id = state.ledger.mint(caller, to, amount);
+
     Ok(id)
 }
 
