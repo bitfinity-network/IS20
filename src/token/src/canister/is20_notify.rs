@@ -4,15 +4,16 @@ use candid::{Nat, Principal};
 use ic_canister::virtual_canister_notify;
 
 use crate::canister::TokenCanister;
+use crate::principal::{CheckedPrincipal, WithRecipient};
 use crate::types::{TxError, TxReceipt};
 
 pub(crate) async fn approve_and_notify(
     canister: &TokenCanister,
-    spender: Principal,
+    caller: CheckedPrincipal<WithRecipient>,
     value: Nat,
 ) -> TxReceipt {
-    let transaction_id = canister.approve(spender, value)?;
-    notify(canister, transaction_id.clone(), spender)
+    let transaction_id = canister.approve(caller.recipient(), value)?;
+    notify(canister, transaction_id.clone(), caller.recipient())
         .await
         .map_err(|e| TxError::ApproveSucceededButNotifyFailed {
             tx_error: Box::from(e),

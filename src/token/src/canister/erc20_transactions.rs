@@ -4,7 +4,7 @@ use candid::Nat;
 use ic_cdk::export::Principal;
 
 use crate::canister::is20_auction::auction_principal;
-use crate::principal::{CheckedPrincipal, Owner, TestNet};
+use crate::principal::{CheckedPrincipal, Owner, TestNet, WithRecipient};
 use crate::state::{Balances, CanisterState};
 use crate::types::{TxError, TxReceipt};
 
@@ -12,45 +12,46 @@ use super::TokenCanister;
 
 pub fn transfer(
     canister: &TokenCanister,
-    to: Principal,
+    caller: CheckedPrincipal<WithRecipient>,
     value: Nat,
     fee_limit: Option<Nat>,
 ) -> TxReceipt {
-    let from = ic_kit::ic::caller();
-    let (fee, fee_to) = canister.state.borrow().stats.fee_info();
+    let CanisterState {
+        ref mut balances,
+        ref mut ledger,
+        ref stats,
+        ref bidding_state,
+        ..
+    } = *canister.state.borrow_mut();
+
+    let (fee, fee_to) = stats.fee_info();
+    let fee_ratio = bidding_state.fee_ratio;
+
     if let Some(fee_limit) = fee_limit {
         if fee > fee_limit {
             return Err(TxError::FeeExceededLimit);
         }
     }
 
-    let fee_ratio = canister.state.borrow().bidding_state.fee_ratio;
-
-    {
-        let balances = &mut canister.state.borrow_mut().balances;
-
-        if balances.balance_of(&from) < value.clone() + fee.clone() {
-            return Err(TxError::InsufficientBalance);
-        }
-
-        _charge_fee(balances, from, fee_to, fee.clone(), fee_ratio);
-        _transfer(balances, from, to, value.clone());
+    if balances.balance_of(&caller.inner()) < value.clone() + fee.clone() {
+        return Err(TxError::InsufficientBalance);
     }
 
-    let mut state = canister.state.borrow_mut();
-    let id = state.ledger.transfer(from, to, value, fee);
+    _charge_fee(balances, caller.inner(), fee_to, fee.clone(), fee_ratio);
+    _transfer(balances, caller.inner(), caller.recipient(), value.clone());
+
+    let id = ledger.transfer(caller.inner(), caller.recipient(), value, fee);
     Ok(id)
 }
 
 pub fn transfer_from(
     canister: &TokenCanister,
+    caller: CheckedPrincipal<WithRecipient>,
     from: Principal,
-    to: Principal,
     value: Nat,
 ) -> TxReceipt {
-    let owner = ic_kit::ic::caller();
     let mut state = canister.state.borrow_mut();
-    let from_allowance = state.allowance(from, owner);
+    let from_allowance = state.allowance(from, caller.inner());
     let CanisterState {
         ref mut balances,
         ref bidding_state,
@@ -72,18 +73,18 @@ pub fn transfer_from(
     }
 
     _charge_fee(balances, from, fee_to, fee.clone(), fee_ratio);
-    _transfer(balances, from, to, value.clone());
+    _transfer(balances, from, caller.recipient(), value.clone());
 
     let allowances = &mut state.allowances;
     match allowances.get(&from) {
         Some(inner) => {
-            let result = inner.get(&owner).unwrap().clone();
+            let result = inner.get(&caller.inner()).unwrap().clone();
             let mut temp = inner.clone();
             if result.clone() - value_with_fee.clone() != 0 {
-                temp.insert(owner, result - value_with_fee);
+                temp.insert(caller.inner(), result - value_with_fee);
                 allowances.insert(from, temp);
             } else {
-                temp.remove(&owner);
+                temp.remove(&caller.inner());
                 if temp.is_empty() {
                     allowances.remove(&from);
                 } else {
@@ -94,12 +95,17 @@ pub fn transfer_from(
         None => panic!(),
     }
 
-    let id = state.ledger.transfer_from(owner, from, to, value, fee);
+    let id = state
+        .ledger
+        .transfer_from(caller.inner(), from, caller.recipient(), value, fee);
     Ok(id)
 }
 
-pub fn approve(canister: &TokenCanister, spender: Principal, value: Nat) -> TxReceipt {
-    let owner = ic_kit::ic::caller();
+pub fn approve(
+    canister: &TokenCanister,
+    caller: CheckedPrincipal<WithRecipient>,
+    value: Nat,
+) -> TxReceipt {
     let mut state = canister.state.borrow_mut();
 
     let CanisterState {
@@ -111,37 +117,37 @@ pub fn approve(canister: &TokenCanister, spender: Principal, value: Nat) -> TxRe
 
     let (fee, fee_to) = stats.fee_info();
     let fee_ratio = bidding_state.fee_ratio;
-    if balances.balance_of(&owner) < fee {
+    if balances.balance_of(&caller.inner()) < fee {
         return Err(TxError::InsufficientBalance);
     }
 
-    _charge_fee(balances, owner, fee_to, fee.clone(), fee_ratio);
+    _charge_fee(balances, caller.inner(), fee_to, fee.clone(), fee_ratio);
     let v = value.clone() + fee.clone();
 
-    match state.allowances.get(&owner) {
+    match state.allowances.get(&caller.inner()) {
         Some(inner) => {
             let mut temp = inner.clone();
             if v != 0 {
-                temp.insert(spender, v);
-                state.allowances.insert(owner, temp);
+                temp.insert(caller.recipient(), v);
+                state.allowances.insert(caller.inner(), temp);
             } else {
-                temp.remove(&spender);
+                temp.remove(&caller.recipient());
                 if temp.is_empty() {
-                    state.allowances.remove(&owner);
+                    state.allowances.remove(&caller.inner());
                 } else {
-                    state.allowances.insert(owner, temp);
+                    state.allowances.insert(caller.inner(), temp);
                 }
             }
         }
         None if v != 0 => {
             let mut inner = HashMap::new();
-            inner.insert(spender, v);
-            state.allowances.insert(owner, inner);
+            inner.insert(caller.recipient(), v);
+            state.allowances.insert(caller.inner(), inner);
         }
         None => {}
     }
 
-    let id = state.ledger.approve(owner, spender, value, fee);
+    let id = state.ledger.approve(caller.inner(), caller.recipient(), value, fee);
     Ok(id)
 }
 
@@ -282,7 +288,8 @@ mod tests {
         let canister = test_canister();
         assert_eq!(Nat::from(1000), canister.balanceOf(alice()));
 
-        assert!(transfer(&canister, bob(), Nat::from(100), None).is_ok());
+        let caller = CheckedPrincipal::with_recipient(bob()).unwrap();
+        assert!(transfer(&canister, caller, Nat::from(100), None).is_ok());
         assert_eq!(canister.balanceOf(bob()), Nat::from(100));
         assert_eq!(canister.balanceOf(alice()), Nat::from(900));
     }
@@ -359,7 +366,7 @@ mod tests {
         MockContext::new().with_caller(bob()).inject();
         assert_eq!(
             canister.transfer(bob(), Nat::from(100), None),
-            Err(TxError::InsufficientBalance)
+            Err(TxError::SelfTransfer)
         );
         assert_eq!(canister.balanceOf(alice()), Nat::from(1000));
         assert_eq!(canister.balanceOf(bob()), Nat::from(0));
@@ -742,7 +749,6 @@ mod tests {
     #[test]
     fn get_user_transactions() {
         let canister = test_canister();
-        canister.transfer(alice(), Nat::from(10), None).unwrap();
         canister.transfer(john(), Nat::from(10), None).unwrap();
         canister.transfer(xtc(), Nat::from(10), None).unwrap();
         canister.transfer(bob(), Nat::from(10), None).unwrap();
@@ -750,13 +756,13 @@ mod tests {
         canister.transfer(john(), Nat::from(10), None).unwrap();
 
         let txs = canister.getUserTransactions(alice(), Nat::from(0), Nat::from(6));
-        assert_eq!(txs.len(), 6);
+        assert_eq!(txs.len(), 6); // the first transaction is a "mint" transaction to the canister
         assert_eq!(txs[0].to, john());
         assert_eq!(txs[1].to, xtc());
         assert_eq!(txs[2].to, bob());
         assert_eq!(txs[3].to, xtc());
         assert_eq!(txs[4].to, john());
-        assert_eq!(txs[5].to, alice());
+        assert_eq!(txs[5].to, alice()); // this is a mint transaction
     }
 
     #[test]

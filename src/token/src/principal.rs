@@ -1,5 +1,4 @@
 use candid::Principal;
-use std::marker::PhantomData;
 
 use crate::types::{StatsData, TxError};
 
@@ -10,7 +9,13 @@ pub struct Owner;
 /// has isTestToken set to true
 pub struct TestNet;
 
-pub struct CheckedPrincipal<T>(Principal, PhantomData<T>);
+/// The caller is not the recipient.
+/// This is used when making transfers
+pub struct WithRecipient {
+    recipient: Principal,
+}
+
+pub struct CheckedPrincipal<T>(Principal, T);
 
 impl<T> CheckedPrincipal<T> {
     pub fn inner(&self) -> Principal {
@@ -22,7 +27,7 @@ impl CheckedPrincipal<Owner> {
     pub fn owner(stats: &StatsData) -> Result<Self, TxError> {
         let caller = ic_kit::ic::caller();
         if caller == stats.owner {
-            Ok(Self(caller, PhantomData))
+            Ok(Self(caller, Owner))
         } else {
             Err(TxError::Unauthorized)
         }
@@ -33,9 +38,24 @@ impl CheckedPrincipal<TestNet> {
     pub fn test_user(stats: &StatsData) -> Result<Self, TxError> {
         let caller = ic_kit::ic::caller();
         if stats.is_test_token {
-            Ok(Self(caller, PhantomData))
+            Ok(Self(caller, TestNet))
         } else {
             Err(TxError::Unauthorized)
         }
+    }
+}
+
+impl CheckedPrincipal<WithRecipient> {
+    pub fn with_recipient(recipient: Principal) -> Result<Self, TxError> {
+        let caller = ic_kit::ic::caller();
+        if caller == recipient {
+            Err(TxError::SelfTransfer)
+        } else {
+            Ok(Self(caller, WithRecipient { recipient }))
+        }
+    }
+
+    pub fn recipient(&self) -> Principal {
+        self.1.recipient
     }
 }

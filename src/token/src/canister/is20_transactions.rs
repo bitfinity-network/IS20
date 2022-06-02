@@ -1,25 +1,27 @@
 use crate::canister::erc20_transactions::{_charge_fee, _transfer};
 use crate::canister::TokenCanister;
+use crate::principal::{CheckedPrincipal, WithRecipient};
 use crate::state::CanisterState;
 use crate::types::{TxError, TxReceipt};
 use candid::{Nat, Principal};
-use ic_kit::ic;
 
 /// Transfers `value` amount to the `to` principal, applying American style fee. This means, that
 /// the recipient will receive `value - fee`, and the sender account will be reduced exactly by `value`.
 ///
 /// Note, that the `value` cannot be less than the `fee` amount. If the value given is too small,
 /// transaction will fail with `TxError::AmountTooSmall` error.
-pub fn transfer_include_fee(canister: &TokenCanister, to: Principal, value: Nat) -> TxReceipt {
-    let from = ic::caller();
-    let mut state = canister.state.borrow_mut();
-
+pub fn transfer_include_fee(
+    canister: &TokenCanister,
+    caller: CheckedPrincipal<WithRecipient>,
+    value: Nat,
+) -> TxReceipt {
     let CanisterState {
         ref mut balances,
+        ref mut ledger,
         ref bidding_state,
         ref stats,
         ..
-    } = &mut *state;
+    } = *canister.state.borrow_mut();
 
     let (fee, fee_to) = stats.fee_info();
     let fee_ratio = bidding_state.fee_ratio;
@@ -28,14 +30,19 @@ pub fn transfer_include_fee(canister: &TokenCanister, to: Principal, value: Nat)
         return Err(TxError::AmountTooSmall);
     }
 
-    if balances.balance_of(&from) < value {
+    if balances.balance_of(&caller.inner()) < value {
         return Err(TxError::InsufficientBalance);
     }
 
-    _charge_fee(balances, from, fee_to, fee.clone(), fee_ratio);
-    _transfer(balances, from, to, value.clone() - fee.clone());
+    _charge_fee(balances, caller.inner(), fee_to, fee.clone(), fee_ratio);
+    _transfer(
+        balances,
+        caller.inner(),
+        caller.recipient(),
+        value.clone() - fee.clone(),
+    );
 
-    let id = state.ledger.transfer(from, to, value, fee);
+    let id = ledger.transfer(caller.inner(), caller.recipient(), value, fee);
     Ok(id)
 }
 

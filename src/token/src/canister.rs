@@ -271,12 +271,14 @@ impl TokenCanister {
 
     #[update]
     fn transfer(&self, to: Principal, value: Nat, fee_limit: Option<Nat>) -> TxReceipt {
-        transfer(self, to, value, fee_limit)
+        let caller = CheckedPrincipal::with_recipient(to)?;
+        transfer(self, caller, value, fee_limit)
     }
 
     #[update]
     fn transferFrom(&self, from: Principal, to: Principal, value: Nat) -> TxReceipt {
-        transfer_from(self, from, to, value)
+        let caller = CheckedPrincipal::with_recipient(to)?;
+        transfer_from(self, caller, from, value)
     }
 
     /// Transfers `value` amount to the `to` principal, applying American style fee. This means, that
@@ -286,7 +288,8 @@ impl TokenCanister {
     /// transaction will fail with `TxError::AmountTooSmall` error.
     #[update]
     fn transferIncludeFee(&self, to: Principal, value: Nat) -> TxReceipt {
-        transfer_include_fee(self, to, value)
+        let caller = CheckedPrincipal::with_recipient(to)?;
+        transfer_include_fee(self, caller, value)
     }
 
     /// Takes a list of transfers, each of which is a pair of `to` and `value` fields, it returns a `TxReceipt` which contains
@@ -301,12 +304,14 @@ impl TokenCanister {
 
     #[update]
     fn approve(&self, spender: Principal, value: Nat) -> TxReceipt {
-        approve(self, spender, value)
+        let caller = CheckedPrincipal::with_recipient(spender)?;
+        approve(self, caller, value)
     }
 
     #[update]
     async fn approveAndNotify(&self, spender: Principal, value: Nat) -> TxReceipt {
-        approve_and_notify(self, spender, value).await
+        let caller = CheckedPrincipal::with_recipient(spender)?;
+        approve_and_notify(self, caller, value).await
     }
 
     #[update]
