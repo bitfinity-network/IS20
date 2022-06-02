@@ -2,7 +2,7 @@ use crate::canister::erc20_transactions::{approve, burn, mint, transfer, transfe
 use crate::canister::is20_auction::{
     auction_info, bid_cycles, bidding_info, run_auction, AuctionError, BiddingInfo,
 };
-use crate::canister::is20_notify::{notify, approve_and_notify, consume_notification};
+use crate::canister::is20_notify::{approve_and_notify, consume_notification, notify};
 use crate::canister::is20_transactions::{batch_transfer, transfer_include_fee};
 use crate::state::CanisterState;
 use crate::types::{AuctionInfo, StatsData, Timestamp, TokenInfo, TxError, TxReceipt, TxRecord};
@@ -287,8 +287,6 @@ impl TokenCanister {
     async fn consume_notification(&self, transaction_id: Nat) -> TxReceipt {
         consume_notification(self, transaction_id).await
     }
-
-
 
     #[update]
     fn mint(&self, to: Principal, amount: Nat) -> TxReceipt {

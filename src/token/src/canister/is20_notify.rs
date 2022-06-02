@@ -70,7 +70,7 @@ pub(crate) async fn notify(
 mod tests {
     use super::*;
     use common::types::Metadata;
-    use ic_canister::{register_virtual_responder,register_failing_virtual_responder, Canister};
+    use ic_canister::{register_failing_virtual_responder, register_virtual_responder, Canister};
     use ic_kit::mock_principals::{alice, bob};
     use ic_kit::MockContext;
     use std::rc::Rc;
@@ -130,19 +130,15 @@ mod tests {
     async fn double_notification() {
         let counter = Rc::new(AtomicU32::new(0));
         let counter_copy = counter.clone();
-        register_virtual_responder(
-            bob(),
-            "transaction_notification",
-            move |_: (TxRecord,)| {
-                counter.fetch_add(1, Ordering::Relaxed);
-            },
-        );
+        register_virtual_responder(bob(), "transaction_notification", move |_: (TxRecord,)| {
+            counter.fetch_add(1, Ordering::Relaxed);
+        });
         let canister = test_canister();
         let id = canister.transfer(bob(), Nat::from(100), None).unwrap();
         canister.notify(id.clone(), bob()).await.unwrap();
 
         MockContext::new().with_caller(bob()).inject();
-        let res= canister.consume_notification(id.clone()).await;
+        let res = canister.consume_notification(id.clone()).await;
 
         MockContext::new().with_caller(alice()).inject();
         let response = canister.notify(id, bob()).await;
@@ -161,19 +157,10 @@ mod tests {
         let canister = test_canister();
         let id = canister.transfer(bob(), Nat::from(100u32), None).unwrap();
         let response = canister.notify(id.clone(), bob()).await;
-        assert!(response.is_ok());  // as
+        assert!(response.is_ok()); // as
 
-        register_virtual_responder(
-            bob(),
-            "transaction_notification",
-            move |_: (TxRecord,)| {},
-        );
-        let response = canister.notify(id.clone(),bob()).await;
+        register_virtual_responder(bob(), "transaction_notification", move |_: (TxRecord,)| {});
+        let response = canister.notify(id.clone(), bob()).await;
         assert!(response.is_ok())
     }
-
 }
-
-
-
-
