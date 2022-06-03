@@ -28,7 +28,9 @@ pub(crate) async fn consume_notification(
     let mut state = canister.state.borrow_mut();
 
     match state.ledger.notifications.get(&transaction_id) {
-        Some(Some(x)) if *x != ic_canister::ic_kit::ic::caller() => return Err(TxError::Unauthorized),
+        Some(Some(x)) if *x != ic_canister::ic_kit::ic::caller() => {
+            return Err(TxError::Unauthorized)
+        }
         Some(x) => {
             if state.ledger.notifications.remove(&transaction_id).is_none() {
                 return Err(TxError::AlreadyActioned);
@@ -70,9 +72,9 @@ pub(crate) async fn notify(
 mod tests {
     use super::*;
     use common::types::Metadata;
-    use ic_canister::{register_virtual_responder, Canister};
     use ic_canister::ic_kit::mock_principals::{alice, bob};
     use ic_canister::ic_kit::MockContext;
+    use ic_canister::{register_virtual_responder, Canister};
     use std::rc::Rc;
     use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 

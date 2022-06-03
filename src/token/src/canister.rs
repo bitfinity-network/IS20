@@ -144,11 +144,9 @@ impl TokenCanister {
 
     #[query]
     fn getTransaction(&self, id: Nat) -> TxRecord {
-        self.state
-            .borrow()
-            .ledger
-            .get(&id)
-            .unwrap_or_else(|| ic_canister::ic_kit::ic::trap(&format!("Transaction {} does not exist", id)))
+        self.state.borrow().ledger.get(&id).unwrap_or_else(|| {
+            ic_canister::ic_kit::ic::trap(&format!("Transaction {} does not exist", id))
+        })
     }
 
     #[query]
