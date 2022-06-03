@@ -65,7 +65,7 @@ impl TokenCanister {
             historySize: self.state.borrow().ledger.len(),
             deployTime: deploy_time,
             holderNumber: self.state.borrow().balances.0.len(),
-            cycles: ic_kit::ic::balance(),
+            cycles: ic_canister::ic_kit::ic::balance(),
         }
     }
 
@@ -148,13 +148,13 @@ impl TokenCanister {
             .borrow()
             .ledger
             .get(&id)
-            .unwrap_or_else(|| ic_kit::ic::trap(&format!("Transaction {} does not exist", id)))
+            .unwrap_or_else(|| ic_canister::ic_kit::ic::trap(&format!("Transaction {} does not exist", id)))
     }
 
     #[query]
     fn getTransactions(&self, start: Nat, limit: Nat) -> Vec<TxRecord> {
         if limit > MAX_TRANSACTION_QUERY_LEN {
-            ic_kit::ic::trap(&format!(
+            ic_canister::ic_kit::ic::trap(&format!(
                 "Limit must be less then {}",
                 MAX_TRANSACTION_QUERY_LEN
             ));
@@ -369,7 +369,7 @@ impl TokenCanister {
 }
 
 fn check_caller(owner: Principal) -> Result<(), TxError> {
-    if ic_kit::ic::caller() == owner {
+    if ic_canister::ic_kit::ic::caller() == owner {
         Ok(())
     } else {
         Err(TxError::Unauthorized)

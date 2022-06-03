@@ -3,7 +3,7 @@ use crate::canister::TokenCanister;
 use crate::state::CanisterState;
 use crate::types::{TxError, TxReceipt};
 use candid::{Nat, Principal};
-use ic_kit::ic;
+use ic_canister::ic_kit::ic;
 
 /// Transfers `value` amount to the `to` principal, applying American style fee. This means, that
 /// the recipient will receive `value - fee`, and the sender account will be reduced exactly by `value`.
@@ -43,7 +43,7 @@ pub fn batch_transfer(
     canister: &TokenCanister,
     transfers: Vec<(Principal, Nat)>,
 ) -> Result<Vec<Nat>, TxError> {
-    let from = ic_kit::ic::caller();
+    let from = ic_canister::ic_kit::ic::caller();
     let mut state = canister.state.borrow_mut();
 
     let total_value = transfers
@@ -83,8 +83,8 @@ mod tests {
     use super::*;
     use common::types::Metadata;
     use ic_canister::Canister;
-    use ic_kit::mock_principals::{alice, bob, john, xtc};
-    use ic_kit::MockContext;
+    use ic_canister::ic_kit::mock_principals::{alice, bob, john, xtc};
+    use ic_canister::ic_kit::MockContext;
 
     fn test_canister() -> TokenCanister {
         MockContext::new().with_caller(alice()).inject();
