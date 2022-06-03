@@ -10,7 +10,7 @@ fn inspect_message() {
     let state = state.borrow();
 
     if ic_cdk::api::call::method_name() == "set_token_bytecode"
-        && state.controller() == ic_kit::ic::caller()
+        && state.controller() == ic_canister::ic_kit::ic::caller()
     {
         return ic_cdk::api::call::accept_message();
     }

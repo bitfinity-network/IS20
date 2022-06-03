@@ -12,7 +12,7 @@ pub fn transfer(
     value: Nat,
     fee_limit: Option<Nat>,
 ) -> TxReceipt {
-    let from = ic_kit::ic::caller();
+    let from = ic_canister::ic_kit::ic::caller();
     let (fee, fee_to) = canister.state.borrow().stats.fee_info();
     if let Some(fee_limit) = fee_limit {
         if fee > fee_limit {
@@ -44,7 +44,7 @@ pub fn transfer_from(
     to: Principal,
     value: Nat,
 ) -> TxReceipt {
-    let owner = ic_kit::ic::caller();
+    let owner = ic_canister::ic_kit::ic::caller();
     let mut state = canister.state.borrow_mut();
     let from_allowance = state.allowance(from, owner);
     let CanisterState {
@@ -95,7 +95,7 @@ pub fn transfer_from(
 }
 
 pub fn approve(canister: &TokenCanister, spender: Principal, value: Nat) -> TxReceipt {
-    let owner = ic_kit::ic::caller();
+    let owner = ic_canister::ic_kit::ic::caller();
     let mut state = canister.state.borrow_mut();
 
     let CanisterState {
@@ -142,7 +142,7 @@ pub fn approve(canister: &TokenCanister, spender: Principal, value: Nat) -> TxRe
 }
 
 pub fn mint(canister: &TokenCanister, to: Principal, amount: Nat) -> TxReceipt {
-    let caller = ic_kit::ic::caller();
+    let caller = ic_canister::ic_kit::ic::caller();
     {
         let balances = &mut canister.state.borrow_mut().balances;
         let to_balance = balances.balance_of(&to);
@@ -156,7 +156,7 @@ pub fn mint(canister: &TokenCanister, to: Principal, amount: Nat) -> TxReceipt {
 }
 
 pub fn burn(canister: &TokenCanister, from: Option<Principal>, amount: Nat) -> TxReceipt {
-    let caller = ic_kit::ic::caller();
+    let caller = ic_canister::ic_kit::ic::caller();
     let from = from.unwrap_or(caller);
     {
         let mut state = canister.state.borrow_mut();
@@ -212,8 +212,8 @@ mod tests {
     use super::*;
     use crate::types::{Operation, TransactionStatus};
     use common::types::Metadata;
-    use ic_kit::mock_principals::{alice, bob, john, xtc};
-    use ic_kit::MockContext;
+    use ic_canister::ic_kit::mock_principals::{alice, bob, john, xtc};
+    use ic_canister::ic_kit::MockContext;
     use std::collections::HashSet;
     use std::iter::FromIterator;
 
@@ -341,7 +341,7 @@ mod tests {
         assert_eq!(canister.historySize(), 1);
 
         const COUNT: usize = 5;
-        let mut ts = ic_kit::ic::time().into();
+        let mut ts = ic_canister::ic_kit::ic::time().into();
         for i in 0..COUNT {
             ctx.add_time(10);
             let id = canister.transfer(bob(), Nat::from(100 + i), None).unwrap();
@@ -394,7 +394,7 @@ mod tests {
         assert_eq!(canister.historySize(), 1);
 
         const COUNT: usize = 5;
-        let mut ts = ic_kit::ic::time().into();
+        let mut ts = ic_canister::ic_kit::ic::time().into();
         for i in 0..COUNT {
             ctx.add_time(10);
             let id = canister.mint(bob(), Nat::from(100 + i)).unwrap();
@@ -479,7 +479,7 @@ mod tests {
         assert_eq!(canister.historySize(), 1);
 
         const COUNT: usize = 5;
-        let mut ts = ic_kit::ic::time().into();
+        let mut ts = ic_canister::ic_kit::ic::time().into();
         for i in 0..COUNT {
             ctx.add_time(10);
             let id = canister.burn(None, Nat::from(100 + i)).unwrap();
@@ -565,7 +565,7 @@ mod tests {
         context.update_caller(bob());
 
         const COUNT: usize = 5;
-        let mut ts = ic_kit::ic::time().into();
+        let mut ts = ic_canister::ic_kit::ic::time().into();
         for i in 0..COUNT {
             ctx.add_time(10);
             let id = canister
@@ -657,7 +657,7 @@ mod tests {
         assert_eq!(canister.historySize(), 1);
 
         const COUNT: usize = 5;
-        let mut ts = ic_kit::ic::time().into();
+        let mut ts = ic_canister::ic_kit::ic::time().into();
         for i in 0..COUNT {
             ctx.add_time(10);
             let id = canister.approve(bob(), Nat::from(100 + i)).unwrap();

@@ -43,7 +43,7 @@ impl From<Metadata> for StatsData {
             owner: md.owner,
             fee: md.fee,
             fee_to: md.feeTo,
-            deploy_time: ic_kit::ic::time(),
+            deploy_time: ic_canister::ic_kit::ic::time(),
             min_cycles: DEFAULT_MIN_CYCLES,
             is_test_token: md.isTestToken.unwrap_or(false),
         }

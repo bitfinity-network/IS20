@@ -6,7 +6,7 @@ use crate::ledger::Ledger;
 use crate::state::{AuctionHistory, Balances, BiddingState, CanisterState};
 use crate::types::{AuctionInfo, StatsData, Timestamp};
 use candid::{CandidType, Deserialize, Nat, Principal};
-use ic_kit::ic;
+use ic_canister::ic_kit::ic;
 use std::collections::HashMap;
 
 // Minimum bidding amount is required, for every update call costs cycles, and we want bidding
@@ -202,8 +202,8 @@ pub fn accumulated_fees(balances: &Balances) -> Nat {
 mod tests {
     use super::*;
     use common::types::Metadata;
-    use ic_kit::mock_principals::{alice, bob};
-    use ic_kit::MockContext;
+    use ic_canister::ic_kit::mock_principals::{alice, bob};
+    use ic_canister::ic_kit::MockContext;
     use test_case::test_case;
 
     use crate::types::TxError;
