@@ -134,7 +134,7 @@ fn inspect_message() {
             match notifications.get(&tx_id) {
                 Some(Some(x)) if *x != ic_kit::ic::caller() => ic_cdk::trap("Unauthorized"),
                 Some(_) => {
-                    if state.ledger.notifications.get(&tx_id).is_none() {
+                    if !state.ledger.notifications.contains_key(&tx_id) {
                         ic_cdk::trap("Already removed");
                     }
                 }
