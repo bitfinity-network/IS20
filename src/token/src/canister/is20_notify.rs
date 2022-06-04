@@ -28,7 +28,9 @@ pub(crate) async fn consume_notification(
     let mut state = canister.state.borrow_mut();
 
     match state.ledger.notifications.get(&transaction_id) {
-        Some(Some(x)) if *x != ic_kit::ic::caller() => return Err(TxError::Unauthorized),
+        Some(Some(x)) if *x != ic_canister::ic_kit::ic::caller() => {
+            return Err(TxError::Unauthorized)
+        }
         Some(x) => {
             if state.ledger.notifications.remove(&transaction_id).is_none() {
                 return Err(TxError::AlreadyActioned);
@@ -52,7 +54,7 @@ pub(crate) async fn notify(
         .get(&transaction_id)
         .ok_or(TxError::TransactionDoesNotExist)?;
 
-    if ic_kit::ic::caller() != tx.from {
+    if ic_canister::ic_kit::ic::caller() != tx.from {
         return Err(TxError::Unauthorized);
     }
 
@@ -70,9 +72,9 @@ pub(crate) async fn notify(
 mod tests {
     use super::*;
     use common::types::Metadata;
+    use ic_canister::ic_kit::mock_principals::{alice, bob};
+    use ic_canister::ic_kit::MockContext;
     use ic_canister::{register_failing_virtual_responder, register_virtual_responder, Canister};
-    use ic_kit::mock_principals::{alice, bob};
-    use ic_kit::MockContext;
     use std::rc::Rc;
     use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 

@@ -98,7 +98,7 @@ pub struct BiddingState {
 
 impl BiddingState {
     pub fn is_auction_due(&self) -> bool {
-        let curr_time = ic_kit::ic::time();
+        let curr_time = ic_canister::ic_kit::ic::time();
         let next_auction = self.last_auction + self.auction_period;
         curr_time >= next_auction
     }

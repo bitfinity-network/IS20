@@ -79,6 +79,9 @@ impl TokenFactoryCanister {
         info: Metadata,
         owner: Option<Principal>,
     ) -> Result<Principal, TokenFactoryError> {
+        let caller = ::ic_canister::ic_kit::ic::caller();
+        let id = ::ic_canister::ic_kit::ic::id();
+
         if info.name.is_empty() {
             return Err(TokenFactoryError::InvalidConfiguration(
                 "name",
@@ -99,7 +102,7 @@ impl TokenFactoryCanister {
             return Err(TokenFactoryError::AlreadyExists);
         }
 
-        let caller = owner.unwrap_or_else(ic_kit::ic::caller);
+        let caller = owner.unwrap_or_else(ic_canister::ic_kit::ic::caller);
         let actor = self.state.borrow().consume_provided_cycles_or_icp(caller);
         let cycles = actor.await?;
 
@@ -149,7 +152,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_set_token_bytecode_impl() {
-        ic_kit::MockContext::new().inject();
+        ic_canister::ic_kit::MockContext::new().inject();
         let factory = TokenFactoryCanister::init_instance();
         assert_eq!(factory.state.borrow().token_wasm, None);
         factory.set_token_bytecode(vec![12, 3]).await;
