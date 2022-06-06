@@ -83,7 +83,7 @@ impl TokenCanister {
             historySize: self.state.borrow().ledger.len(),
             deployTime: deploy_time,
             holderNumber: self.state.borrow().balances.0.len(),
-            cycles: ic_kit::ic::balance(),
+            cycles: ic_canister::ic_kit::ic::balance(),
         }
     }
 
@@ -158,13 +158,13 @@ impl TokenCanister {
             .borrow()
             .ledger
             .get(&id)
-            .unwrap_or_else(|| ic_kit::ic::trap(&format!("Transaction {} does not exist", id)))
+            .unwrap_or_else(|| ic_canister::ic_kit::ic::trap(&format!("Transaction {} does not exist", id)))
     }
 
     #[query]
     fn getTransactions(&self, start: Nat, limit: Nat) -> Vec<TxRecord> {
         if limit > MAX_TRANSACTION_QUERY_LEN {
-            ic_kit::ic::trap(&format!(
+            ic_canister::ic_kit::ic::trap(&format!(
                 "Limit must be less then {}",
                 MAX_TRANSACTION_QUERY_LEN
             ));
@@ -333,7 +333,7 @@ impl TokenCanister {
     fn burn(&self, from: Option<Principal>, amount: Nat) -> TxReceipt {
         match from {
             None => burn_own_tokens(self, amount),
-            Some(from) if from == ic_kit::ic::caller() => burn_own_tokens(self, amount),
+            Some(from) if from == ic_canister::ic_kit::ic::caller() => burn_own_tokens(self, amount),
             Some(from) => {
                 let caller = CheckedPrincipal::owner(&self.state.borrow().stats)?;
                 burn_as_owner(self, caller, from, amount)

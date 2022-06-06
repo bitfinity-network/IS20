@@ -204,7 +204,7 @@ fn burn(canister: &TokenCanister, caller: Principal, from: Principal, amount: Na
 }
 
 pub fn burn_own_tokens(canister: &TokenCanister, amount: Nat) -> TxReceipt {
-    let caller = ic_kit::ic::caller();
+    let caller = ic_canister::ic_kit::ic::caller();
     burn(canister, caller, caller, amount)
 }
 
@@ -254,8 +254,8 @@ mod tests {
     use super::*;
     use crate::types::{Operation, TransactionStatus};
     use common::types::Metadata;
-    use ic_kit::mock_principals::{alice, bob, john, xtc};
-    use ic_kit::MockContext;
+    use ic_canister::ic_kit::mock_principals::{alice, bob, john, xtc};
+    use ic_canister::ic_kit::MockContext;
     use std::collections::HashSet;
     use std::iter::FromIterator;
 
@@ -384,7 +384,7 @@ mod tests {
         assert_eq!(canister.historySize(), 1);
 
         const COUNT: usize = 5;
-        let mut ts = ic_kit::ic::time().into();
+        let mut ts = ic_canister::ic_kit::ic::time().into();
         for i in 0..COUNT {
             ctx.add_time(10);
             let id = canister.transfer(bob(), Nat::from(100 + i), None).unwrap();
@@ -437,7 +437,7 @@ mod tests {
         assert_eq!(canister.historySize(), 1);
 
         const COUNT: usize = 5;
-        let mut ts = ic_kit::ic::time().into();
+        let mut ts = ic_canister::ic_kit::ic::time().into();
         for i in 0..COUNT {
             ctx.add_time(10);
             let id = canister.mint(bob(), Nat::from(100 + i)).unwrap();
@@ -522,7 +522,7 @@ mod tests {
         assert_eq!(canister.historySize(), 1);
 
         const COUNT: usize = 5;
-        let mut ts = ic_kit::ic::time().into();
+        let mut ts = ic_canister::ic_kit::ic::time().into();
         for i in 0..COUNT {
             ctx.add_time(10);
             let id = canister.burn(None, Nat::from(100 + i)).unwrap();
@@ -608,7 +608,7 @@ mod tests {
         context.update_caller(bob());
 
         const COUNT: usize = 5;
-        let mut ts = ic_kit::ic::time().into();
+        let mut ts = ic_canister::ic_kit::ic::time().into();
         for i in 0..COUNT {
             ctx.add_time(10);
             let id = canister
@@ -700,7 +700,7 @@ mod tests {
         assert_eq!(canister.historySize(), 1);
 
         const COUNT: usize = 5;
-        let mut ts = ic_kit::ic::time().into();
+        let mut ts = ic_canister::ic_kit::ic::time().into();
         for i in 0..COUNT {
             ctx.add_time(10);
             let id = canister.approve(bob(), Nat::from(100 + i)).unwrap();

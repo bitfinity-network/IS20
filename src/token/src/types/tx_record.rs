@@ -1,6 +1,6 @@
 use crate::types::{Operation, TransactionStatus};
 use candid::{CandidType, Deserialize, Int, Nat, Principal};
-use ic_kit::ic;
+use ic_canister::ic_kit::ic;
 
 #[derive(Deserialize, CandidType, Debug, Clone)]
 pub struct TxRecord {

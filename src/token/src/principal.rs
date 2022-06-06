@@ -1,6 +1,7 @@
 use candid::Principal;
 
 use crate::types::{StatsData, TxError};
+use ic_canister::ic_kit::ic;
 
 /// Canister owner
 pub struct Owner;
@@ -25,7 +26,7 @@ impl<T> CheckedPrincipal<T> {
 
 impl CheckedPrincipal<Owner> {
     pub fn owner(stats: &StatsData) -> Result<Self, TxError> {
-        let caller = ic_kit::ic::caller();
+        let caller = ic::caller();
         if caller == stats.owner {
             Ok(Self(caller, Owner))
         } else {
@@ -36,7 +37,7 @@ impl CheckedPrincipal<Owner> {
 
 impl CheckedPrincipal<TestNet> {
     pub fn test_user(stats: &StatsData) -> Result<Self, TxError> {
-        let caller = ic_kit::ic::caller();
+        let caller = ic::caller();
         if stats.is_test_token {
             Ok(Self(caller, TestNet))
         } else {
@@ -47,7 +48,7 @@ impl CheckedPrincipal<TestNet> {
 
 impl CheckedPrincipal<WithRecipient> {
     pub fn with_recipient(recipient: Principal) -> Result<Self, TxError> {
-        let caller = ic_kit::ic::caller();
+        let caller = ic::caller();
         if caller == recipient {
             Err(TxError::SelfTransfer)
         } else {
