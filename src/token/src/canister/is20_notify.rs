@@ -85,8 +85,6 @@ mod tests {
     use ic_canister::ic_kit::mock_principals::{alice, bob};
     use ic_canister::ic_kit::MockContext;
     use ic_canister::{register_failing_virtual_responder, register_virtual_responder, Canister};
-    use std::rc::Rc;
-    use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
     use super::*;
     use crate::types::TxRecord;
 
