@@ -135,16 +135,16 @@ impl Ledger {
 
     fn push(&mut self, record: TxRecord) {
         self.history.push(record.clone());
-        self.notifications.insert(record.index.clone(), None);
+        self.notifications.insert(record.index, None);
 
         if self.len() > MAX_HISTORY_LENGTH + HISTORY_REMOVAL_BATCH_SIZE {
             // We remove first `HISTORY_REMOVAL_BATCH_SIZE` from the history at one go, to prevent
             // often relocation of the history vec.
             // This removal code can later be changed to moving old history records into another
             // storage.
-            self.history[..HISTORY_REMOVAL_BATCH_SIZE]
-                .into_iter()
-                .map(|record| self.notifications.remove(&record.index.clone()));
+            for record in &self.history[..HISTORY_REMOVAL_BATCH_SIZE] {
+                self.notifications.remove(&record.index.clone());
+            }
             self.history = self.history[HISTORY_REMOVAL_BATCH_SIZE..].into();
             self.vec_offset += HISTORY_REMOVAL_BATCH_SIZE;
         }
