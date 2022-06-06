@@ -60,6 +60,7 @@ impl Default for State {
     }
 }
 
+#[cfg(target_arch = "wasm32")]
 pub fn get_token_bytecode() -> Vec<u8> {
     State::get()
         .borrow()

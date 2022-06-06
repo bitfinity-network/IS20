@@ -1,5 +1,5 @@
 use crate::ledger::Ledger;
-use crate::types::{Allowances, AuctionInfo, PendingNotifications, StatsData, Timestamp};
+use crate::types::{Allowances, AuctionInfo, StatsData, Timestamp};
 use candid::{CandidType, Deserialize, Nat, Principal};
 use common::types::Metadata;
 use ic_storage::stable::Versioned;

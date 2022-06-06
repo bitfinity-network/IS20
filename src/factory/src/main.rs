@@ -8,9 +8,8 @@ fn main() {}
 #[cfg(not(any(target_arch = "wasm32", test)))]
 fn main() {
     use crate::error::TokenFactoryError;
-    use candid::{Nat, Principal};
+    use candid::Principal;
     use common::types::Metadata;
-    use ic_helpers::factory::error::FactoryError;
 
     std::print!("{}", ic_canister::generate_idl!());
 }

@@ -7,14 +7,18 @@ use std::rc::Rc;
 
 use crate::error::TokenFactoryError;
 use crate::state::State;
-use candid::{Nat, Principal};
+use candid::Principal;
 use common::types::Metadata;
 use ic_canister::{init, query, update, Canister};
 use ic_helpers::factory::error::FactoryError;
 use ic_helpers::factory::FactoryState;
 
+#[cfg(target_arch = "wasm32")]
+use candid::Nat;
+
 mod inspect_message;
 
+#[cfg(target_arch = "wasm32")]
 ic_helpers::extend_with_factory_api!(
     TokenFactoryCanister,
     state,
@@ -79,9 +83,6 @@ impl TokenFactoryCanister {
         info: Metadata,
         owner: Option<Principal>,
     ) -> Result<Principal, TokenFactoryError> {
-        let caller = ::ic_canister::ic_kit::ic::caller();
-        let id = ::ic_canister::ic_kit::ic::id();
-
         if info.name.is_empty() {
             return Err(TokenFactoryError::InvalidConfiguration(
                 "name",
@@ -106,21 +107,22 @@ impl TokenFactoryCanister {
         let actor = self.state.borrow().consume_provided_cycles_or_icp(caller);
         let cycles = actor.await?;
 
-        let state_ref = &mut *self.state.borrow_mut();
+        let create_token = {
+            let state = self.state.borrow();
+            let wasm = state
+                .token_wasm
+                .as_ref()
+                .expect("token_wasm is not set in token state");
 
-        let wasm = state_ref
-            .token_wasm
-            .as_ref()
-            .expect("token_wasm is not set in token state");
-
-        let create_token = state_ref.factory.create_with_cycles(&wasm, (info,), cycles);
+            state.factory.create_with_cycles(wasm, (info,), cycles)
+        };
 
         let canister = create_token
             .await
             .map_err(|e| TokenFactoryError::CanisterCreateFailed(e.1))?;
         let principal = canister.identity();
 
-        state_ref.factory.register(key, canister);
+        self.state.borrow_mut().factory.register(key, canister);
 
         Ok(principal)
     }
@@ -131,16 +133,16 @@ impl TokenFactoryCanister {
     #[update]
     async fn forget_token(&self, name: String) -> Result<(), TokenFactoryError> {
         //    Check controller access
-        let mut state_ref = self.state.borrow_mut();
-        state_ref.check_controller_access()?;
+        self.state.borrow_mut().check_controller_access()?;
 
         let token = self
             .get_token(name.clone())
             .await
             .ok_or(TokenFactoryError::FactoryError(FactoryError::NotFound))?;
 
-        state_ref.factory().drop(token).await?;
-        state_ref.factory_mut().forget(&name)?;
+        let drop_token_fut = self.state.borrow_mut().factory.drop(token);
+        drop_token_fut.await?;
+        self.state.borrow_mut().factory.forget(&name)?;
 
         Ok(())
     }

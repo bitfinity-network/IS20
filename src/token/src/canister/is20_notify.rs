@@ -1,20 +1,19 @@
 //! API methods of IS20 standard related to transaction notification mechanism.
 
-use crate::canister::TokenCanister;
-use crate::types::{TxError, TxReceipt, TxRecord};
-use candid::{CandidType, Deserialize, Nat, Principal};
+use candid::{Nat, Principal};
 use ic_canister::virtual_canister_notify;
-use ic_canister::{query, update, Canister};
-use ic_storage::{stable::Versioned, IcStorage};
-use std::cell::RefCell;
+
+use crate::canister::TokenCanister;
+use crate::principal::{CheckedPrincipal, WithRecipient};
+use crate::types::{TxError, TxReceipt};
 
 pub(crate) async fn approve_and_notify(
     canister: &TokenCanister,
-    spender: Principal,
+    caller: CheckedPrincipal<WithRecipient>,
     value: Nat,
 ) -> TxReceipt {
-    let transaction_id = canister.approve(spender, value)?;
-    notify(canister, transaction_id.clone(), spender)
+    let transaction_id = canister.approve(caller.recipient(), value)?;
+    notify(canister, transaction_id.clone(), caller.recipient())
         .await
         .map_err(|e| TxError::ApproveSucceededButNotifyFailed {
             tx_error: Box::from(e),
@@ -31,7 +30,7 @@ pub(crate) async fn consume_notification(
         Some(Some(x)) if *x != ic_canister::ic_kit::ic::caller() => {
             return Err(TxError::Unauthorized)
         }
-        Some(x) => {
+        Some(_) => {
             if state.ledger.notifications.remove(&transaction_id).is_none() {
                 return Err(TxError::AlreadyActioned);
             }
@@ -48,8 +47,9 @@ pub(crate) async fn notify(
     transaction_id: Nat,
     to: Principal,
 ) -> TxReceipt {
-    let mut state = canister.state.borrow_mut();
-    let tx = state
+    let tx = canister
+        .state
+        .borrow()
         .ledger
         .get(&transaction_id)
         .ok_or(TxError::TransactionDoesNotExist)?;
@@ -58,28 +58,40 @@ pub(crate) async fn notify(
         return Err(TxError::Unauthorized);
     }
 
-    match state.ledger.notifications.get_mut(&transaction_id) {
+    match canister
+        .state
+        .borrow_mut()
+        .ledger
+        .notifications
+        .get_mut(&transaction_id)
+    {
         Some(Some(dest)) if *dest != to => return Err(TxError::Unauthorized),
         Some(x) => *x = Some(to),
         None => return Err(TxError::AlreadyActioned),
     }
 
-    virtual_canister_notify!(to, "transaction_notification", (tx,), ()).await;
-    Ok(transaction_id)
+    match virtual_canister_notify!(to, "transaction_notification", (tx,), ()).await {
+        Ok(_) => Ok(transaction_id),
+        Err(_) => Err(TxError::NotificationFailed { transaction_id }),
+    }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use std::rc::Rc;
+    use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
+
     use common::types::Metadata;
     use ic_canister::ic_kit::mock_principals::{alice, bob};
     use ic_canister::ic_kit::MockContext;
     use ic_canister::{register_virtual_responder, Canister};
-    use std::rc::Rc;
-    use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
+
+    use super::*;
+    use crate::types::TxRecord;
 
     fn test_canister() -> TokenCanister {
         MockContext::new().with_caller(alice()).inject();
+
         let canister = TokenCanister::init_instance();
         canister.init(Metadata {
             logo: "".to_string(),
@@ -92,8 +104,10 @@ mod tests {
             feeTo: alice(),
             isTestToken: None,
         });
+
         canister
     }
+
     #[tokio::test]
     async fn approve_notify() {
         const AMOUNT: u128 = 100;

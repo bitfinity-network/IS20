@@ -98,6 +98,7 @@ pub enum TxError {
     TxTooOld { allowed_window_nanos: u64 },
     TxCreatedInFuture,
     TxDuplicate { duplicate_of: u64 },
+    SelfTransfer,
 }
 
 pub type TxReceipt = Result<Nat, TxError>;
