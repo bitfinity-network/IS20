@@ -27,7 +27,9 @@ pub(crate) async fn consume_notification(
     let mut state = canister.state.borrow_mut();
 
     match state.ledger.notifications.get(&transaction_id) {
-        Some(Some(x)) if *x != ic_canister::ic_kit::ic::caller() => return Err(TxError::Unauthorized),
+        Some(Some(x)) if *x != ic_canister::ic_kit::ic::caller() => {
+            return Err(TxError::Unauthorized)
+        }
         Some(_) => {
             if state.ledger.notifications.remove(&transaction_id).is_none() {
                 return Err(TxError::AlreadyActioned);

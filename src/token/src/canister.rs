@@ -154,11 +154,9 @@ impl TokenCanister {
 
     #[query]
     fn getTransaction(&self, id: Nat) -> TxRecord {
-        self.state
-            .borrow()
-            .ledger
-            .get(&id)
-            .unwrap_or_else(|| ic_canister::ic_kit::ic::trap(&format!("Transaction {} does not exist", id)))
+        self.state.borrow().ledger.get(&id).unwrap_or_else(|| {
+            ic_canister::ic_kit::ic::trap(&format!("Transaction {} does not exist", id))
+        })
     }
 
     #[query]
@@ -333,7 +331,9 @@ impl TokenCanister {
     fn burn(&self, from: Option<Principal>, amount: Nat) -> TxReceipt {
         match from {
             None => burn_own_tokens(self, amount),
-            Some(from) if from == ic_canister::ic_kit::ic::caller() => burn_own_tokens(self, amount),
+            Some(from) if from == ic_canister::ic_kit::ic::caller() => {
+                burn_own_tokens(self, amount)
+            }
             Some(from) => {
                 let caller = CheckedPrincipal::owner(&self.state.borrow().stats)?;
                 burn_as_owner(self, caller, from, amount)

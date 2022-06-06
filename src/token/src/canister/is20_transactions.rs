@@ -89,9 +89,9 @@ pub fn batch_transfer(
 mod tests {
     use super::*;
     use common::types::Metadata;
-    use ic_canister::Canister;
     use ic_canister::ic_kit::mock_principals::{alice, bob, john, xtc};
     use ic_canister::ic_kit::MockContext;
+    use ic_canister::Canister;
 
     fn test_canister() -> TokenCanister {
         MockContext::new().with_caller(alice()).inject();
@@ -189,4 +189,3 @@ mod tests {
         assert_eq!(canister.balanceOf(bob()), Nat::from(0));
     }
 }
-
