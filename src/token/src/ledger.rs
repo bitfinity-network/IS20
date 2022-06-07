@@ -25,27 +25,6 @@ impl Ledger {
         self.history.get(self.get_index(id)?).cloned()
     }
 
-    // pub fn get_range(&self, start: &Nat, limit: &Nat) -> Vec<TxRecord> {
-    //     let start = match self.get_index(start) {
-    //         Some(v) => v,
-    //         None => {
-    //             if *start > self.vec_offset.clone() {
-    //                 usize::MAX
-    //             } else {
-    //                 0
-    //             }
-    //         }
-    //     };
-
-    //     let limit = limit.0.to_usize().unwrap_or(usize::MAX);
-    //     self.history
-    //         .iter()
-    //         .skip(start)
-    //         .take(limit)
-    //         .cloned()
-    //         .collect()
-    // }
-
     pub fn get_transactions(
         &self,
         caller: Option<Principal>,
