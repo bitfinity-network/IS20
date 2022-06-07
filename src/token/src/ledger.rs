@@ -1,4 +1,4 @@
-use crate::types::{PendingNotifications, TxRecord};
+use crate::types::{PaginatedResult, PendingNotifications, TxRecord};
 use candid::{CandidType, Deserialize, Nat, Principal};
 use num_traits::ToPrimitive;
 
@@ -25,25 +25,56 @@ impl Ledger {
         self.history.get(self.get_index(id)?).cloned()
     }
 
-    pub fn get_range(&self, start: &Nat, limit: &Nat) -> Vec<TxRecord> {
-        let start = match self.get_index(start) {
-            Some(v) => v,
-            None => {
-                if *start > self.vec_offset.clone() {
-                    usize::MAX
-                } else {
-                    0
-                }
-            }
+    // pub fn get_range(&self, start: &Nat, limit: &Nat) -> Vec<TxRecord> {
+    //     let start = match self.get_index(start) {
+    //         Some(v) => v,
+    //         None => {
+    //             if *start > self.vec_offset.clone() {
+    //                 usize::MAX
+    //             } else {
+    //                 0
+    //             }
+    //         }
+    //     };
+
+    //     let limit = limit.0.to_usize().unwrap_or(usize::MAX);
+    //     self.history
+    //         .iter()
+    //         .skip(start)
+    //         .take(limit)
+    //         .cloned()
+    //         .collect()
+    // }
+
+    pub fn get_transactions(
+        &self,
+        caller: Option<Principal>,
+        count: u32,
+        transaction_id: Option<u128>,
+    ) -> PaginatedResult {
+        let count = count as usize;
+        let mut transactions = self
+            .history
+            .iter()
+            .rev()
+            .filter(|tx| {
+                caller.map_or(true, |c| c == tx.from || c == tx.to || Some(c) == tx.caller)
+            })
+            .filter(|tx| transaction_id.map_or(true, |id| id >= tx.index))
+            .take(count + 1)
+            .cloned()
+            .collect::<Vec<_>>();
+
+        let next_id = if transactions.len() == count + 1 {
+            Some(transactions.remove(count).index.0.to_u128().unwrap())
+        } else {
+            None
         };
 
-        let limit = limit.0.to_usize().unwrap_or(usize::MAX);
-        self.history
-            .iter()
-            .skip(start)
-            .take(limit)
-            .cloned()
-            .collect()
+        PaginatedResult {
+            result: transactions,
+            next: next_id,
+        }
     }
 
     pub fn iter(&self) -> impl DoubleEndedIterator<Item = &TxRecord> {

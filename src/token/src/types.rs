@@ -132,3 +132,9 @@ pub struct AuctionInfo {
     pub first_transaction_id: Nat,
     pub last_transaction_id: Nat,
 }
+
+#[derive(Debug, Clone, CandidType, Deserialize)]
+pub struct PaginatedResult {
+    pub result: Vec<TxRecord>,
+    pub next: Option<u128>,
+}
