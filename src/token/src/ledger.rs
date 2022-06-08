@@ -27,7 +27,7 @@ impl Ledger {
 
     pub fn get_transactions(
         &self,
-        caller: Option<Principal>,
+        who: Option<Principal>,
         count: u32,
         transaction_id: Option<u128>,
     ) -> PaginatedResult {
@@ -36,9 +36,7 @@ impl Ledger {
             .history
             .iter()
             .rev()
-            .filter(|tx| {
-                caller.map_or(true, |c| c == tx.from || c == tx.to || Some(c) == tx.caller)
-            })
+            .filter(|tx| who.map_or(true, |c| c == tx.from || c == tx.to || Some(c) == tx.caller))
             .filter(|tx| transaction_id.map_or(true, |id| id >= tx.index))
             .take(count + 1)
             .cloned()

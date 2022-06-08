@@ -721,8 +721,8 @@ mod tests {
     #[test]
     fn get_transactions_test() {
         let canister = test_canister();
-        const COUNT: usize = 5;
-        for i in 1..COUNT {
+
+        for _ in 1..5 {
             canister.transfer(bob(), Nat::from(10), None).unwrap();
         }
 
@@ -732,7 +732,7 @@ mod tests {
 
         assert_eq!(canister.getTransactions(None, 10, None).result.len(), 8);
         assert_eq!(canister.getTransactions(None, 10, Some(3)).result.len(), 4);
-        println!("{:?}", canister.getTransactions(None, 5, None));
+
         assert_eq!(
             canister.getTransactions(Some(bob()), 5, None).result.len(),
             5
@@ -749,6 +749,11 @@ mod tests {
             6
         );
         assert_eq!(canister.getTransactions(None, 5, None).next, Some(2));
+        assert_eq!(
+            canister.getTransactions(Some(alice()), 3, Some(5)).next,
+            Some(2)
+        );
+        assert_eq!(canister.getTransactions(Some(bob()), 3, Some(2)).next, None);
     }
 
     #[test]

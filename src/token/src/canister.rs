@@ -161,10 +161,17 @@ impl TokenCanister {
         })
     }
 
+    /// Returns a list of transactions in paginated form. The `who` is optional, if given, only transactions of the `who` are
+    /// returned. `count` is the number of transactions to return, `transaction_id` is the transaction index which is used as
+    /// the offset of the first transaction to return, any
+    ///
+    /// It returns `PaginatedResult` a struct, which contains `result` which is a list of transactions `Vec<TxRecord>` that meet the requirements of the query,
+    /// and `next_id` which is the index of the next transaction to return.
+
     #[query]
     fn getTransactions(
         &self,
-        caller: Option<Principal>,
+        who: Option<Principal>,
         count: u32,
         transaction_id: Option<u128>,
     ) -> PaginatedResult {
@@ -175,7 +182,7 @@ impl TokenCanister {
         self.state
             .borrow()
             .ledger
-            .get_transactions(caller, count, transaction_id)
+            .get_transactions(who, count, transaction_id)
     }
 
     // This function can only be called as the owner

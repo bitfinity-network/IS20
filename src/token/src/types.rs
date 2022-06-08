@@ -133,8 +133,12 @@ pub struct AuctionInfo {
     pub last_transaction_id: Nat,
 }
 
+/// `PaginatedResult` is returned by paginated queries i.e `getTransactions`.
 #[derive(Debug, Clone, CandidType, Deserialize)]
 pub struct PaginatedResult {
+    /// The result is the transactions which is the `count` transactions starting from `next` if it exists.
     pub result: Vec<TxRecord>,
+
+    /// This is  the next `id` of the transaction. The `next` is used as offset for the next query if it exits.
     pub next: Option<u128>,
 }
