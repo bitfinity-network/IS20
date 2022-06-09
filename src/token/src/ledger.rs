@@ -5,7 +5,7 @@ use num_traits::ToPrimitive;
 const MAX_HISTORY_LENGTH: usize = 1_000_000;
 const HISTORY_REMOVAL_BATCH_SIZE: usize = 10_000;
 
-#[derive(Default, CandidType, Deserialize)]
+#[derive(Debug, Default, CandidType, Deserialize)]
 pub struct Ledger {
     history: Vec<TxRecord>,
     vec_offset: Nat,

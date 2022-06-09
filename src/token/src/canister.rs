@@ -41,7 +41,7 @@ enum CanisterUpdate {
     AuctionPeriod(u64),
 }
 
-#[derive(Clone, Canister)]
+#[derive(Debug, Clone, Canister)]
 pub struct TokenCanister {
     #[id]
     principal: Principal,

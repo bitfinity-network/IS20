@@ -789,3 +789,283 @@ mod tests {
         assert_eq!(canister.getUserTransactionCount(alice()), Nat::from(COUNT));
     }
 }
+
+
+#[cfg(test)]
+mod proptests {
+    use super::*;
+    use common::types::Metadata;
+    use ic_canister::Canister;
+    use ic_canister::ic_kit::MockContext;
+    use proptest::collection::vec;
+    use proptest::prelude::*;
+    use proptest::sample::Index;
+
+    #[derive(Debug, Clone, PartialEq, Eq)]
+    enum Action {
+        Mint {
+            minter: Principal,
+            recipient: Principal,
+            amount: Nat,
+        },
+        Burn(Nat, Principal),
+        TransferWithFee {
+            from: Principal,
+            to: Principal,
+            amount: Nat,
+        },
+        TransferWithoutFee {
+            caller: Principal,
+            from: Principal,
+            to: Principal,
+            amount: Nat,
+            fee_limit: Option<Nat>,
+        },
+        TransferFrom {
+            caller: Principal,
+            from: Principal,
+            to: Principal,
+            on_behalf_of: Principal,
+            amount: Nat,
+        },
+    }
+
+    prop_compose! {
+        fn select_principal(p: Vec<Principal>) (index in any::<Index>()) -> Principal {
+            let i = index.index(p.len());
+            p[i]
+        }
+
+    }
+
+    fn make_action(principals: Vec<Principal>) -> impl Strategy<Value = Action> {
+        prop_oneof![
+            // Mint
+            (
+                make_nat(),
+                select_principal(principals.clone()),
+                select_principal(principals.clone()),
+            )
+                .prop_map(|(amount, minter, recipient)| Action::Mint {
+                    minter,
+                    recipient,
+                    amount
+                }),
+            // Burn
+            (make_nat(), select_principal(principals.clone()))
+                .prop_map(|(amount, principal)| Action::Burn(amount, principal)),
+            // With fee
+            (
+                select_principal(principals.clone()),
+                select_principal(principals.clone()),
+                make_nat()
+            )
+                .prop_map(|(from, to, amount)| Action::TransferWithFee {
+                    from,
+                    to,
+                    amount
+                }),
+            // Without fee
+            (
+                select_principal(principals.clone()),
+                select_principal(principals.clone()),
+                select_principal(principals.clone()),
+                make_nat(),
+                make_option(),
+            )
+                .prop_map(|(caller, from, to, amount, fee_limit)| {
+                    Action::TransferWithoutFee {
+                        caller: caller,
+                        from: from,
+                        to: to,
+                        amount,
+                        fee_limit,
+                    }
+                }),
+            // Transfer from
+            (
+                select_principal(principals.clone()),
+                select_principal(principals.clone()),
+                select_principal(principals.clone()),
+                select_principal(principals),
+                make_nat()
+            )
+                .prop_map(|(principal, from, to, on_behalf_of, amount)| {
+                    Action::TransferFrom {
+                        caller: principal,
+                        from,
+                        to,
+                        on_behalf_of,
+                        amount,
+                    }
+                })
+        ]
+    }
+
+    fn make_option() -> impl Strategy<Value = Option<Nat>> {
+        prop_oneof![
+            Just(None),
+            (make_nat()).prop_map(|fee_limit| Some(fee_limit))
+        ]
+    }
+
+    fn make_principal() -> BoxedStrategy<Principal> {
+        (any::<[u8; 29]>().prop_map(|mut bytes| {
+            // Make sure the last byte is more than four as the last byte carries special
+            // meaning
+            bytes[28] = bytes[28].saturating_add(5);
+            bytes
+        }))
+        .prop_map(|bytes| Principal::from_slice(&bytes))
+        .boxed()
+    }
+
+    prop_compose! {
+        fn make_nat() (num in "[0-9]{1,2}") -> Nat {
+            let nat = Nat::parse(num.as_bytes()).unwrap();
+            nat
+        }
+    }
+    prop_compose! {
+        fn make_canister() (
+            logo in any::<String>(),
+            name in any::<String>(),
+            symbol in any::<String>(),
+            decimals in any::<u8>(),
+            totalSupply in make_nat(),
+            fee in make_nat(),
+            principals in vec(make_principal(), 1..7),
+            owner_idx in any::<Index>(),
+            fee_to_idx in any::<Index>(),
+        )-> (TokenCanister, Vec<Principal>) {
+            // pick two random principals (they could very well be the same principal twice)
+            let owner = principals[owner_idx.index(principals.len())];
+            let fee_to = principals[fee_to_idx.index(principals.len())];
+            MockContext::new().with_caller(owner).inject();
+            let meta = Metadata {
+                logo,
+                name,
+                symbol,
+                decimals,
+                totalSupply,
+                owner,
+                fee,
+                feeTo: fee_to,
+                isTestToken: None,
+            };
+            let canister = TokenCanister::init_instance();
+            canister.init(meta);
+            (canister, principals)
+        }
+    }
+    fn canister_and_actions() -> impl Strategy<Value = (TokenCanister, Vec<Action>)> {
+        make_canister().prop_flat_map(|(canister, principals)| {
+            let actions = vec(make_action(principals.clone()), 1..7);
+            (Just(canister), actions)
+        })
+    }
+    proptest! {
+        #[test]
+        fn generic_proptest((canister, actions) in canister_and_actions()) {
+            let mut total_minted = Nat::from(0);
+            let mut total_burned = Nat::from(0);
+            let starting_supply = canister.totalSupply();
+            for action in actions {
+                use Action::*;
+                match action {
+                    Mint { minter, recipient, amount } => {
+                        MockContext::new().with_caller(minter).inject();
+                        let original = canister.totalSupply();
+                        let res = canister.mint(recipient, amount.clone());
+                        let expected = if minter == canister.owner() {
+                            total_minted += amount.clone();
+                            assert!(matches!(res, Ok(_)));
+                            original + amount
+                        } else {
+                            assert_eq!(res, Err(TxError::Unauthorized));
+                            original
+                        };
+                        assert_eq!(expected, canister.totalSupply());
+                    },
+                    Burn(amount, burner) => {
+                        MockContext::new().with_caller(burner).inject();
+                        let original = canister.totalSupply();
+                        let balance = canister.balanceOf(burner);
+                        let res = canister.burn(Some(burner), amount.clone());
+                        if balance < amount {
+                            prop_assert_eq!(res, Err(TxError::InsufficientBalance));
+                            prop_assert_eq!(original, canister.totalSupply());
+                        } else {
+                            prop_assert!(matches!(res, Ok(_)));
+                            prop_assert_eq!(original.clone() - amount.clone(), canister.totalSupply());
+                            total_burned += amount.clone();
+                        }
+                    },
+                    TransferFrom { caller, from, to, on_behalf_of, amount } => {
+                        // Transfers value amount of tokens from user from to user to,
+                        // this method allows canister smart contracts to transfer tokens on your behalf,
+                        // it returns a TxReceipt which contains the transaction index or an error message.
+                        //
+                        // If the fee is set, the from principal is charged with the fee. In this case,
+                        // the maximum amount that the caller can request to transfer is allowance - fee.
+                        MockContext::new().with_caller(caller).inject();
+                        let from_balance = canister.balanceOf(from);
+                        let to_balance = canister.balanceOf(to);
+                        let res = canister.transferFrom(from, to, amount);
+                    },
+                    TransferWithoutFee{caller,from,to,amount,fee_limit} => {
+                        MockContext::new().with_caller(caller).inject();
+                        let from_balance = canister.balanceOf(from);
+                        let fee = canister.state.borrow().stats.fee.clone();
+                        let res = canister.transfer(to, amount.clone(), fee_limit.clone());
+
+                        if to == caller {
+                            prop_assert_eq!(res, Err(TxError::SelfTransfer));
+                            return Ok(())
+                        }
+
+                        if let Some(fee_limit) = fee_limit {
+                            if fee_limit < fee.clone() {
+                                prop_assert_eq!(res, Err(TxError::FeeExceededLimit));
+                                return Ok(())
+                            }
+                        }
+                        if from_balance <= amount.clone() + fee.clone() {
+                            prop_assert_eq!(res, Err(TxError::InsufficientBalance));
+                            return Ok(())
+                        }
+                        prop_assert!(matches!(res, Ok(_)));
+                        prop_assert_eq!(from_balance.clone() - amount.clone() - fee.clone(), canister.balanceOf(from));
+                        prop_assert_eq!(canister.balanceOf(to).clone() + amount.clone(), canister.balanceOf(to));
+                    }
+                    TransferWithFee { from, to, amount } => {
+                        // MockContext::new().with_caller(from).inject();
+                        // let from_balance = canister.balanceOf(from);
+                        // let to_balance = canister.balanceOf(to);
+                        // let fee = canister.state.borrow().stats.fee.clone();
+                        // let res = canister.transferIncludeFee(to, amount.clone());
+                        // if amount.clone() <= fee.clone()  {
+                        //     prop_assert_eq!(res, Err(TxError::AmountTooSmall));
+                        //     return Ok(());
+                        // }
+                        // if from_balance < amount.clone(){
+                        //     prop_assert_eq!(res, Err(TxError::InsufficientBalance));
+                        //     return Ok(());
+                        // }
+                        // prop_assert!(matches!(res, Ok(_)));
+                        // eprintln!("starting balance of from : {from_balance}");
+                        // eprintln!("amount                   : {}", amount.clone() );
+                        // eprintln!("fee                      : {}", fee.clone() );
+                        // eprintln!("current: balance of from : {}", canister.balanceOf(from));
+                        // eprintln!("from                     : {from}");
+                        // eprintln!("to                       : {to}");
+                        // eprintln!("--------------------------------------------------------");
+                        // // prop_assert_eq!(from_balance.clone() - amount.clone() + amount - fee if the recipeint, canister.balanceOf(from));
+                        // // prop_assert_eq!(to_balance.clone() + amount.clone() - fee.clone(), canister.balanceOf(to));
+                    }
+                }
+            }
+            prop_assert_eq!(total_minted.clone() + starting_supply - total_burned.clone(), canister.totalSupply());
+        }
+    }
+}
