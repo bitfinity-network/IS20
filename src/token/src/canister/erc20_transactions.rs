@@ -721,25 +721,46 @@ mod tests {
     #[test]
     fn get_transactions_test() {
         let canister = test_canister();
-        const COUNT: usize = 5;
-        for _ in 0..COUNT {
+
+        for _ in 1..5 {
             canister.transfer(bob(), Nat::from(10), None).unwrap();
         }
 
-        let txs = canister.getTransactions(Nat::from(0), Nat::from(2));
-        assert_eq!(txs.len(), 2);
-        assert_eq!(txs[1].index, Nat::from(1));
+        canister.transfer(bob(), Nat::from(10), None).unwrap();
+        canister.transfer(xtc(), Nat::from(10), None).unwrap();
+        canister.transfer(john(), Nat::from(10), None).unwrap();
 
-        let txs = canister.getTransactions(Nat::from(COUNT), Nat::from(2));
-        assert_eq!(txs.len(), 1);
-        assert_eq!(txs[0].index, Nat::from(COUNT));
+        assert_eq!(canister.getTransactions(None, 10, None).result.len(), 8);
+        assert_eq!(canister.getTransactions(None, 10, Some(3)).result.len(), 4);
+
+        assert_eq!(
+            canister.getTransactions(Some(bob()), 5, None).result.len(),
+            5
+        );
+        assert_eq!(
+            canister.getTransactions(Some(xtc()), 5, None).result.len(),
+            1
+        );
+        assert_eq!(
+            canister
+                .getTransactions(Some(alice()), 10, Some(5))
+                .result
+                .len(),
+            6
+        );
+        assert_eq!(canister.getTransactions(None, 5, None).next, Some(2));
+        assert_eq!(
+            canister.getTransactions(Some(alice()), 3, Some(5)).next,
+            Some(2)
+        );
+        assert_eq!(canister.getTransactions(Some(bob()), 3, Some(2)).next, None);
     }
 
     #[test]
     #[should_panic]
     fn get_transactions_over_limit() {
         let canister = test_canister();
-        canister.getTransactions(Nat::from(0), Nat::from(MAX_TRANSACTION_QUERY_LEN + 1));
+        canister.getTransactions(None, (MAX_TRANSACTION_QUERY_LEN + 1) as u32, None);
     }
 
     #[test]
@@ -747,36 +768,6 @@ mod tests {
     fn get_transaction_not_existing() {
         let canister = test_canister();
         canister.getTransaction(Nat::from(2));
-    }
-
-    #[test]
-    fn get_user_transactions() {
-        let canister = test_canister();
-        canister.transfer(john(), Nat::from(10), None).unwrap();
-        canister.transfer(xtc(), Nat::from(10), None).unwrap();
-        canister.transfer(bob(), Nat::from(10), None).unwrap();
-        canister.transfer(xtc(), Nat::from(10), None).unwrap();
-        canister.transfer(john(), Nat::from(10), None).unwrap();
-
-        let txs = canister.getUserTransactions(alice(), Nat::from(0), Nat::from(6));
-        assert_eq!(txs.len(), 6); // the first transaction is a "mint" transaction to the canister
-        assert_eq!(txs[0].to, john());
-        assert_eq!(txs[1].to, xtc());
-        assert_eq!(txs[2].to, bob());
-        assert_eq!(txs[3].to, xtc());
-        assert_eq!(txs[4].to, john());
-        assert_eq!(txs[5].to, alice()); // this is a mint transaction
-    }
-
-    #[test]
-    fn get_user_transactions_over_limit() {
-        let canister = test_canister();
-
-        for _ in 1..5 {
-            canister.transfer(bob(), Nat::from(10), None).unwrap();
-        }
-        let txs = canister.getUserTransactions(alice(), Nat::from(6), Nat::from(5));
-        assert_eq!(txs.is_empty(), true)
     }
 
     #[test]
