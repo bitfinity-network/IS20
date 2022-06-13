@@ -4,7 +4,7 @@ use candid::Nat;
 use ic_cdk::export::Principal;
 
 use crate::canister::is20_auction::auction_principal;
-use crate::principal::{CheckedPrincipal, Owner, TestNet, WithRecipient, SenderRecipient};
+use crate::principal::{CheckedPrincipal, Owner, SenderRecipient, TestNet, WithRecipient};
 use crate::state::{Balances, CanisterState};
 use crate::types::{TxError, TxReceipt};
 
