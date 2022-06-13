@@ -84,8 +84,7 @@ mod tests {
     use common::types::Metadata;
     use ic_canister::ic_kit::mock_principals::{alice, bob};
     use ic_canister::ic_kit::MockContext;
-    use ic_canister::{register_virtual_responder, Canister};
-
+    use ic_canister::{register_failing_virtual_responder, register_virtual_responder, Canister};
     use super::*;
     use crate::types::TxRecord;
 
@@ -134,5 +133,49 @@ mod tests {
             .unwrap();
         assert!(is_notified_clone.load(Ordering::Relaxed));
         assert_eq!(counter_copy.load(Ordering::Relaxed), 1);
+    }
+    #[tokio::test]
+    async fn notify_non_existing() {
+        let canister = test_canister();
+        let response = canister.notify(Nat::from(10), bob()).await;
+        assert_eq!(response, Err(TxError::TransactionDoesNotExist));
+    }
+
+    #[tokio::test]
+    async fn double_notification() {
+        let counter = Rc::new(AtomicU32::new(0));
+        let counter_copy = counter.clone();
+        register_virtual_responder(bob(), "transaction_notification", move |_: (TxRecord,)| {
+            counter.fetch_add(1, Ordering::Relaxed);
+        });
+        let canister = test_canister();
+        let id = canister.transfer(bob(), Nat::from(100), None).unwrap();
+        canister.notify(id.clone(), bob()).await.unwrap();
+
+        MockContext::new().with_caller(bob()).inject();
+        let res = canister.consume_notification(id.clone()).await;
+
+        MockContext::new().with_caller(alice()).inject();
+        let response = canister.notify(id, bob()).await;
+        assert_eq!(response, Err(TxError::AlreadyActioned));
+        assert_eq!(counter_copy.load(Ordering::Relaxed), 1);
+    }
+
+    #[tokio::test]
+    async fn notification_failure() {
+        register_failing_virtual_responder(
+            bob(),
+            "transaction_notification",
+            "something's wrong".into(),
+        );
+
+        let canister = test_canister();
+        let id = canister.transfer(bob(), Nat::from(100u32), None).unwrap();
+        let response = canister.notify(id.clone(), bob()).await;
+        assert!(response.is_ok()); // as
+
+        register_virtual_responder(bob(), "transaction_notification", move |_: (TxRecord,)| {});
+        let response = canister.notify(id.clone(), bob()).await;
+        assert!(response.is_ok())
     }
 }

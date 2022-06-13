@@ -14,7 +14,7 @@ use crate::canister::erc20_transactions::{
 use crate::canister::is20_auction::{
     auction_info, bid_cycles, bidding_info, run_auction, AuctionError, BiddingInfo,
 };
-use crate::canister::is20_notify::approve_and_notify;
+use crate::canister::is20_notify::{approve_and_notify, consume_notification, notify};
 use crate::canister::is20_transactions::{batch_transfer, transfer_include_fee};
 use crate::principal::{CheckedPrincipal, Owner};
 use crate::state::CanisterState;
@@ -290,6 +290,16 @@ impl TokenCanister {
     async fn approveAndNotify(&self, spender: Principal, value: Nat) -> TxReceipt {
         let caller = CheckedPrincipal::with_recipient(spender)?;
         approve_and_notify(self, caller, value).await
+    }
+
+    #[update]
+    async fn notify(&self, transaction_id: Nat, to: Principal) -> TxReceipt {
+        notify(self, transaction_id, to).await
+    }
+
+    #[update]
+    async fn consume_notification(&self, transaction_id: Nat) -> TxReceipt {
+        consume_notification(self, transaction_id).await
     }
 
     #[update]
