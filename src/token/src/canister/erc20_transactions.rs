@@ -4,7 +4,7 @@ use candid::Nat;
 use ic_cdk::export::Principal;
 
 use crate::canister::is20_auction::auction_principal;
-use crate::principal::{CheckedPrincipal, Owner, TestNet, WithRecipient};
+use crate::principal::{CheckedPrincipal, Owner, TestNet, WithRecipient, SenderRecipient};
 use crate::state::{Balances, CanisterState};
 use crate::types::{TxError, TxReceipt};
 
@@ -46,12 +46,11 @@ pub fn transfer(
 
 pub fn transfer_from(
     canister: &TokenCanister,
-    caller: CheckedPrincipal<WithRecipient>,
-    from: Principal,
+    caller: CheckedPrincipal<SenderRecipient>,
     value: Nat,
 ) -> TxReceipt {
     let mut state = canister.state.borrow_mut();
-    let from_allowance = state.allowance(from, caller.inner());
+    let from_allowance = state.allowance(caller.from(), caller.inner());
     let CanisterState {
         ref mut balances,
         ref bidding_state,
@@ -67,28 +66,28 @@ pub fn transfer_from(
         return Err(TxError::InsufficientAllowance);
     }
 
-    let from_balance = balances.balance_of(&from);
+    let from_balance = balances.balance_of(&caller.from());
     if from_balance < value_with_fee {
         return Err(TxError::InsufficientBalance);
     }
 
-    _charge_fee(balances, from, fee_to, fee.clone(), fee_ratio);
-    _transfer(balances, from, caller.recipient(), value.clone());
+    _charge_fee(balances, caller.from(), fee_to, fee.clone(), fee_ratio);
+    _transfer(balances, caller.from(), caller.to(), value.clone());
 
     let allowances = &mut state.allowances;
-    match allowances.get(&from) {
+    match allowances.get(&caller.from()) {
         Some(inner) => {
             let result = inner.get(&caller.inner()).unwrap().clone();
             let mut temp = inner.clone();
             if result.clone() - value_with_fee.clone() != 0 {
                 temp.insert(caller.inner(), result - value_with_fee);
-                allowances.insert(from, temp);
+                allowances.insert(caller.from(), temp);
             } else {
                 temp.remove(&caller.inner());
                 if temp.is_empty() {
-                    allowances.remove(&from);
+                    allowances.remove(&caller.from());
                 } else {
-                    allowances.insert(from, temp);
+                    allowances.insert(caller.from(), temp);
                 }
             }
         }
@@ -97,7 +96,7 @@ pub fn transfer_from(
 
     let id = state
         .ledger
-        .transfer_from(caller.inner(), from, caller.recipient(), value, fee);
+        .transfer_from(caller.inner(), caller.from(), caller.to(), value, fee);
     Ok(id)
 }
 
