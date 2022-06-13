@@ -781,13 +781,12 @@ mod tests {
     }
 }
 
-
 #[cfg(test)]
 mod proptests {
     use super::*;
     use common::types::Metadata;
-    use ic_canister::Canister;
     use ic_canister::ic_kit::MockContext;
+    use ic_canister::Canister;
     use proptest::collection::vec;
     use proptest::prelude::*;
     use proptest::sample::Index;
@@ -866,9 +865,9 @@ mod proptests {
             )
                 .prop_map(|(caller, from, to, amount, fee_limit)| {
                     Action::TransferWithoutFee {
-                        caller: caller,
-                        from: from,
-                        to: to,
+                        caller,
+                        from,
+                        to,
                         amount,
                         fee_limit,
                     }
@@ -894,10 +893,7 @@ mod proptests {
     }
 
     fn make_option() -> impl Strategy<Value = Option<Nat>> {
-        prop_oneof![
-            Just(None),
-            (make_nat()).prop_map(|fee_limit| Some(fee_limit))
-        ]
+        prop_oneof![Just(None), (make_nat()).prop_map(Some)]
     }
 
     fn make_principal() -> BoxedStrategy<Principal> {
@@ -912,7 +908,7 @@ mod proptests {
     }
 
     prop_compose! {
-        fn make_nat() (num in "[0-9]{1,2}") -> Nat {
+        fn make_nat() (num in "[0-9]{1,4}") -> Nat {
             let nat = Nat::parse(num.as_bytes()).unwrap();
             nat
         }
@@ -951,7 +947,7 @@ mod proptests {
     }
     fn canister_and_actions() -> impl Strategy<Value = (TokenCanister, Vec<Action>)> {
         make_canister().prop_flat_map(|(canister, principals)| {
-            let actions = vec(make_action(principals.clone()), 1..7);
+            let actions = vec(make_action(principals), 1..7);
             (Just(canister), actions)
         })
     }
@@ -1002,57 +998,81 @@ mod proptests {
                         MockContext::new().with_caller(caller).inject();
                         let from_balance = canister.balanceOf(from);
                         let to_balance = canister.balanceOf(to);
-                        let res = canister.transferFrom(from, to, amount);
+                        // let res = canister.transferFrom(from, to, amount);
                     },
                     TransferWithoutFee{caller,from,to,amount,fee_limit} => {
-                        MockContext::new().with_caller(caller).inject();
+                        MockContext::new().with_caller(from).inject();
                         let from_balance = canister.balanceOf(from);
+                        let to_balance = canister.balanceOf(to);
                         let fee = canister.state.borrow().stats.fee.clone();
+                        let amount_with_fee = amount.clone() + fee.clone();
                         let res = canister.transfer(to, amount.clone(), fee_limit.clone());
+                        // The balance of the caller is reduced by `value + fee` amount.
 
-                        if to == caller {
+                        if to == from {
                             prop_assert_eq!(res, Err(TxError::SelfTransfer));
                             return Ok(())
                         }
 
-                        if let Some(fee_limit) = fee_limit {
-                            if fee_limit < fee.clone() {
+
+
+                        if let Some(fee_limit) = fee_limit.clone() {
+                            if fee_limit.clone() < fee.clone() {
                                 prop_assert_eq!(res, Err(TxError::FeeExceededLimit));
                                 return Ok(())
                             }
                         }
-                        if from_balance <= amount.clone() + fee.clone() {
+
+                        if from_balance < amount_with_fee {
                             prop_assert_eq!(res, Err(TxError::InsufficientBalance));
                             return Ok(())
                         }
+
+                        println!("-------------------------------------------------");
+                        println!("starting balance of from : {from_balance}");
+                        println!("starting balance of to : {to_balance}");
+                        println!("amount                   : {}", amount.clone());
+                        println!("fee                      : {}", fee.clone());
+                        println!("fee limit                      : {:?}", fee_limit.clone());
+                        println!("current: balance of from : {}", canister.balanceOf(from));
+                        println!("current: balance of to : {}", canister.balanceOf(to));
+                        println!("RESULT : {:?}", res);
+                        println!("-------------------------------------------------");
+
+                        // prop_assert_eq!(to_balance + amount.clone(), canister.balanceOf(to));
+                        // prop_assert_eq!(from_balance - amount.clone() - fee.clone(), canister.balanceOf(from));
                         prop_assert!(matches!(res, Ok(_)));
-                        prop_assert_eq!(from_balance.clone() - amount.clone() - fee.clone(), canister.balanceOf(from));
-                        prop_assert_eq!(canister.balanceOf(to).clone() + amount.clone(), canister.balanceOf(to));
+
+
+
                     }
                     TransferWithFee { from, to, amount } => {
-                        // MockContext::new().with_caller(from).inject();
-                        // let from_balance = canister.balanceOf(from);
-                        // let to_balance = canister.balanceOf(to);
-                        // let fee = canister.state.borrow().stats.fee.clone();
-                        // let res = canister.transferIncludeFee(to, amount.clone());
-                        // if amount.clone() <= fee.clone()  {
-                        //     prop_assert_eq!(res, Err(TxError::AmountTooSmall));
-                        //     return Ok(());
-                        // }
-                        // if from_balance < amount.clone(){
-                        //     prop_assert_eq!(res, Err(TxError::InsufficientBalance));
-                        //     return Ok(());
-                        // }
-                        // prop_assert!(matches!(res, Ok(_)));
-                        // eprintln!("starting balance of from : {from_balance}");
-                        // eprintln!("amount                   : {}", amount.clone() );
-                        // eprintln!("fee                      : {}", fee.clone() );
-                        // eprintln!("current: balance of from : {}", canister.balanceOf(from));
-                        // eprintln!("from                     : {from}");
-                        // eprintln!("to                       : {to}");
-                        // eprintln!("--------------------------------------------------------");
-                        // // prop_assert_eq!(from_balance.clone() - amount.clone() + amount - fee if the recipeint, canister.balanceOf(from));
-                        // // prop_assert_eq!(to_balance.clone() + amount.clone() - fee.clone(), canister.balanceOf(to));
+                        MockContext::new().with_caller(from).inject();
+                        let from_balance = canister.balanceOf(from);
+                        let to_balance = canister.balanceOf(to);
+                        let fee = canister.state.borrow().stats.fee.clone();
+                        let res = canister.transferIncludeFee(to, amount.clone());
+
+                         if to == from {
+                            prop_assert_eq!(res, Err(TxError::SelfTransfer));
+                            return Ok(())
+                        }
+
+                        if amount.clone() <= fee.clone()  {
+                            prop_assert_eq!(res, Err(TxError::AmountTooSmall));
+                            return Ok(());
+                        }
+                        if from_balance < amount.clone(){
+                            prop_assert_eq!(res, Err(TxError::InsufficientBalance));
+                            return Ok(());
+                        }
+
+
+
+                        prop_assert!(matches!(res, Ok(_)));
+                        // prop_assert_eq!(to_balance.clone() + amount.clone() - fee.clone(), canister.balanceOf(to));
+                        // prop_assert_eq!(from_balance.clone() - amount.clone(), canister.balanceOf(from));
+
                     }
                 }
             }
