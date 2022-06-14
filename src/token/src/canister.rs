@@ -5,7 +5,6 @@ use candid::Nat;
 use common::types::Metadata;
 use ic_canister::{init, query, update, Canister};
 use ic_cdk::export::candid::Principal;
-use num_traits::ToPrimitive;
 
 use crate::canister::erc20_transactions::{
     approve, burn_as_owner, burn_own_tokens, mint_as_owner, mint_test_token, transfer,
@@ -255,8 +254,8 @@ impl TokenCanister {
 
     #[update]
     fn transferFrom(&self, from: Principal, to: Principal, value: Nat) -> TxReceipt {
-        let caller = CheckedPrincipal::with_recipient(to)?;
-        transfer_from(self, caller, from, value)
+        let caller = CheckedPrincipal::from_to(from, to)?;
+        transfer_from(self, caller, value)
     }
 
     /// Transfers `value` amount to the `to` principal, applying American style fee. This means, that
