@@ -1,5 +1,6 @@
-use candid::{CandidType, Deserialize, Nat, Principal};
+use candid::{CandidType, Deserialize, Principal};
 use common::types::Metadata;
+use ic_helpers::tokens::Tokens128;
 use std::collections::HashMap;
 
 mod tx_record;
@@ -13,9 +14,9 @@ pub struct StatsData {
     pub name: String,
     pub symbol: String,
     pub decimals: u8,
-    pub total_supply: Nat,
+    pub total_supply: Tokens128,
     pub owner: Principal,
-    pub fee: Nat,
+    pub fee: Tokens128,
     pub fee_to: Principal,
     pub deploy_time: u64,
     pub min_cycles: u64,
@@ -23,8 +24,8 @@ pub struct StatsData {
 }
 
 impl StatsData {
-    pub fn fee_info(&self) -> (Nat, Principal) {
-        (self.fee.clone(), self.fee_to)
+    pub fn fee_info(&self) -> (Tokens128, Principal) {
+        (self.fee, self.fee_to)
     }
 }
 
@@ -55,7 +56,7 @@ impl From<Metadata> for StatsData {
 pub struct TokenInfo {
     pub metadata: Metadata,
     pub feeTo: Principal,
-    pub historySize: Nat,
+    pub historySize: u64,
     pub deployTime: Timestamp,
     pub holderNumber: usize,
     pub cycles: u64,
@@ -68,9 +69,9 @@ impl Default for StatsData {
             name: "".to_string(),
             symbol: "".to_string(),
             decimals: 0u8,
-            total_supply: Nat::from(0),
+            total_supply: Tokens128::from(0u128),
             owner: Principal::anonymous(),
-            fee: Nat::from(0),
+            fee: Tokens128::from(0u128),
             fee_to: Principal::anonymous(),
             deploy_time: 0,
             min_cycles: 0,
@@ -79,7 +80,7 @@ impl Default for StatsData {
     }
 }
 
-pub type Allowances = HashMap<Principal, HashMap<Principal, Nat>>;
+pub type Allowances = HashMap<Principal, HashMap<Principal, Tokens128>>;
 
 #[derive(CandidType, Debug, PartialEq, Deserialize)]
 pub enum TxError {
@@ -89,22 +90,23 @@ pub enum TxError {
     AmountTooSmall,
     FeeExceededLimit,
     ApproveSucceededButNotifyFailed { tx_error: Box<TxError> },
-    NotificationFailed { transaction_id: Nat },
+    NotificationFailed { transaction_id: u64 },
     AlreadyActioned,
     NotificationDoesNotExist,
     TransactionDoesNotExist,
-    BadFee { expected_fee: u64 },
-    InsufficientFunds { balance: u64 },
+    BadFee { expected_fee: Tokens128 },
+    InsufficientFunds { balance: Tokens128 },
     TxTooOld { allowed_window_nanos: u64 },
     TxCreatedInFuture,
     TxDuplicate { duplicate_of: u64 },
     SelfTransfer,
+    AmountOverflow,
 }
 
-pub type TxReceipt = Result<Nat, TxError>;
+pub type TxReceipt = Result<u64, TxError>;
 
 // Notification receiver not set if None
-pub type PendingNotifications = HashMap<Nat, Option<Principal>>;
+pub type PendingNotifications = HashMap<u64, Option<Principal>>;
 
 #[derive(CandidType, Debug, Clone, Copy, Deserialize, PartialEq)]
 pub enum TransactionStatus {
@@ -126,11 +128,11 @@ pub enum Operation {
 pub struct AuctionInfo {
     pub auction_id: usize,
     pub auction_time: Timestamp,
-    pub tokens_distributed: Nat,
-    pub cycles_collected: u64,
+    pub tokens_distributed: Tokens128,
+    pub cycles_collected: Cycles,
     pub fee_ratio: f64,
-    pub first_transaction_id: Nat,
-    pub last_transaction_id: Nat,
+    pub first_transaction_id: TxId,
+    pub last_transaction_id: TxId,
 }
 
 /// `PaginatedResult` is returned by paginated queries i.e `getTransactions`.
@@ -140,5 +142,8 @@ pub struct PaginatedResult {
     pub result: Vec<TxRecord>,
 
     /// This is  the next `id` of the transaction. The `next` is used as offset for the next query if it exits.
-    pub next: Option<u128>,
+    pub next: Option<TxId>,
 }
+
+pub type TxId = u64;
+pub type Cycles = u64;

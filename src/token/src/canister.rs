@@ -1,11 +1,10 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use candid::Nat;
 use common::types::Metadata;
 use ic_canister::{init, query, update, Canister};
 use ic_cdk::export::candid::Principal;
-use num_traits::ToPrimitive;
+use ic_helpers::tokens::Tokens128;
 
 use crate::canister::erc20_transactions::{
     approve, burn_as_owner, burn_own_tokens, mint_as_owner, mint_test_token, transfer,
@@ -19,7 +18,8 @@ use crate::canister::is20_transactions::{batch_transfer, transfer_include_fee};
 use crate::principal::{CheckedPrincipal, Owner};
 use crate::state::CanisterState;
 use crate::types::{
-    AuctionInfo, PaginatedResult, StatsData, Timestamp, TokenInfo, TxError, TxReceipt, TxRecord,
+    AuctionInfo, PaginatedResult, StatsData, Timestamp, TokenInfo, TxError, TxId, TxReceipt,
+    TxRecord,
 };
 
 mod erc20_transactions;
@@ -36,7 +36,7 @@ const MAX_TRANSACTION_QUERY_LEN: usize = 1000;
 enum CanisterUpdate {
     Name(String),
     Logo(String),
-    Fee(Nat),
+    Fee(Tokens128),
     FeeTo(Principal),
     Owner(Principal),
     MinCycles(u64),
@@ -90,7 +90,7 @@ impl TokenCanister {
     }
 
     #[query]
-    fn getHolders(&self, start: usize, limit: usize) -> Vec<(Principal, Nat)> {
+    fn getHolders(&self, start: usize, limit: usize) -> Vec<(Principal, Tokens128)> {
         self.state.borrow().balances.get_holders(start, limit)
     }
 
@@ -100,7 +100,7 @@ impl TokenCanister {
     }
 
     #[query]
-    fn getUserApprovals(&self, who: Principal) -> Vec<(Principal, Nat)> {
+    fn getUserApprovals(&self, who: Principal) -> Vec<(Principal, Tokens128)> {
         self.state.borrow().user_approvals(who)
     }
 
@@ -130,17 +130,17 @@ impl TokenCanister {
     }
 
     #[query]
-    fn totalSupply(&self) -> Nat {
+    fn totalSupply(&self) -> Tokens128 {
         self.state.borrow().stats.total_supply.clone()
     }
 
     #[query]
-    fn balanceOf(&self, holder: Principal) -> Nat {
+    fn balanceOf(&self, holder: Principal) -> Tokens128 {
         self.state.borrow().balances.balance_of(&holder)
     }
 
     #[query]
-    fn allowance(&self, owner: Principal, spender: Principal) -> Nat {
+    fn allowance(&self, owner: Principal, spender: Principal) -> Tokens128 {
         self.state.borrow().allowance(owner, spender)
     }
 
@@ -150,13 +150,13 @@ impl TokenCanister {
     }
 
     #[query]
-    fn historySize(&self) -> Nat {
+    fn historySize(&self) -> u64 {
         self.state.borrow().ledger.len()
     }
 
     #[query]
-    fn getTransaction(&self, id: Nat) -> TxRecord {
-        self.state.borrow().ledger.get(&id).unwrap_or_else(|| {
+    fn getTransaction(&self, id: TxId) -> TxRecord {
+        self.state.borrow().ledger.get(id).unwrap_or_else(|| {
             ic_canister::ic_kit::ic::trap(&format!("Transaction {} does not exist", id))
         })
     }
@@ -167,15 +167,14 @@ impl TokenCanister {
     ///
     /// It returns `PaginatedResult` a struct, which contains `result` which is a list of transactions `Vec<TxRecord>` that meet the requirements of the query,
     /// and `next_id` which is the index of the next transaction to return.
-
     #[query]
     fn getTransactions(
         &self,
         who: Option<Principal>,
-        count: u32,
-        transaction_id: Option<u128>,
+        count: usize,
+        transaction_id: Option<TxId>,
     ) -> PaginatedResult {
-        if count as usize > MAX_TRANSACTION_QUERY_LEN {
+        if count > MAX_TRANSACTION_QUERY_LEN {
             ic_canister::ic_kit::ic::trap("Too many transactions requested");
         }
 
@@ -216,7 +215,7 @@ impl TokenCanister {
     }
 
     #[update]
-    fn setFee(&self, fee: Nat) -> Result<(), TxError> {
+    fn setFee(&self, fee: Tokens128) -> Result<(), TxError> {
         let caller = CheckedPrincipal::owner(&self.state.borrow_mut().stats)?;
         self.update_stats(caller, CanisterUpdate::Fee(fee));
         Ok(())
@@ -243,20 +242,25 @@ impl TokenCanister {
 
     /// Returns the total number of transactions related to the user `who`.
     #[query]
-    fn getUserTransactionCount(&self, who: Principal) -> Nat {
+    fn getUserTransactionCount(&self, who: Principal) -> usize {
         self.state.borrow().ledger.get_len_user_history(who)
     }
 
     #[update]
-    fn transfer(&self, to: Principal, value: Nat, fee_limit: Option<Nat>) -> TxReceipt {
+    fn transfer(
+        &self,
+        to: Principal,
+        amount: Tokens128,
+        fee_limit: Option<Tokens128>,
+    ) -> TxReceipt {
         let caller = CheckedPrincipal::with_recipient(to)?;
-        transfer(self, caller, value, fee_limit)
+        transfer(self, caller, amount, fee_limit)
     }
 
     #[update]
-    fn transferFrom(&self, from: Principal, to: Principal, value: Nat) -> TxReceipt {
+    fn transferFrom(&self, from: Principal, to: Principal, amount: Tokens128) -> TxReceipt {
         let caller = CheckedPrincipal::with_recipient(to)?;
-        transfer_from(self, caller, from, value)
+        transfer_from(self, caller, from, amount)
     }
 
     /// Transfers `value` amount to the `to` principal, applying American style fee. This means, that
@@ -265,9 +269,9 @@ impl TokenCanister {
     /// Note, that the `value` cannot be less than the `fee` amount. If the value given is too small,
     /// transaction will fail with `TxError::AmountTooSmall` error.
     #[update]
-    fn transferIncludeFee(&self, to: Principal, value: Nat) -> TxReceipt {
+    fn transferIncludeFee(&self, to: Principal, amount: Tokens128) -> TxReceipt {
         let caller = CheckedPrincipal::with_recipient(to)?;
-        transfer_include_fee(self, caller, value)
+        transfer_include_fee(self, caller, amount)
     }
 
     /// Takes a list of transfers, each of which is a pair of `to` and `value` fields, it returns a `TxReceipt` which contains
@@ -276,40 +280,40 @@ impl TokenCanister {
     /// The balance of the caller is reduced by sum of `value + fee` amount for each transfer. If the total sum of `value + fee` for all transfers,
     /// is less than the `balance` of the caller, the transaction will fail with `TxError::InsufficientBalance` error.
     #[update]
-    fn batchTransfer(&self, transfers: Vec<(Principal, Nat)>) -> Result<Vec<Nat>, TxError> {
+    fn batchTransfer(&self, transfers: Vec<(Principal, Tokens128)>) -> Result<Vec<TxId>, TxError> {
         batch_transfer(self, transfers)
     }
 
     #[update]
-    fn approve(&self, spender: Principal, value: Nat) -> TxReceipt {
+    fn approve(&self, spender: Principal, amount: Tokens128) -> TxReceipt {
         let caller = CheckedPrincipal::with_recipient(spender)?;
-        approve(self, caller, value)
+        approve(self, caller, amount)
     }
 
     #[update]
-    async fn approveAndNotify(&self, spender: Principal, value: Nat) -> TxReceipt {
+    async fn approveAndNotify(&self, spender: Principal, amount: Tokens128) -> TxReceipt {
         let caller = CheckedPrincipal::with_recipient(spender)?;
-        approve_and_notify(self, caller, value).await
+        approve_and_notify(self, caller, amount).await
     }
 
     #[update]
-    async fn notify(&self, transaction_id: Nat, to: Principal) -> TxReceipt {
+    async fn notify(&self, transaction_id: TxId, to: Principal) -> TxReceipt {
         notify(self, transaction_id, to).await
     }
 
     #[update]
-    async fn consume_notification(&self, transaction_id: Nat) -> TxReceipt {
+    async fn consume_notification(&self, transaction_id: TxId) -> TxReceipt {
         consume_notification(self, transaction_id).await
     }
 
     #[update]
-    fn mint(&self, to: Principal, amount: Nat) -> TxReceipt {
+    fn mint(&self, to: Principal, amount: Tokens128) -> TxReceipt {
         if self.isTestToken() {
             let test_user = CheckedPrincipal::test_user(&self.state.borrow().stats)?;
-            mint_test_token(self, test_user, to, amount)
+            mint_test_token(&mut *self.state.borrow_mut(), test_user, to, amount)
         } else {
             let owner = CheckedPrincipal::owner(&self.state.borrow().stats)?;
-            mint_as_owner(self, owner, to, amount)
+            mint_as_owner(&mut *self.state.borrow_mut(), owner, to, amount)
         }
     }
 
@@ -318,15 +322,15 @@ impl TokenCanister {
     /// If `from` is Some(_) but method called not by owner, `TxError::Unauthorized` will be returned.
     /// If owner calls this method and `from` is Some(who), then who's tokens will be burned.
     #[update]
-    fn burn(&self, from: Option<Principal>, amount: Nat) -> TxReceipt {
+    fn burn(&self, from: Option<Principal>, amount: Tokens128) -> TxReceipt {
         match from {
-            None => burn_own_tokens(self, amount),
+            None => burn_own_tokens(&mut *self.state.borrow_mut(), amount),
             Some(from) if from == ic_canister::ic_kit::ic::caller() => {
-                burn_own_tokens(self, amount)
+                burn_own_tokens(&mut *self.state.borrow_mut(), amount)
             }
             Some(from) => {
                 let caller = CheckedPrincipal::owner(&self.state.borrow().stats)?;
-                burn_as_owner(self, caller, from, amount)
+                burn_as_owner(&mut *self.state.borrow_mut(), caller, from, amount)
             }
         }
     }

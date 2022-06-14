@@ -1,22 +1,29 @@
-use crate::types::{Operation, TransactionStatus};
-use candid::{CandidType, Deserialize, Int, Nat, Principal};
+use crate::types::{Operation, TransactionStatus, TxId};
+use candid::{CandidType, Deserialize, Principal};
 use ic_canister::ic_kit::ic;
+use ic_helpers::tokens::Tokens128;
 
 #[derive(Deserialize, CandidType, Debug, Clone)]
 pub struct TxRecord {
     pub caller: Option<Principal>,
-    pub index: Nat,
+    pub index: TxId,
     pub from: Principal,
     pub to: Principal,
-    pub amount: Nat,
-    pub fee: Nat,
-    pub timestamp: Int,
+    pub amount: Tokens128,
+    pub fee: Tokens128,
+    pub timestamp: u64,
     pub status: TransactionStatus,
     pub operation: Operation,
 }
 
 impl TxRecord {
-    pub fn transfer(index: Nat, from: Principal, to: Principal, amount: Nat, fee: Nat) -> Self {
+    pub fn transfer(
+        index: TxId,
+        from: Principal,
+        to: Principal,
+        amount: Tokens128,
+        fee: Tokens128,
+    ) -> Self {
         Self {
             caller: Some(from),
             index,
@@ -31,12 +38,12 @@ impl TxRecord {
     }
 
     pub fn transfer_from(
-        index: Nat,
+        index: TxId,
         caller: Principal,
         from: Principal,
         to: Principal,
-        amount: Nat,
-        fee: Nat,
+        amount: Tokens128,
+        fee: Tokens128,
     ) -> Self {
         Self {
             caller: Some(caller),
@@ -51,7 +58,13 @@ impl TxRecord {
         }
     }
 
-    pub fn approve(index: Nat, from: Principal, to: Principal, amount: Nat, fee: Nat) -> Self {
+    pub fn approve(
+        index: TxId,
+        from: Principal,
+        to: Principal,
+        amount: Tokens128,
+        fee: Tokens128,
+    ) -> Self {
         Self {
             caller: Some(from),
             index,
@@ -65,42 +78,42 @@ impl TxRecord {
         }
     }
 
-    pub fn mint(index: Nat, from: Principal, to: Principal, amount: Nat) -> Self {
+    pub fn mint(index: TxId, from: Principal, to: Principal, amount: Tokens128) -> Self {
         Self {
             caller: Some(from),
             index,
             from,
             to,
             amount,
-            fee: Nat::from(0),
+            fee: Tokens128::from(0u128),
             timestamp: ic::time().into(),
             status: TransactionStatus::Succeeded,
             operation: Operation::Mint,
         }
     }
 
-    pub fn burn(index: Nat, caller: Principal, from: Principal, amount: Nat) -> Self {
+    pub fn burn(index: TxId, caller: Principal, from: Principal, amount: Tokens128) -> Self {
         Self {
             caller: Some(caller),
             index,
             from,
             to: from,
             amount,
-            fee: Nat::from(0),
+            fee: Tokens128::from(0u128),
             timestamp: ic::time().into(),
             status: TransactionStatus::Succeeded,
             operation: Operation::Burn,
         }
     }
 
-    pub fn auction(index: Nat, to: Principal, amount: Nat) -> Self {
+    pub fn auction(index: TxId, to: Principal, amount: Tokens128) -> Self {
         Self {
             caller: Some(to),
             index,
             from: to,
             to,
             amount,
-            fee: Nat::from(0),
+            fee: Tokens128::from(0u128),
             timestamp: ic::time().into(),
             status: TransactionStatus::Succeeded,
             operation: Operation::Auction,

@@ -1,7 +1,5 @@
-use std::collections::HashMap;
-
-use candid::Nat;
 use ic_cdk::export::Principal;
+use ic_helpers::tokens::Tokens128;
 
 use crate::canister::is20_auction::auction_principal;
 use crate::principal::{CheckedPrincipal, Owner, TestNet, WithRecipient};
@@ -13,8 +11,8 @@ use super::TokenCanister;
 pub fn transfer(
     canister: &TokenCanister,
     caller: CheckedPrincipal<WithRecipient>,
-    value: Nat,
-    fee_limit: Option<Nat>,
+    amount: Tokens128,
+    fee_limit: Option<Tokens128>,
 ) -> TxReceipt {
     let CanisterState {
         ref mut balances,
@@ -33,14 +31,18 @@ pub fn transfer(
         }
     }
 
-    if balances.balance_of(&caller.inner()) < value.clone() + fee.clone() {
+    if balances.balance_of(&caller.inner())
+        < (amount + fee).ok_or_else(|| TxError::AmountOverflow)?
+    {
         return Err(TxError::InsufficientBalance);
     }
 
-    _charge_fee(balances, caller.inner(), fee_to, fee.clone(), fee_ratio);
-    _transfer(balances, caller.inner(), caller.recipient(), value.clone());
+    charge_fee(balances, caller.inner(), fee_to, fee, fee_ratio)
+        .expect("never fails due to checks above");
+    transfer_balance(balances, caller.inner(), caller.recipient(), amount)
+        .expect("never fails due to checks above");
 
-    let id = ledger.transfer(caller.inner(), caller.recipient(), value, fee);
+    let id = ledger.transfer(caller.inner(), caller.recipient(), amount, fee);
     Ok(id)
 }
 
@@ -48,7 +50,7 @@ pub fn transfer_from(
     canister: &TokenCanister,
     caller: CheckedPrincipal<WithRecipient>,
     from: Principal,
-    value: Nat,
+    amount: Tokens128,
 ) -> TxReceipt {
     let mut state = canister.state.borrow_mut();
     let from_allowance = state.allowance(from, caller.inner());
@@ -62,7 +64,7 @@ pub fn transfer_from(
     let (fee, fee_to) = stats.fee_info();
     let fee_ratio = bidding_state.fee_ratio;
 
-    let value_with_fee = value.clone() + fee.clone();
+    let value_with_fee = (amount + fee).ok_or_else(|| TxError::AmountOverflow)?;
     if from_allowance < value_with_fee {
         return Err(TxError::InsufficientAllowance);
     }
@@ -72,39 +74,37 @@ pub fn transfer_from(
         return Err(TxError::InsufficientBalance);
     }
 
-    _charge_fee(balances, from, fee_to, fee.clone(), fee_ratio);
-    _transfer(balances, from, caller.recipient(), value.clone());
+    charge_fee(balances, from, fee_to, fee, fee_ratio).expect("never fails due to checks above");
+    transfer_balance(balances, from, caller.recipient(), amount)
+        .expect("never fails due to checks above");
 
-    let allowances = &mut state.allowances;
-    match allowances.get(&from) {
-        Some(inner) => {
-            let result = inner.get(&caller.inner()).unwrap().clone();
-            let mut temp = inner.clone();
-            if result.clone() - value_with_fee.clone() != 0 {
-                temp.insert(caller.inner(), result - value_with_fee);
-                allowances.insert(from, temp);
-            } else {
-                temp.remove(&caller.inner());
-                if temp.is_empty() {
-                    allowances.remove(&from);
-                } else {
-                    allowances.insert(from, temp);
-                }
-            }
+    let allowances = state
+        .allowances
+        .get_mut(&from)
+        .expect("allowance existing is checked above when check allowance sufficiency");
+    let allowance = allowances
+        .get_mut(&caller.inner())
+        .expect("allowance existing is checked above when check allowance sufficiency");
+    *allowance = (*allowance - value_with_fee).expect("allowance sufficiency checked above");
+
+    if *allowance == Tokens128::from(0u128) {
+        allowances.remove(&caller.inner());
+
+        if allowances.is_empty() {
+            state.allowances.remove(&from);
         }
-        None => panic!(),
     }
 
     let id = state
         .ledger
-        .transfer_from(caller.inner(), from, caller.recipient(), value, fee);
+        .transfer_from(caller.inner(), from, caller.recipient(), amount, fee);
     Ok(id)
 }
 
 pub fn approve(
     canister: &TokenCanister,
     caller: CheckedPrincipal<WithRecipient>,
-    value: Nat,
+    amount: Tokens128,
 ) -> TxReceipt {
     let mut state = canister.state.borrow_mut();
 
@@ -121,132 +121,159 @@ pub fn approve(
         return Err(TxError::InsufficientBalance);
     }
 
-    _charge_fee(balances, caller.inner(), fee_to, fee.clone(), fee_ratio);
-    let v = value.clone() + fee.clone();
+    charge_fee(balances, caller.inner(), fee_to, fee, fee_ratio)
+        .expect("never fails due to checks above");
+    let amount_with_fee = (amount + fee).ok_or(TxError::AmountOverflow)?;
 
-    match state.allowances.get(&caller.inner()) {
-        Some(inner) => {
-            let mut temp = inner.clone();
-            if v != 0 {
-                temp.insert(caller.recipient(), v);
-                state.allowances.insert(caller.inner(), temp);
-            } else {
-                temp.remove(&caller.recipient());
-                if temp.is_empty() {
-                    state.allowances.remove(&caller.inner());
-                } else {
-                    state.allowances.insert(caller.inner(), temp);
-                }
+    if amount_with_fee == Tokens128::from(0u128) {
+        if let Some(allowances) = state.allowances.get_mut(&caller.inner()) {
+            allowances.remove(&caller.recipient());
+            if allowances.is_empty() {
+                state.allowances.remove(&caller.inner());
             }
         }
-        None if v != 0 => {
-            let mut inner = HashMap::new();
-            inner.insert(caller.recipient(), v);
-            state.allowances.insert(caller.inner(), inner);
-        }
-        None => {}
+    } else {
+        state
+            .allowances
+            .entry(caller.inner())
+            .or_default()
+            .insert(caller.recipient(), amount_with_fee);
     }
 
     let id = state
         .ledger
-        .approve(caller.inner(), caller.recipient(), value, fee);
+        .approve(caller.inner(), caller.recipient(), amount, fee);
     Ok(id)
 }
 
-fn mint(canister: &TokenCanister, caller: Principal, to: Principal, amount: Nat) -> TxReceipt {
-    {
-        let balances = &mut canister.state.borrow_mut().balances;
-        let to_balance = balances.balance_of(&to);
-        balances.0.insert(to, to_balance + amount.clone());
-    }
+fn mint(
+    state: &mut CanisterState,
+    caller: Principal,
+    to: Principal,
+    amount: Tokens128,
+) -> TxReceipt {
+    state.stats.total_supply =
+        (state.stats.total_supply + amount).ok_or(TxError::AmountOverflow)?;
+    let balance = state.balances.0.entry(to).or_default();
+    let new_balance = (*balance + amount)
+        .expect("balance cannot be larger than total_supply which is already checked");
+    *balance = new_balance;
 
-    let mut state = canister.state.borrow_mut();
-    state.stats.total_supply += amount.clone();
     let id = state.ledger.mint(caller, to, amount);
 
     Ok(id)
 }
 
 pub(crate) fn mint_test_token(
-    canister: &TokenCanister,
+    state: &mut CanisterState,
     caller: CheckedPrincipal<TestNet>,
     to: Principal,
-    amount: Nat,
+    amount: Tokens128,
 ) -> TxReceipt {
-    mint(canister, caller.inner(), to, amount)
+    mint(state, caller.inner(), to, amount)
 }
 
 pub(crate) fn mint_as_owner(
-    canister: &TokenCanister,
+    state: &mut CanisterState,
     caller: CheckedPrincipal<Owner>,
     to: Principal,
-    amount: Nat,
+    amount: Tokens128,
 ) -> TxReceipt {
-    mint(canister, caller.inner(), to, amount)
+    mint(state, caller.inner(), to, amount)
 }
 
-fn burn(canister: &TokenCanister, caller: Principal, from: Principal, amount: Nat) -> TxReceipt {
-    {
-        let mut state = canister.state.borrow_mut();
-        let balance = state.balances.balance_of(&from);
-        if balance < amount {
-            return Err(TxError::InsufficientBalance);
+fn burn(
+    state: &mut CanisterState,
+    caller: Principal,
+    from: Principal,
+    amount: Tokens128,
+) -> TxReceipt {
+    match state.balances.0.get_mut(&from) {
+        Some(balance) => {
+            *balance = (*balance - amount).ok_or(TxError::InsufficientBalance)?;
+            if *balance == Tokens128::from(0) {
+                state.balances.0.remove(&from);
+            }
         }
-
-        state.balances.0.insert(from, balance - amount.clone());
+        None => return Err(TxError::InsufficientBalance),
     }
 
-    let mut state = canister.state.borrow_mut();
-    state.stats.total_supply -= amount.clone();
+    state.stats.total_supply =
+        (state.stats.total_supply - amount).expect("total supply cannot be less then user balance");
 
     let id = state.ledger.burn(caller, from, amount);
     Ok(id)
 }
 
-pub fn burn_own_tokens(canister: &TokenCanister, amount: Nat) -> TxReceipt {
+pub fn burn_own_tokens(state: &mut CanisterState, amount: Tokens128) -> TxReceipt {
     let caller = ic_canister::ic_kit::ic::caller();
-    burn(canister, caller, caller, amount)
+    burn(state, caller, caller, amount)
 }
 
 pub fn burn_as_owner(
-    canister: &TokenCanister,
+    state: &mut CanisterState,
     caller: CheckedPrincipal<Owner>,
     from: Principal,
-    amount: Nat,
+    amount: Tokens128,
 ) -> TxReceipt {
-    burn(canister, caller.inner(), from, amount)
+    burn(state, caller.inner(), from, amount)
 }
 
-pub fn _transfer(balances: &mut Balances, from: Principal, to: Principal, value: Nat) {
-    let from_balance = balances.balance_of(&from);
-    let from_balance_new = from_balance - value.clone();
-    if from_balance_new != 0 {
-        balances.0.insert(from, from_balance_new);
-    } else {
+pub(crate) fn transfer_balance(
+    balances: &mut Balances,
+    from: Principal,
+    to: Principal,
+    amount: Tokens128,
+) -> Result<(), TxError> {
+    {
+        let from_balance = balances
+            .0
+            .get_mut(&from)
+            .ok_or(TxError::InsufficientBalance)?;
+        *from_balance = (*from_balance - amount).ok_or(TxError::InsufficientBalance)?;
+    }
+
+    {
+        let to_balance = balances.0.entry(to).or_default();
+        *to_balance = (*to_balance + amount).expect(
+            "never overflows since `from_balance + to_balance` is limited by `total_supply` amount",
+        );
+    }
+
+    if *balances.0.get(&from).expect("checked above") == Tokens128::from(0) {
         balances.0.remove(&from);
     }
-    let to_balance = balances.balance_of(&to);
-    let to_balance_new = to_balance + value;
-    if to_balance_new != 0 {
-        balances.0.insert(to, to_balance_new);
-    }
+
+    Ok(())
 }
 
-pub fn _charge_fee(
+pub(crate) fn charge_fee(
     balances: &mut Balances,
     user: Principal,
     fee_to: Principal,
-    fee: Nat,
+    fee: Tokens128,
     fee_ratio: f64,
-) {
-    if fee > 0u32 {
-        const INT_CONVERSION_K: u64 = 1_000_000_000_000;
-        let auction_fee_amount =
-            fee.clone() * (fee_ratio * INT_CONVERSION_K as f64) as u64 / INT_CONVERSION_K;
-        let owner_fee_amount = fee - auction_fee_amount.clone();
-        _transfer(balances, user, fee_to, owner_fee_amount);
-        _transfer(balances, user, auction_principal(), auction_fee_amount);
+) -> Result<(), TxError> {
+    // todo: check if this is enforced
+    debug_assert!(fee_ratio >= 0.0 && fee_ratio <= 1.0);
+
+    if fee == Tokens128::from(0) {
+        return Ok(());
     }
+
+    // todo: test and figure out overflows
+    const INT_CONVERSION_K: u128 = 1_000_000_000_000;
+    let auction_fee_amount = (fee * Tokens128::from((fee_ratio * INT_CONVERSION_K as f64) as u128)
+        / INT_CONVERSION_K)
+        .expect("never division by 0");
+    let auction_fee_amount = auction_fee_amount
+        .to_tokens128()
+        .expect("fee is always greater");
+    let owner_fee_amount = (fee - auction_fee_amount).expect("fee is always greater");
+    transfer_balance(balances, user, fee_to, owner_fee_amount)?;
+    transfer_balance(balances, user, auction_principal(), auction_fee_amount)?;
+
+    Ok(())
 }
 
 #[cfg(test)]
@@ -271,9 +298,9 @@ mod tests {
             name: "".to_string(),
             symbol: "".to_string(),
             decimals: 8,
-            totalSupply: Nat::from(1000),
+            totalSupply: Tokens128::from(1000),
             owner: alice(),
-            fee: Nat::from(0),
+            fee: Tokens128::from(0),
             feeTo: alice(),
             isTestToken: None,
         });
@@ -289,37 +316,37 @@ mod tests {
     #[test]
     fn transfer_without_fee() {
         let canister = test_canister();
-        assert_eq!(Nat::from(1000), canister.balanceOf(alice()));
+        assert_eq!(Tokens128::from(1000), canister.balanceOf(alice()));
 
         let caller = CheckedPrincipal::with_recipient(bob()).unwrap();
-        assert!(transfer(&canister, caller, Nat::from(100), None).is_ok());
-        assert_eq!(canister.balanceOf(bob()), Nat::from(100));
-        assert_eq!(canister.balanceOf(alice()), Nat::from(900));
+        assert!(transfer(&canister, caller, Tokens128::from(100), None).is_ok());
+        assert_eq!(canister.balanceOf(bob()), Tokens128::from(100));
+        assert_eq!(canister.balanceOf(alice()), Tokens128::from(900));
     }
 
     #[test]
     fn transfer_with_fee() {
         let canister = test_canister();
-        canister.state.borrow_mut().stats.fee = Nat::from(100);
+        canister.state.borrow_mut().stats.fee = Tokens128::from(100);
         canister.state.borrow_mut().stats.fee_to = john();
 
-        assert!(canister.transfer(bob(), Nat::from(200), None).is_ok());
-        assert_eq!(canister.balanceOf(bob()), Nat::from(200));
-        assert_eq!(canister.balanceOf(alice()), Nat::from(700));
-        assert_eq!(canister.balanceOf(john()), Nat::from(100));
+        assert!(canister.transfer(bob(), Tokens128::from(200), None).is_ok());
+        assert_eq!(canister.balanceOf(bob()), Tokens128::from(200));
+        assert_eq!(canister.balanceOf(alice()), Tokens128::from(700));
+        assert_eq!(canister.balanceOf(john()), Tokens128::from(100));
     }
 
     #[test]
     fn transfer_fee_exceeded() {
         let canister = test_canister();
-        canister.state.borrow_mut().stats.fee = Nat::from(100);
+        canister.state.borrow_mut().stats.fee = Tokens128::from(100);
         canister.state.borrow_mut().stats.fee_to = john();
 
         assert!(canister
-            .transfer(bob(), Nat::from(200), Some(Nat::from(100)))
+            .transfer(bob(), Tokens128::from(200), Some(Tokens128::from(100)))
             .is_ok());
         assert_eq!(
-            canister.transfer(bob(), Nat::from(200), Some(Nat::from(50))),
+            canister.transfer(bob(), Tokens128::from(200), Some(Tokens128::from(50))),
             Err(TxError::FeeExceededLimit)
         );
     }
@@ -327,40 +354,42 @@ mod tests {
     #[test]
     fn fees_with_auction_enabled() {
         let canister = test_canister();
-        canister.state.borrow_mut().stats.fee = Nat::from(50);
+        canister.state.borrow_mut().stats.fee = Tokens128::from(50);
         canister.state.borrow_mut().stats.fee_to = john();
         canister.state.borrow_mut().bidding_state.fee_ratio = 0.5;
 
-        canister.transfer(bob(), Nat::from(100), None).unwrap();
-        assert_eq!(canister.balanceOf(bob()), Nat::from(100));
-        assert_eq!(canister.balanceOf(alice()), Nat::from(850));
-        assert_eq!(canister.balanceOf(john()), Nat::from(25));
-        assert_eq!(canister.balanceOf(auction_principal()), Nat::from(25));
+        canister
+            .transfer(bob(), Tokens128::from(100), None)
+            .unwrap();
+        assert_eq!(canister.balanceOf(bob()), Tokens128::from(100));
+        assert_eq!(canister.balanceOf(alice()), Tokens128::from(850));
+        assert_eq!(canister.balanceOf(john()), Tokens128::from(25));
+        assert_eq!(canister.balanceOf(auction_principal()), Tokens128::from(25));
     }
 
     #[test]
     fn transfer_insufficient_balance() {
         let canister = test_canister();
         assert_eq!(
-            canister.transfer(bob(), Nat::from(1001), None),
+            canister.transfer(bob(), Tokens128::from(1001), None),
             Err(TxError::InsufficientBalance)
         );
-        assert_eq!(canister.balanceOf(alice()), Nat::from(1000));
-        assert_eq!(canister.balanceOf(bob()), Nat::from(0));
+        assert_eq!(canister.balanceOf(alice()), Tokens128::from(1000));
+        assert_eq!(canister.balanceOf(bob()), Tokens128::from(0));
     }
 
     #[test]
     fn transfer_with_fee_insufficient_balance() {
         let canister = test_canister();
-        canister.state.borrow_mut().stats.fee = Nat::from(100);
+        canister.state.borrow_mut().stats.fee = Tokens128::from(100);
         canister.state.borrow_mut().stats.fee_to = john();
 
         assert_eq!(
-            canister.transfer(bob(), Nat::from(950), None),
+            canister.transfer(bob(), Tokens128::from(950), None),
             Err(TxError::InsufficientBalance)
         );
-        assert_eq!(canister.balanceOf(alice()), Nat::from(1000));
-        assert_eq!(canister.balanceOf(bob()), Nat::from(0));
+        assert_eq!(canister.balanceOf(alice()), Tokens128::from(1000));
+        assert_eq!(canister.balanceOf(bob()), Tokens128::from(0));
     }
 
     #[test]
@@ -368,30 +397,34 @@ mod tests {
         let canister = test_canister();
         MockContext::new().with_caller(bob()).inject();
         assert_eq!(
-            canister.transfer(bob(), Nat::from(100), None),
+            canister.transfer(bob(), Tokens128::from(100), None),
             Err(TxError::SelfTransfer)
         );
-        assert_eq!(canister.balanceOf(alice()), Nat::from(1000));
-        assert_eq!(canister.balanceOf(bob()), Nat::from(0));
+        assert_eq!(canister.balanceOf(alice()), Tokens128::from(1000));
+        assert_eq!(canister.balanceOf(bob()), Tokens128::from(0));
     }
 
     #[test]
     fn transfer_saved_into_history() {
         let (ctx, canister) = test_context();
-        canister.state.borrow_mut().stats.fee = Nat::from(10);
+        canister.state.borrow_mut().stats.fee = Tokens128::from(10);
 
-        canister.transfer(bob(), Nat::from(1001), None).unwrap_err();
+        canister
+            .transfer(bob(), Tokens128::from(1001), None)
+            .unwrap_err();
         assert_eq!(canister.historySize(), 1);
 
-        const COUNT: usize = 5;
+        const COUNT: u64 = 5;
         let mut ts = ic_canister::ic_kit::ic::time().into();
         for i in 0..COUNT {
             ctx.add_time(10);
-            let id = canister.transfer(bob(), Nat::from(100 + i), None).unwrap();
+            let id = canister
+                .transfer(bob(), Tokens128::from(100 + i as u128), None)
+                .unwrap();
             assert_eq!(canister.historySize(), 2 + i);
             let tx = canister.getTransaction(id);
-            assert_eq!(tx.amount, Nat::from(100 + i));
-            assert_eq!(tx.fee, Nat::from(10));
+            assert_eq!(tx.amount, Tokens128::from(100 + i as u128));
+            assert_eq!(tx.fee, Tokens128::from(10));
             assert_eq!(tx.operation, Operation::Transfer);
             assert_eq!(tx.status, TransactionStatus::Succeeded);
             assert_eq!(tx.index, i + 1);
@@ -407,44 +440,46 @@ mod tests {
         let canister = test_canister();
         MockContext::new().with_caller(bob()).inject();
         assert_eq!(
-            canister.mint(alice(), Nat::from(100u32)),
+            canister.mint(alice(), Tokens128::from(100)),
             Err(TxError::Unauthorized)
         );
 
         canister.state.borrow_mut().stats.is_test_token = true;
 
-        assert!(canister.mint(alice(), Nat::from(2000)).is_ok());
-        assert!(canister.mint(bob(), Nat::from(5000)).is_ok());
-        assert_eq!(canister.balanceOf(alice()), Nat::from(3000));
-        assert_eq!(canister.balanceOf(bob()), Nat::from(5000));
+        assert!(canister.mint(alice(), Tokens128::from(2000)).is_ok());
+        assert!(canister.mint(bob(), Tokens128::from(5000)).is_ok());
+        assert_eq!(canister.balanceOf(alice()), Tokens128::from(3000));
+        assert_eq!(canister.balanceOf(bob()), Tokens128::from(5000));
     }
 
     #[test]
     fn mint_by_owner() {
         let canister = test_canister();
-        assert!(canister.mint(alice(), Nat::from(2000)).is_ok());
-        assert!(canister.mint(bob(), Nat::from(5000)).is_ok());
-        assert_eq!(canister.balanceOf(alice()), Nat::from(3000));
-        assert_eq!(canister.balanceOf(bob()), Nat::from(5000));
-        assert_eq!(canister.getMetadata().totalSupply, Nat::from(8000));
+        assert!(canister.mint(alice(), Tokens128::from(2000)).is_ok());
+        assert!(canister.mint(bob(), Tokens128::from(5000)).is_ok());
+        assert_eq!(canister.balanceOf(alice()), Tokens128::from(3000));
+        assert_eq!(canister.balanceOf(bob()), Tokens128::from(5000));
+        assert_eq!(canister.getMetadata().totalSupply, Tokens128::from(8000));
     }
 
     #[test]
     fn mint_saved_into_history() {
         let (ctx, canister) = test_context();
-        canister.state.borrow_mut().stats.fee = Nat::from(10);
+        canister.state.borrow_mut().stats.fee = Tokens128::from(10);
 
         assert_eq!(canister.historySize(), 1);
 
-        const COUNT: usize = 5;
+        const COUNT: u64 = 5;
         let mut ts = ic_canister::ic_kit::ic::time().into();
         for i in 0..COUNT {
             ctx.add_time(10);
-            let id = canister.mint(bob(), Nat::from(100 + i)).unwrap();
+            let id = canister
+                .mint(bob(), Tokens128::from(100 + i as u128))
+                .unwrap();
             assert_eq!(canister.historySize(), 2 + i);
             let tx = canister.getTransaction(id);
-            assert_eq!(tx.amount, Nat::from(100 + i));
-            assert_eq!(tx.fee, Nat::from(0));
+            assert_eq!(tx.amount, Tokens128::from(100 + i as u128));
+            assert_eq!(tx.fee, Tokens128::from(0));
             assert_eq!(tx.operation, Operation::Mint);
             assert_eq!(tx.status, TransactionStatus::Succeeded);
             assert_eq!(tx.index, i + 1);
@@ -458,20 +493,20 @@ mod tests {
     #[test]
     fn burn_by_owner() {
         let canister = test_canister();
-        assert!(canister.burn(None, Nat::from(100)).is_ok());
-        assert_eq!(canister.balanceOf(alice()), Nat::from(900));
-        assert_eq!(canister.getMetadata().totalSupply, Nat::from(900));
+        assert!(canister.burn(None, Tokens128::from(100)).is_ok());
+        assert_eq!(canister.balanceOf(alice()), Tokens128::from(900));
+        assert_eq!(canister.getMetadata().totalSupply, Tokens128::from(900));
     }
 
     #[test]
     fn burn_too_much() {
         let canister = test_canister();
         assert_eq!(
-            canister.burn(None, Nat::from(1001)),
+            canister.burn(None, Tokens128::from(1001)),
             Err(TxError::InsufficientBalance)
         );
-        assert_eq!(canister.balanceOf(alice()), Nat::from(1000));
-        assert_eq!(canister.getMetadata().totalSupply, Nat::from(1000));
+        assert_eq!(canister.balanceOf(alice()), Tokens128::from(1000));
+        assert_eq!(canister.getMetadata().totalSupply, Tokens128::from(1000));
     }
 
     #[test]
@@ -480,24 +515,24 @@ mod tests {
         let context = MockContext::new().with_caller(bob()).inject();
         context.update_caller(bob());
         assert_eq!(
-            canister.burn(None, Nat::from(100)),
+            canister.burn(None, Tokens128::from(100)),
             Err(TxError::InsufficientBalance)
         );
-        assert_eq!(canister.balanceOf(alice()), Nat::from(1000));
-        assert_eq!(canister.getMetadata().totalSupply, Nat::from(1000));
+        assert_eq!(canister.balanceOf(alice()), Tokens128::from(1000));
+        assert_eq!(canister.getMetadata().totalSupply, Tokens128::from(1000));
     }
 
     #[test]
     fn burn_from() {
         let canister = test_canister();
-        let bob_balance = Nat::from(1000);
+        let bob_balance = Tokens128::from(1000);
         canister.mint(bob(), bob_balance.clone()).unwrap();
         assert_eq!(canister.balanceOf(bob()), bob_balance);
 
-        canister.burn(Some(bob()), Nat::from(100)).unwrap();
-        assert_eq!(canister.balanceOf(bob()), Nat::from(900));
+        canister.burn(Some(bob()), Tokens128::from(100)).unwrap();
+        assert_eq!(canister.balanceOf(bob()), Tokens128::from(900));
 
-        assert_eq!(canister.getMetadata().totalSupply, Nat::from(1900));
+        assert_eq!(canister.getMetadata().totalSupply, Tokens128::from(1900));
     }
 
     #[test]
@@ -506,30 +541,32 @@ mod tests {
         let context = MockContext::new().with_caller(bob()).inject();
         context.update_caller(bob());
         assert_eq!(
-            canister.burn(Some(alice()), Nat::from(100)),
+            canister.burn(Some(alice()), Tokens128::from(100)),
             Err(TxError::Unauthorized)
         );
-        assert_eq!(canister.balanceOf(alice()), Nat::from(1000));
-        assert_eq!(canister.getMetadata().totalSupply, Nat::from(1000));
+        assert_eq!(canister.balanceOf(alice()), Tokens128::from(1000));
+        assert_eq!(canister.getMetadata().totalSupply, Tokens128::from(1000));
     }
 
     #[test]
     fn burn_saved_into_history() {
         let (ctx, canister) = test_context();
-        canister.state.borrow_mut().stats.fee = Nat::from(10);
+        canister.state.borrow_mut().stats.fee = Tokens128::from(10);
 
-        canister.burn(None, Nat::from(1001)).unwrap_err();
+        canister.burn(None, Tokens128::from(1001)).unwrap_err();
         assert_eq!(canister.historySize(), 1);
 
-        const COUNT: usize = 5;
+        const COUNT: u64 = 5;
         let mut ts = ic_canister::ic_kit::ic::time().into();
         for i in 0..COUNT {
             ctx.add_time(10);
-            let id = canister.burn(None, Nat::from(100 + i)).unwrap();
+            let id = canister
+                .burn(None, Tokens128::from(100 + i as u128))
+                .unwrap();
             assert_eq!(canister.historySize(), 2 + i);
             let tx = canister.getTransaction(id);
-            assert_eq!(tx.amount, Nat::from(100 + i));
-            assert_eq!(tx.fee, Nat::from(0));
+            assert_eq!(tx.amount, Tokens128::from(100 + i as u128));
+            assert_eq!(tx.fee, Tokens128::from(0));
             assert_eq!(tx.operation, Operation::Burn);
             assert_eq!(tx.status, TransactionStatus::Succeeded);
             assert_eq!(tx.index, i + 1);
@@ -544,40 +581,40 @@ mod tests {
     fn transfer_from_with_approve() {
         let canister = test_canister();
         let context = MockContext::new().with_caller(alice()).inject();
-        assert!(canister.approve(bob(), Nat::from(500)).is_ok());
+        assert!(canister.approve(bob(), Tokens128::from(500)).is_ok());
         context.update_caller(bob());
 
         assert!(canister
-            .transferFrom(alice(), john(), Nat::from(100))
+            .transferFrom(alice(), john(), Tokens128::from(100))
             .is_ok());
-        assert_eq!(canister.balanceOf(alice()), Nat::from(900));
-        assert_eq!(canister.balanceOf(john()), Nat::from(100));
+        assert_eq!(canister.balanceOf(alice()), Tokens128::from(900));
+        assert_eq!(canister.balanceOf(john()), Tokens128::from(100));
         assert!(canister
-            .transferFrom(alice(), john(), Nat::from(100))
+            .transferFrom(alice(), john(), Tokens128::from(100))
             .is_ok());
-        assert_eq!(canister.balanceOf(alice()), Nat::from(800));
-        assert_eq!(canister.balanceOf(john()), Nat::from(200));
+        assert_eq!(canister.balanceOf(alice()), Tokens128::from(800));
+        assert_eq!(canister.balanceOf(john()), Tokens128::from(200));
         assert!(canister
-            .transferFrom(alice(), john(), Nat::from(300))
+            .transferFrom(alice(), john(), Tokens128::from(300))
             .is_ok());
 
-        assert_eq!(canister.balanceOf(alice()), Nat::from(500));
-        assert_eq!(canister.balanceOf(bob()), Nat::from(0));
-        assert_eq!(canister.balanceOf(john()), Nat::from(500));
+        assert_eq!(canister.balanceOf(alice()), Tokens128::from(500));
+        assert_eq!(canister.balanceOf(bob()), Tokens128::from(0));
+        assert_eq!(canister.balanceOf(john()), Tokens128::from(500));
     }
 
     #[test]
     fn insufficient_allowance() {
         let canister = test_canister();
         let context = MockContext::new().with_caller(alice()).inject();
-        assert!(canister.approve(bob(), Nat::from(500)).is_ok());
+        assert!(canister.approve(bob(), Tokens128::from(500)).is_ok());
         context.update_caller(bob());
         assert_eq!(
-            canister.transferFrom(alice(), john(), Nat::from(600)),
+            canister.transferFrom(alice(), john(), Tokens128::from(600)),
             Err(TxError::InsufficientAllowance)
         );
-        assert_eq!(canister.balanceOf(alice()), Nat::from(1000));
-        assert_eq!(canister.balanceOf(john()), Nat::from(0));
+        assert_eq!(canister.balanceOf(alice()), Tokens128::from(1000));
+        assert_eq!(canister.balanceOf(john()), Tokens128::from(0));
     }
 
     #[test]
@@ -586,39 +623,39 @@ mod tests {
         let context = MockContext::new().with_caller(alice()).inject();
         context.update_caller(bob());
         assert_eq!(
-            canister.transferFrom(alice(), john(), Nat::from(600)),
+            canister.transferFrom(alice(), john(), Tokens128::from(600)),
             Err(TxError::InsufficientAllowance)
         );
-        assert_eq!(canister.balanceOf(alice()), Nat::from(1000));
-        assert_eq!(canister.balanceOf(john()), Nat::from(0));
+        assert_eq!(canister.balanceOf(alice()), Tokens128::from(1000));
+        assert_eq!(canister.balanceOf(john()), Tokens128::from(0));
     }
 
     #[test]
     fn transfer_from_saved_into_history() {
         let (ctx, canister) = test_context();
         let context = MockContext::new().with_caller(alice()).inject();
-        canister.state.borrow_mut().stats.fee = Nat::from(10);
+        canister.state.borrow_mut().stats.fee = Tokens128::from(10);
 
         canister
-            .transferFrom(bob(), john(), Nat::from(10))
+            .transferFrom(bob(), john(), Tokens128::from(10))
             .unwrap_err();
         assert_eq!(canister.historySize(), 1);
 
-        canister.approve(bob(), Nat::from(1000)).unwrap();
+        canister.approve(bob(), Tokens128::from(1000)).unwrap();
         context.update_caller(bob());
 
-        const COUNT: usize = 5;
+        const COUNT: u64 = 5;
         let mut ts = ic_canister::ic_kit::ic::time().into();
         for i in 0..COUNT {
             ctx.add_time(10);
             let id = canister
-                .transferFrom(alice(), john(), Nat::from(100 + i))
+                .transferFrom(alice(), john(), Tokens128::from(100 + i as u128))
                 .unwrap();
             assert_eq!(canister.historySize(), 3 + i);
             let tx = canister.getTransaction(id);
             assert_eq!(tx.caller, Some(bob()));
-            assert_eq!(tx.amount, Nat::from(100 + i));
-            assert_eq!(tx.fee, Nat::from(10));
+            assert_eq!(tx.amount, Tokens128::from(100 + i as u128));
+            assert_eq!(tx.fee, Tokens128::from(10));
             assert_eq!(tx.operation, Operation::TransferFrom);
             assert_eq!(tx.status, TransactionStatus::Succeeded);
             assert_eq!(tx.index, i + 2);
@@ -632,25 +669,33 @@ mod tests {
     #[test]
     fn multiple_approves() {
         let canister = test_canister();
-        assert!(canister.approve(bob(), Nat::from(500)).is_ok());
+        assert!(canister.approve(bob(), Tokens128::from(500)).is_ok());
         assert_eq!(
             canister.getUserApprovals(alice()),
-            vec![(bob(), Nat::from(500))]
+            vec![(bob(), Tokens128::from(500))]
         );
 
-        assert!(canister.approve(bob(), Nat::from(200)).is_ok());
+        assert!(canister.approve(bob(), Tokens128::from(200)).is_ok());
         assert_eq!(
             canister.getUserApprovals(alice()),
-            vec![(bob(), Nat::from(200))]
+            vec![(bob(), Tokens128::from(200))]
         );
 
-        assert!(canister.approve(john(), Nat::from(1000)).is_ok());
+        assert!(canister.approve(john(), Tokens128::from(1000)).is_ok());
 
         // Convert vectors to sets before comparing to make comparison unaffected by the element
         // order.
         assert_eq!(
-            HashSet::<&(Principal, Nat)>::from_iter(canister.getUserApprovals(alice()).iter()),
-            HashSet::from_iter(vec![(bob(), Nat::from(200)), (john(), Nat::from(1000))].iter())
+            HashSet::<&(Principal, Tokens128)>::from_iter(
+                canister.getUserApprovals(alice()).iter()
+            ),
+            HashSet::from_iter(
+                vec![
+                    (bob(), Tokens128::from(200)),
+                    (john(), Tokens128::from(1000))
+                ]
+                .iter()
+            )
         );
     }
 
@@ -658,56 +703,58 @@ mod tests {
     fn approve_over_balance() {
         let canister = test_canister();
         let context = MockContext::new().with_caller(alice()).inject();
-        assert!(canister.approve(bob(), Nat::from(1500)).is_ok());
+        assert!(canister.approve(bob(), Tokens128::from(1500)).is_ok());
         context.update_caller(bob());
         assert!(canister
-            .transferFrom(alice(), john(), Nat::from(500))
+            .transferFrom(alice(), john(), Tokens128::from(500))
             .is_ok());
-        assert_eq!(canister.balanceOf(alice()), Nat::from(500));
-        assert_eq!(canister.balanceOf(john()), Nat::from(500));
+        assert_eq!(canister.balanceOf(alice()), Tokens128::from(500));
+        assert_eq!(canister.balanceOf(john()), Tokens128::from(500));
 
         assert_eq!(
-            canister.transferFrom(alice(), john(), Nat::from(600)),
+            canister.transferFrom(alice(), john(), Tokens128::from(600)),
             Err(TxError::InsufficientBalance)
         );
-        assert_eq!(canister.balanceOf(alice()), Nat::from(500));
-        assert_eq!(canister.balanceOf(john()), Nat::from(500));
+        assert_eq!(canister.balanceOf(alice()), Tokens128::from(500));
+        assert_eq!(canister.balanceOf(john()), Tokens128::from(500));
     }
 
     #[test]
     fn transfer_from_with_fee() {
         let canister = test_canister();
-        canister.state.borrow_mut().stats.fee = Nat::from(100);
+        canister.state.borrow_mut().stats.fee = Tokens128::from(100);
         canister.state.borrow_mut().stats.fee_to = bob();
         let context = MockContext::new().with_caller(alice()).inject();
 
-        assert!(canister.approve(bob(), Nat::from(1500)).is_ok());
-        assert_eq!(canister.balanceOf(bob()), Nat::from(100));
+        assert!(canister.approve(bob(), Tokens128::from(1500)).is_ok());
+        assert_eq!(canister.balanceOf(bob()), Tokens128::from(100));
         context.update_caller(bob());
 
         assert!(canister
-            .transferFrom(alice(), john(), Nat::from(300))
+            .transferFrom(alice(), john(), Tokens128::from(300))
             .is_ok());
-        assert_eq!(canister.balanceOf(bob()), Nat::from(200));
-        assert_eq!(canister.balanceOf(alice()), Nat::from(500));
-        assert_eq!(canister.balanceOf(john()), Nat::from(300));
+        assert_eq!(canister.balanceOf(bob()), Tokens128::from(200));
+        assert_eq!(canister.balanceOf(alice()), Tokens128::from(500));
+        assert_eq!(canister.balanceOf(john()), Tokens128::from(300));
     }
 
     #[test]
     fn approve_saved_into_history() {
         let (ctx, canister) = test_context();
-        canister.state.borrow_mut().stats.fee = Nat::from(10);
+        canister.state.borrow_mut().stats.fee = Tokens128::from(10);
         assert_eq!(canister.historySize(), 1);
 
-        const COUNT: usize = 5;
+        const COUNT: u64 = 5;
         let mut ts = ic_canister::ic_kit::ic::time().into();
         for i in 0..COUNT {
             ctx.add_time(10);
-            let id = canister.approve(bob(), Nat::from(100 + i)).unwrap();
+            let id = canister
+                .approve(bob(), Tokens128::from(100 + i as u128))
+                .unwrap();
             assert_eq!(canister.historySize(), 2 + i);
             let tx = canister.getTransaction(id);
-            assert_eq!(tx.amount, Nat::from(100 + i));
-            assert_eq!(tx.fee, Nat::from(10));
+            assert_eq!(tx.amount, Tokens128::from(100 + i as u128));
+            assert_eq!(tx.fee, Tokens128::from(10));
             assert_eq!(tx.operation, Operation::Approve);
             assert_eq!(tx.status, TransactionStatus::Succeeded);
             assert_eq!(tx.index, i + 1);
@@ -723,12 +770,14 @@ mod tests {
         let canister = test_canister();
 
         for _ in 1..5 {
-            canister.transfer(bob(), Nat::from(10), None).unwrap();
+            canister.transfer(bob(), Tokens128::from(10), None).unwrap();
         }
 
-        canister.transfer(bob(), Nat::from(10), None).unwrap();
-        canister.transfer(xtc(), Nat::from(10), None).unwrap();
-        canister.transfer(john(), Nat::from(10), None).unwrap();
+        canister.transfer(bob(), Tokens128::from(10), None).unwrap();
+        canister.transfer(xtc(), Tokens128::from(10), None).unwrap();
+        canister
+            .transfer(john(), Tokens128::from(10), None)
+            .unwrap();
 
         assert_eq!(canister.getTransactions(None, 10, None).result.len(), 8);
         assert_eq!(canister.getTransactions(None, 10, Some(3)).result.len(), 4);
@@ -760,14 +809,14 @@ mod tests {
     #[should_panic]
     fn get_transactions_over_limit() {
         let canister = test_canister();
-        canister.getTransactions(None, (MAX_TRANSACTION_QUERY_LEN + 1) as u32, None);
+        canister.getTransactions(None, (MAX_TRANSACTION_QUERY_LEN + 1) as usize, None);
     }
 
     #[test]
     #[should_panic]
     fn get_transaction_not_existing() {
         let canister = test_canister();
-        canister.getTransaction(Nat::from(2));
+        canister.getTransaction(2);
     }
 
     #[test]
@@ -775,8 +824,8 @@ mod tests {
         let canister = test_canister();
         const COUNT: usize = 10;
         for _ in 1..COUNT {
-            canister.transfer(bob(), Nat::from(10), None).unwrap();
+            canister.transfer(bob(), Tokens128::from(10), None).unwrap();
         }
-        assert_eq!(canister.getUserTransactionCount(alice()), Nat::from(COUNT));
+        assert_eq!(canister.getUserTransactionCount(alice()), COUNT);
     }
 }

@@ -13,7 +13,8 @@ fn main() {}
 fn main() {
     use canister::is20_auction::{AuctionError, BiddingInfo};
     use common::types::Metadata;
-    use ic_cdk::export::candid::{Nat, Principal};
+    use ic_cdk::export::candid::Principal;
+    use ic_helpers::tokens::Tokens128;
     use types::*;
 
     std::print!("{}", ic_canister::generate_idl!());

@@ -1,4 +1,5 @@
-use candid::{CandidType, Nat, Principal};
+use candid::{CandidType, Principal};
+use ic_helpers::tokens::Tokens128;
 use serde::Deserialize;
 
 #[allow(non_snake_case)]
@@ -8,9 +9,9 @@ pub struct Metadata {
     pub name: String,
     pub symbol: String,
     pub decimals: u8,
-    pub totalSupply: Nat,
+    pub totalSupply: Tokens128,
     pub owner: Principal,
-    pub fee: Nat,
+    pub fee: Tokens128,
     pub feeTo: Principal,
     pub isTestToken: Option<bool>,
 }

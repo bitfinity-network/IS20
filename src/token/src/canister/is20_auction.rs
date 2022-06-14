@@ -1,17 +1,18 @@
 //! This module contains APIs from IS20 standard providing cycle auction related functionality.
 
-use crate::canister::erc20_transactions::_transfer;
+use crate::canister::erc20_transactions::transfer_balance;
 use crate::canister::TokenCanister;
 use crate::ledger::Ledger;
 use crate::state::{AuctionHistory, Balances, BiddingState, CanisterState};
-use crate::types::{AuctionInfo, StatsData, Timestamp};
-use candid::{CandidType, Deserialize, Nat, Principal};
+use crate::types::{AuctionInfo, Cycles, StatsData, Timestamp};
+use candid::{CandidType, Deserialize, Principal};
 use ic_canister::ic_kit::ic;
+use ic_helpers::tokens::Tokens128;
 use std::collections::HashMap;
 
 // Minimum bidding amount is required, for every update call costs cycles, and we want bidding
 // to add cycles rather then to decrease them. 1M is chosen as one ingress call costs 590K cycles.
-const MIN_BIDDING_AMOUNT: u64 = 1_000_000;
+const MIN_BIDDING_AMOUNT: Cycles = 1_000_000;
 
 /// Current information about upcoming auction and current cycle bids.
 #[derive(CandidType, Debug, Clone, Deserialize)]
@@ -30,14 +31,14 @@ pub struct BiddingInfo {
     auction_period: Timestamp,
 
     /// Total cycles accumulated since the last auction.
-    total_cycles: u64,
+    total_cycles: Cycles,
 
     /// The amount of cycles the caller bid for the upcoming auction.
-    caller_cycles: u64,
+    caller_cycles: Cycles,
 
     /// The amount of fees accumulated since the last auction and that will be distributed on the
     /// next auction.
-    accumulated_fees: Nat,
+    accumulated_fees: Tokens128,
 }
 
 #[derive(CandidType, Debug, Clone, Deserialize, PartialEq)]
@@ -55,7 +56,10 @@ pub enum AuctionError {
     TooEarlyToBeginAuction,
 }
 
-pub(crate) fn bid_cycles(canister: &TokenCanister, bidder: Principal) -> Result<u64, AuctionError> {
+pub(crate) fn bid_cycles(
+    canister: &TokenCanister,
+    bidder: Principal,
+) -> Result<Cycles, AuctionError> {
     let amount = ic::msg_cycles_available();
     if amount < MIN_BIDDING_AMOUNT {
         return Err(AuctionError::BiddingTooSmall);
@@ -132,16 +136,21 @@ fn perform_auction(
     }
 
     let total_amount = accumulated_fees(balances);
-    let mut transferred_amount = Nat::from(0);
+    let mut transferred_amount = Tokens128::from(0u128);
     let total_cycles = bidding_state.cycles_since_auction;
 
     let first_id = ledger.len();
 
     for (bidder, cycles) in &bidding_state.bids {
-        let amount = total_amount.clone() * *cycles / total_cycles;
-        _transfer(balances, auction_principal(), *bidder, amount.clone());
-        ledger.auction(*bidder, amount.clone());
-        transferred_amount += amount;
+        let amount = (total_amount * cycles / total_cycles)
+            .expect("total cycles is not 0 checked by bids existing")
+            .to_tokens128()
+            .expect("total cycles is smaller then single user bid cycles");
+        transfer_balance(balances, auction_principal(), *bidder, amount)
+            .expect("auction principal always have enough balance");
+        ledger.auction(*bidder, amount);
+        transferred_amount =
+            (transferred_amount + amount).expect("can never be larger than total_supply");
     }
 
     let last_id = ledger.len() - 1;
@@ -167,7 +176,7 @@ fn reset_bidding_state(stats: &StatsData, bidding_state: &mut BiddingState) {
     bidding_state.bids = HashMap::new();
 }
 
-fn get_fee_ratio(min_cycles: u64, current_cycles: u64) -> f64 {
+fn get_fee_ratio(min_cycles: Cycles, current_cycles: Cycles) -> f64 {
     let min_cycles = min_cycles as f64;
     let current_cycles = current_cycles as f64;
     if min_cycles == 0.0 {
@@ -190,12 +199,12 @@ pub fn auction_principal() -> Principal {
     Principal::management_canister()
 }
 
-pub fn accumulated_fees(balances: &Balances) -> Nat {
+pub fn accumulated_fees(balances: &Balances) -> Tokens128 {
     balances
         .0
         .get(&auction_principal())
         .cloned()
-        .unwrap_or_else(|| Nat::from(0))
+        .unwrap_or_else(|| Tokens128::from(0u128))
 }
 
 #[cfg(test)]
@@ -218,9 +227,9 @@ mod tests {
             name: "".to_string(),
             symbol: "".to_string(),
             decimals: 8,
-            totalSupply: Nat::from(1000),
+            totalSupply: Tokens128::from(1000),
             owner: alice(),
-            fee: Nat::from(0),
+            fee: Tokens128::from(0),
             feeTo: alice(),
             isTestToken: None,
         });
@@ -291,15 +300,18 @@ mod tests {
             .borrow_mut()
             .balances
             .0
-            .insert(auction_principal(), Nat::from(6_000));
+            .insert(auction_principal(), Tokens128::from(6_000));
 
         let result = canister.runAuction().unwrap();
         assert_eq!(result.cycles_collected, 6_000_000);
-        assert_eq!(result.first_transaction_id, Nat::from(1));
-        assert_eq!(result.last_transaction_id, Nat::from(2));
-        assert_eq!(result.tokens_distributed, Nat::from(6_000));
+        assert_eq!(result.first_transaction_id, 1);
+        assert_eq!(result.last_transaction_id, 2);
+        assert_eq!(result.tokens_distributed, Tokens128::from(6_000));
 
-        assert_eq!(canister.state.borrow().balances.0[&bob()], 4_000);
+        assert_eq!(
+            canister.state.borrow().balances.0[&bob()],
+            Tokens128::from(4_000)
+        );
 
         let retrieved_result = canister.auctionInfo(result.auction_id).unwrap();
         assert_eq!(retrieved_result, result);
