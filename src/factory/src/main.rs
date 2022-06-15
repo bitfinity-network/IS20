@@ -7,9 +7,15 @@ fn main() {}
 
 #[cfg(not(any(target_arch = "wasm32", test)))]
 fn main() {
-    use crate::error::TokenFactoryError;
+    use crate::{api::TokenFactoryCanister, error::TokenFactoryError};
     use candid::Principal;
     use common::types::Metadata;
+    use ic_factory::api::FactoryCanister;
 
-    std::print!("{}", ic_canister::generate_idl!());
+    let canister_idl = ic_canister::generate_idl!();
+    let mut factory_idl = <TokenFactoryCanister as FactoryCanister>::get_idl();
+    factory_idl.merge(&canister_idl);
+
+    let result = candid::bindings::candid::compile(&factory_idl.env.env, &Some(factory_idl.actor));
+    println!("{result}");
 }
