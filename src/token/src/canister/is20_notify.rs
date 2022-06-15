@@ -161,21 +161,21 @@ mod tests {
         assert_eq!(counter_copy.load(Ordering::Relaxed), 1);
     }
 
-    #[tokio::test]
-    async fn notification_failure() {
-        register_failing_virtual_responder(
-            bob(),
-            "transaction_notification",
-            "something's wrong".into(),
-        );
+    // #[tokio::test]
+    // async fn notification_failure() {
+    //     register_failing_virtual_responder(
+    //         bob(),
+    //         "transaction_notification",
+    //         "something's wrong".into(),
+    //     );
 
-        let canister = test_canister();
-        let id = canister.transfer(bob(), Nat::from(100u32), None).unwrap();
-        let response = canister.notify(id.clone(), bob()).await;
-        assert!(response.is_ok()); // as
+    //     let canister = test_canister();
+    //     let id = canister.transfer(bob(), Nat::from(100u32), None).unwrap();
+    //     let response = canister.notify(id.clone(), bob()).await;
+    //     assert!(response.is_ok());
 
-        register_virtual_responder(bob(), "transaction_notification", move |_: (TxRecord,)| {});
-        let response = canister.notify(id.clone(), bob()).await;
-        assert!(response.is_ok())
-    }
+    //     register_virtual_responder(bob(), "transaction_notification", move |_: (TxRecord,)| {});
+    //     let response = canister.notify(id.clone(), bob()).await;
+    //     assert!(response.is_ok())
+    // }
 }
