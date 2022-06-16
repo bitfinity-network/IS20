@@ -104,9 +104,7 @@ impl TokenFactoryCanister {
         }
 
         let key = info.name.clone();
-        let key = Principal::from_text(key).unwrap();
-
-        if self.factory.borrow().factory.get(&key).is_some() {
+        if self.state.borrow().tokens.contains_key(&key) {
             return Err(TokenFactoryError::AlreadyExists);
         }
 
@@ -132,7 +130,12 @@ impl TokenFactoryCanister {
             .map_err(|e| TokenFactoryError::CanisterCreateFailed(e.1))?;
         let principal = canister.identity();
 
-        self.factory.borrow_mut().factory.register(key, canister);
+        self.factory
+            .borrow_mut()
+            .factory
+            .register(principal, canister);
+
+        self.state.borrow_mut().tokens.insert(key, principal);
 
         Ok(principal)
     }
@@ -152,6 +155,7 @@ impl TokenFactoryCanister {
 
         let drop_token_fut = self.factory.borrow_mut().factory.drop(token);
         drop_token_fut.await?;
+        let _ = self.state.borrow_mut().tokens.remove(&name);
         let name = Principal::from_text(name).unwrap();
         self.factory.borrow_mut().factory.forget(&name)?;
 

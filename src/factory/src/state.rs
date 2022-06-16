@@ -1,10 +1,14 @@
+use candid::Principal;
 use ic_cdk::export::candid::CandidType;
 use ic_storage::{stable::Versioned, IcStorage};
 use serde::Deserialize;
+use std::collections::HashMap;
 
 #[derive(CandidType, Deserialize, IcStorage, Default)]
 pub struct State {
     pub token_wasm: Option<Vec<u8>>,
+    /// Associated list of token name and its principal
+    pub tokens: HashMap<String, Principal>,
 }
 
 impl Versioned for State {
