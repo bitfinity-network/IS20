@@ -804,7 +804,6 @@ mod proptests {
             amount: Nat,
         },
         TransferWithoutFee {
-            caller: Principal,
             from: Principal,
             to: Principal,
             amount: Nat,
@@ -857,13 +856,11 @@ mod proptests {
             (
                 select_principal(principals.clone()),
                 select_principal(principals.clone()),
-                select_principal(principals.clone()),
                 make_nat(),
                 make_option(),
             )
-                .prop_map(|(caller, from, to, amount, fee_limit)| {
+                .prop_map(|(from, to, amount, fee_limit)| {
                     Action::TransferWithoutFee {
-                        caller,
                         from,
                         to,
                         amount,
@@ -985,24 +982,15 @@ mod proptests {
                         }
                     },
                     TransferFrom { caller, from, to, amount } => {
-                        // Transfers value amount of tokens from user `from` to user `to`,
-                        // this method allows canister smart contracts to transfer tokens on your behalf,
-                        // it returns a TxReceipt which contains the transaction index or an error message.
-                        //
-                        // If the fee is set, the from principal is charged with the fee. In this case,
-                        // the maximum amount that the caller can request to transfer is allowance - fee.
                         MockContext::new().with_caller(caller).inject();
                         let from_balance = canister.balanceOf(from);
                         let to_balance = canister.balanceOf(to);
-                        let fee_to = canister.state.borrow().stats.fee_to;
-                        let fee = canister.state.borrow().stats.fee.clone();
+                        let (fee , _) = canister.state.borrow().stats.fee_info();
                         let amount_with_fee = fee.clone() + amount.clone();
                         let res = canister.transferFrom(from, to, amount.clone());
-                        let approve = canister.approve(from, amount.clone());
+                        let _ = canister.approve(from, amount.clone());
                         let from_allowance = canister.allowance(from, caller);
-                        println!("ALLWOANCE {:?}", from_allowance);
                         if from == to {
-                            // prop_assert_eq!(approve, Err(TxError::SelfTransfer));
                             prop_assert_eq!(res, Err(TxError::SelfTransfer));
                             return Ok(());
                         }
@@ -1013,12 +1001,17 @@ mod proptests {
                         }
 
                         if from_balance < amount_with_fee {
-                            eprintln!("in test: balance: {from_balance} - amount with fee: {amount_with_fee}");
                             prop_assert_eq!(res, Err(TxError::InsufficientBalance));
+                            prop_assert_eq!(from_balance, canister.balanceOf(from));
+
                             return Ok(());
                         }
+
+                        prop_assert!(matches!(res, Ok(_)));
+                        prop_assert_eq!(from_balance - amount_with_fee.clone(), canister.balanceOf(from));
+                        prop_assert_eq!(to_balance + amount, canister.balanceOf(to));
                     },
-                    TransferWithoutFee{caller:_,from,to,amount,fee_limit} => {
+                    TransferWithoutFee{from,to,amount,fee_limit} => {
                         MockContext::new().with_caller(from).inject();
                         let from_balance = canister.balanceOf(from);
                         let to_balance = canister.balanceOf(to);
