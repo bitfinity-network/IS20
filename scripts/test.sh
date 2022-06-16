@@ -1,3 +1,3 @@
 cargo fmt -- --check
-cargo clippy -j`nproc || printf 1`
+cargo clippy
 cargo test
