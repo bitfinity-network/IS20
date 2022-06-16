@@ -995,26 +995,53 @@ mod proptests {
                         //
                         // If the fee is set, the from principal is charged with the fee. In this case,
                         // the maximum amount that the caller can request to transfer is allowance - fee.
-                        MockContext::new().with_caller(caller).inject();
-                        let from_balance = canister.balanceOf(from);
-                        let to_balance = canister.balanceOf(to);
-                        // let res = canister.transferFrom(from, to, amount);
-                    },
-                    TransferWithoutFee{caller,from,to,amount,fee_limit} => {
                         MockContext::new().with_caller(from).inject();
                         let from_balance = canister.balanceOf(from);
                         let to_balance = canister.balanceOf(to);
+                        let fee_to = canister.state.borrow().stats.fee_to;
                         let fee = canister.state.borrow().stats.fee.clone();
+                        let amount_with_fee = fee.clone() + amount.clone();
+                        let res = canister.transferFrom(from, to, amount.clone());
+                        let approve = canister.approve(on_behalf_of, amount.clone());
+                        let from_allowance = canister.allowance(from, on_behalf_of);
+                        println!("ALLWOANCE{:?}", from_allowance);
+                        if from == to {
+                            // prop_assert_eq!(approve, Err(TxError::SelfTransfer));
+                            prop_assert_eq!(res, Err(TxError::SelfTransfer));
+                            return Ok(());
+                        }
+
+                        if from_balance < amount_with_fee {
+                            prop_assert_eq!(res, Err(TxError::InsufficientBalance));
+                            return Ok(());
+                        }
+
+                        if from_allowance < amount_with_fee {
+                            prop_assert_eq!(res, Err(TxError::InsufficientAllowance));
+                            return Ok(());
+                        }
+
+
+
+                        if from == on_behalf_of || to == on_behalf_of {
+                        //    println!("FROM == ON_BEHALF_OF");
+                        //    println!("TO == ON_BEHALF_OF");
+                          return Ok(());
+                        }
+
+                    },
+                    TransferWithoutFee{caller:_,from,to,amount,fee_limit} => {
+                        MockContext::new().with_caller(from).inject();
+                        let from_balance = canister.balanceOf(from);
+                        let to_balance = canister.balanceOf(to);
+                        let (fee , fee_to) = canister.state.borrow().stats.fee_info();
                         let amount_with_fee = amount.clone() + fee.clone();
                         let res = canister.transfer(to, amount.clone(), fee_limit.clone());
-                        // The balance of the caller is reduced by `value + fee` amount.
 
                         if to == from {
                             prop_assert_eq!(res, Err(TxError::SelfTransfer));
                             return Ok(())
                         }
-
-
 
                         if let Some(fee_limit) = fee_limit.clone() {
                             if fee_limit.clone() < fee.clone() {
@@ -1028,32 +1055,31 @@ mod proptests {
                             return Ok(())
                         }
 
-                        println!("-------------------------------------------------");
-                        println!("starting balance of from : {from_balance}");
-                        println!("starting balance of to : {to_balance}");
-                        println!("amount                   : {}", amount.clone());
-                        println!("fee                      : {}", fee.clone());
-                        println!("fee limit                      : {:?}", fee_limit.clone());
-                        println!("current: balance of from : {}", canister.balanceOf(from));
-                        println!("current: balance of to : {}", canister.balanceOf(to));
-                        println!("RESULT : {:?}", res);
-                        println!("-------------------------------------------------");
+                        if fee_to == from  {
+                            prop_assert!(matches!(res, Ok(_)));
+                            prop_assert_eq!(from_balance - amount, canister.balanceOf(from));
+                            return Ok(());
+                        }
 
-                        // prop_assert_eq!(to_balance + amount.clone(), canister.balanceOf(to));
-                        // prop_assert_eq!(from_balance - amount.clone() - fee.clone(), canister.balanceOf(from));
+                        if fee_to == to  {
+                            prop_assert!(matches!(res, Ok(_)));
+                            prop_assert_eq!(to_balance + amount + fee, canister.balanceOf(to));
+                            return Ok(());
+                        }
+
                         prop_assert!(matches!(res, Ok(_)));
-
-
+                        prop_assert_eq!(from_balance - amount_with_fee, canister.balanceOf(from));
+                        prop_assert_eq!(to_balance + amount.clone(), canister.balanceOf(to));
 
                     }
                     TransferWithFee { from, to, amount } => {
                         MockContext::new().with_caller(from).inject();
                         let from_balance = canister.balanceOf(from);
                         let to_balance = canister.balanceOf(to);
-                        let fee = canister.state.borrow().stats.fee.clone();
+                        let (fee , fee_to) = canister.state.borrow().stats.fee_info();
                         let res = canister.transferIncludeFee(to, amount.clone());
 
-                         if to == from {
+                        if to == from {
                             prop_assert_eq!(res, Err(TxError::SelfTransfer));
                             return Ok(())
                         }
@@ -1067,11 +1093,20 @@ mod proptests {
                             return Ok(());
                         }
 
+                        // Sometimes the fee can be sent `to` or `from`
+                        if fee_to == from  {
+                            prop_assert_eq!(from_balance - amount + fee, canister.balanceOf(from));
+                            return Ok(());
+                        }
 
+                        if fee_to == to  {
+                            prop_assert_eq!(to_balance + amount, canister.balanceOf(to));
+                            return Ok(());
+                        }
 
                         prop_assert!(matches!(res, Ok(_)));
-                        // prop_assert_eq!(to_balance.clone() + amount.clone() - fee.clone(), canister.balanceOf(to));
-                        // prop_assert_eq!(from_balance.clone() - amount.clone(), canister.balanceOf(from));
+                        prop_assert_eq!(to_balance.clone() + amount.clone() - fee.clone(), canister.balanceOf(to));
+                        prop_assert_eq!(from_balance.clone() - amount.clone(), canister.balanceOf(from));
 
                     }
                 }

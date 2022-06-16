@@ -27,9 +27,3 @@ repos:
             language: script
             files: \.x$
             always_run: true
-        -   id: run-cargo-test
-            name: Run Cargo test
-            entry: /bin/bash -c "cargo test"
-            language: script
-            files: \.x$
-            always_run: true
