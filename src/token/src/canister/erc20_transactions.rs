@@ -91,7 +91,7 @@ pub fn transfer_from(
                 }
             }
         }
-        None => panic!(),
+        None => return Err(TxError::NoAllowance),
     }
 
     let id = state
@@ -814,7 +814,6 @@ mod proptests {
             caller: Principal,
             from: Principal,
             to: Principal,
-            on_behalf_of: Principal,
             amount: Nat,
         },
     }
@@ -875,16 +874,14 @@ mod proptests {
             (
                 select_principal(principals.clone()),
                 select_principal(principals.clone()),
-                select_principal(principals.clone()),
                 select_principal(principals),
                 make_nat()
             )
-                .prop_map(|(principal, from, to, on_behalf_of, amount)| {
+                .prop_map(|(principal, from, to, amount)| {
                     Action::TransferFrom {
                         caller: principal,
                         from,
                         to,
-                        on_behalf_of,
                         amount,
                     }
                 })
@@ -987,31 +984,26 @@ mod proptests {
                             total_burned += amount.clone();
                         }
                     },
-                    TransferFrom { caller, from, to, on_behalf_of, amount } => {
-                        // Transfers value amount of tokens from user from to user to,
+                    TransferFrom { caller, from, to, amount } => {
+                        // Transfers value amount of tokens from user `from` to user `to`,
                         // this method allows canister smart contracts to transfer tokens on your behalf,
                         // it returns a TxReceipt which contains the transaction index or an error message.
                         //
                         // If the fee is set, the from principal is charged with the fee. In this case,
                         // the maximum amount that the caller can request to transfer is allowance - fee.
-                        MockContext::new().with_caller(from).inject();
+                        MockContext::new().with_caller(caller).inject();
                         let from_balance = canister.balanceOf(from);
                         let to_balance = canister.balanceOf(to);
                         let fee_to = canister.state.borrow().stats.fee_to;
                         let fee = canister.state.borrow().stats.fee.clone();
                         let amount_with_fee = fee.clone() + amount.clone();
                         let res = canister.transferFrom(from, to, amount.clone());
-                        let approve = canister.approve(on_behalf_of, amount.clone());
-                        let from_allowance = canister.allowance(from, on_behalf_of);
-                        println!("ALLWOANCE{:?}", from_allowance);
+                        let approve = canister.approve(from, amount.clone());
+                        let from_allowance = canister.allowance(from, caller);
+                        println!("ALLWOANCE {:?}", from_allowance);
                         if from == to {
                             // prop_assert_eq!(approve, Err(TxError::SelfTransfer));
                             prop_assert_eq!(res, Err(TxError::SelfTransfer));
-                            return Ok(());
-                        }
-
-                        if from_balance < amount_with_fee {
-                            prop_assert_eq!(res, Err(TxError::InsufficientBalance));
                             return Ok(());
                         }
 
@@ -1020,14 +1012,11 @@ mod proptests {
                             return Ok(());
                         }
 
-
-
-                        if from == on_behalf_of || to == on_behalf_of {
-                        //    println!("FROM == ON_BEHALF_OF");
-                        //    println!("TO == ON_BEHALF_OF");
-                          return Ok(());
+                        if from_balance < amount_with_fee {
+                            eprintln!("in test: balance: {from_balance} - amount with fee: {amount_with_fee}");
+                            prop_assert_eq!(res, Err(TxError::InsufficientBalance));
+                            return Ok(());
                         }
-
                     },
                     TransferWithoutFee{caller:_,from,to,amount,fee_limit} => {
                         MockContext::new().with_caller(from).inject();
