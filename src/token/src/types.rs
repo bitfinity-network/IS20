@@ -1,5 +1,4 @@
 use candid::{CandidType, Deserialize, Principal};
-use common::types::Metadata;
 use ic_helpers::tokens::Tokens128;
 use std::collections::HashMap;
 
@@ -7,6 +6,20 @@ mod tx_record;
 pub use tx_record::*;
 
 pub type Timestamp = u64;
+
+#[allow(non_snake_case)]
+#[derive(Deserialize, CandidType, Clone, Debug)]
+pub struct Metadata {
+    pub logo: String,
+    pub name: String,
+    pub symbol: String,
+    pub decimals: u8,
+    pub totalSupply: Tokens128,
+    pub owner: Principal,
+    pub fee: Tokens128,
+    pub feeTo: Principal,
+    pub isTestToken: Option<bool>,
+}
 
 #[derive(Deserialize, CandidType, Clone, Debug)]
 pub struct StatsData {

@@ -1,7 +1,6 @@
 use crate::ledger::Ledger;
-use crate::types::{Allowances, AuctionInfo, Cycles, StatsData, Timestamp};
+use crate::types::{Allowances, AuctionInfo, Cycles, Metadata, StatsData, Timestamp};
 use candid::{CandidType, Deserialize, Principal};
-use common::types::Metadata;
 use ic_helpers::tokens::Tokens128;
 use ic_storage::stable::Versioned;
 use ic_storage::IcStorage;
@@ -24,9 +23,9 @@ impl CanisterState {
             name: self.stats.name.clone(),
             symbol: self.stats.symbol.clone(),
             decimals: self.stats.decimals,
-            totalSupply: self.stats.total_supply.clone(),
+            totalSupply: self.stats.total_supply,
             owner: self.stats.owner,
-            fee: self.stats.fee.clone(),
+            fee: self.stats.fee,
             feeTo: self.stats.fee_to,
             isTestToken: Some(self.stats.is_test_token),
         }

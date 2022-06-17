@@ -8,13 +8,13 @@ use std::rc::Rc;
 use crate::error::TokenFactoryError;
 use crate::state::State;
 use candid::Principal;
-use common::types::Metadata;
 use ic_canister::{init, query, update, Canister};
 use ic_helpers::factory::error::FactoryError;
 use ic_helpers::factory::FactoryState;
 
 #[cfg(target_arch = "wasm32")]
 use candid::Nat;
+use token::types::Metadata;
 
 mod inspect_message;
 

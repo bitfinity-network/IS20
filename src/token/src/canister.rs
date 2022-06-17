@@ -1,7 +1,6 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use common::types::Metadata;
 use ic_canister::{init, query, update, Canister};
 use ic_cdk::export::candid::Principal;
 use ic_helpers::tokens::Tokens128;
@@ -18,12 +17,15 @@ use crate::canister::is20_transactions::{batch_transfer, transfer_include_fee};
 use crate::principal::{CheckedPrincipal, Owner};
 use crate::state::CanisterState;
 use crate::types::{
-    AuctionInfo, PaginatedResult, StatsData, Timestamp, TokenInfo, TxError, TxId, TxReceipt,
-    TxRecord,
+    AuctionInfo, Metadata, PaginatedResult, StatsData, Timestamp, TokenInfo, TxError, TxId,
+    TxReceipt, TxRecord,
 };
 
 mod erc20_transactions;
+
+#[cfg(not(feature = "no_api"))]
 mod inspect;
+
 pub mod is20_auction;
 pub mod is20_notify;
 mod is20_transactions;
@@ -135,7 +137,7 @@ impl TokenCanister {
     }
 
     #[query]
-    fn balanceOf(&self, holder: Principal) -> Tokens128 {
+    pub fn balanceOf(&self, holder: Principal) -> Tokens128 {
         self.state.borrow().balances.balance_of(&holder)
     }
 
@@ -258,7 +260,7 @@ impl TokenCanister {
     }
 
     #[update]
-    fn transferFrom(&self, from: Principal, to: Principal, amount: Tokens128) -> TxReceipt {
+    pub fn transferFrom(&self, from: Principal, to: Principal, amount: Tokens128) -> TxReceipt {
         let caller = CheckedPrincipal::with_recipient(to)?;
         transfer_from(self, caller, from, amount)
     }
@@ -269,7 +271,7 @@ impl TokenCanister {
     /// Note, that the `value` cannot be less than the `fee` amount. If the value given is too small,
     /// transaction will fail with `TxError::AmountTooSmall` error.
     #[update]
-    fn transferIncludeFee(&self, to: Principal, amount: Tokens128) -> TxReceipt {
+    pub fn transferIncludeFee(&self, to: Principal, amount: Tokens128) -> TxReceipt {
         let caller = CheckedPrincipal::with_recipient(to)?;
         transfer_include_fee(self, caller, amount)
     }

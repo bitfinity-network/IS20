@@ -9,7 +9,7 @@ fn main() {}
 fn main() {
     use crate::error::TokenFactoryError;
     use candid::Principal;
-    use common::types::Metadata;
+    use token::types::Metadata;
 
     std::print!("{}", ic_canister::generate_idl!());
 }

@@ -9,12 +9,12 @@ no_api = []
 
 [dependencies]
 candid = "0.7"
-common = { path = "../common" }
 ic-cdk = "0.5"
 ic-cdk-macros = "0.5"
 ic-canister = { git = "https://github.com/infinity-swap/ic-helpers", package = "ic-canister", tag = "v0.3.4" }
 ic-helpers = { git = "https://github.com/infinity-swap/ic-helpers", package = "ic-helpers", tag = "v0.3.4" }
 ic-storage = { git = "https://github.com/infinity-swap/ic-helpers", package = "ic-storage", tag = "v0.3.4" }
+token = { path = "../token", features = ["no_api"] }
 serde = "1.0"
 thiserror = "1.0"
 
