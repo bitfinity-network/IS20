@@ -6,7 +6,7 @@ use ic_storage::stable::Versioned;
 use ic_storage::IcStorage;
 use std::collections::HashMap;
 
-#[derive(Default, CandidType, Deserialize, IcStorage)]
+#[derive(Debug, Default, CandidType, Deserialize, IcStorage)]
 pub struct CanisterState {
     pub(crate) bidding_state: BiddingState,
     pub(crate) balances: Balances,
@@ -64,7 +64,7 @@ impl Versioned for CanisterState {
     }
 }
 
-#[derive(Default, CandidType, Deserialize)]
+#[derive(Debug, Default, CandidType, Deserialize)]
 pub struct Balances(pub HashMap<Principal, Tokens128>);
 
 impl Balances {
@@ -103,5 +103,5 @@ impl BiddingState {
     }
 }
 
-#[derive(Default, CandidType, Deserialize)]
+#[derive(Debug, Default, CandidType, Deserialize)]
 pub struct AuctionHistory(pub Vec<AuctionInfo>);
