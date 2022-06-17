@@ -189,11 +189,15 @@ fn burn(
     match state.balances.0.get_mut(&from) {
         Some(balance) => {
             *balance = (*balance - amount).ok_or(TxError::InsufficientBalance)?;
-            if *balance == Tokens128::from(0) {
+            if *balance == Tokens128::ZERO {
                 state.balances.0.remove(&from);
             }
         }
-        None => return Err(TxError::InsufficientBalance),
+        None => {
+            if !amount.is_zero() {
+                return Err(TxError::InsufficientBalance);
+            }
+        }
     }
 
     state.stats.total_supply =
@@ -830,7 +834,7 @@ mod tests {
 #[cfg(test)]
 mod proptests {
     use super::*;
-    use common::types::Metadata;
+    use crate::types::Metadata;
     use ic_canister::ic_kit::MockContext;
     use ic_canister::Canister;
     use proptest::collection::vec;
@@ -842,25 +846,25 @@ mod proptests {
         Mint {
             minter: Principal,
             recipient: Principal,
-            amount: Nat,
+            amount: Tokens128,
         },
-        Burn(Nat, Principal),
+        Burn(Tokens128, Principal),
         TransferWithFee {
             from: Principal,
             to: Principal,
-            amount: Nat,
+            amount: Tokens128,
         },
         TransferWithoutFee {
             from: Principal,
             to: Principal,
-            amount: Nat,
-            fee_limit: Option<Nat>,
+            amount: Tokens128,
+            fee_limit: Option<Tokens128>,
         },
         TransferFrom {
             caller: Principal,
             from: Principal,
             to: Principal,
-            amount: Nat,
+            amount: Tokens128,
         },
     }
 
@@ -876,7 +880,7 @@ mod proptests {
         prop_oneof![
             // Mint
             (
-                make_nat(),
+                make_tokens128(),
                 select_principal(principals.clone()),
                 select_principal(principals.clone()),
             )
@@ -886,13 +890,13 @@ mod proptests {
                     amount
                 }),
             // Burn
-            (make_nat(), select_principal(principals.clone()))
+            (make_tokens128(), select_principal(principals.clone()))
                 .prop_map(|(amount, principal)| Action::Burn(amount, principal)),
             // With fee
             (
                 select_principal(principals.clone()),
                 select_principal(principals.clone()),
-                make_nat()
+                make_tokens128()
             )
                 .prop_map(|(from, to, amount)| Action::TransferWithFee {
                     from,
@@ -903,7 +907,7 @@ mod proptests {
             (
                 select_principal(principals.clone()),
                 select_principal(principals.clone()),
-                make_nat(),
+                make_tokens128(),
                 make_option(),
             )
                 .prop_map(|(from, to, amount, fee_limit)| {
@@ -919,7 +923,7 @@ mod proptests {
                 select_principal(principals.clone()),
                 select_principal(principals.clone()),
                 select_principal(principals),
-                make_nat()
+                make_tokens128()
             )
                 .prop_map(|(principal, from, to, amount)| {
                     Action::TransferFrom {
@@ -932,8 +936,8 @@ mod proptests {
         ]
     }
 
-    fn make_option() -> impl Strategy<Value = Option<Nat>> {
-        prop_oneof![Just(None), (make_nat()).prop_map(Some)]
+    fn make_option() -> impl Strategy<Value = Option<Tokens128>> {
+        prop_oneof![Just(None), (make_tokens128()).prop_map(Some)]
     }
 
     fn make_principal() -> BoxedStrategy<Principal> {
@@ -948,9 +952,8 @@ mod proptests {
     }
 
     prop_compose! {
-        fn make_nat() (num in "[0-9]{1,4}") -> Nat {
-            let nat = Nat::parse(num.as_bytes()).unwrap();
-            nat
+        fn make_tokens128() (num in "[0-9]{1,4}") -> Tokens128 {
+            Tokens128::from(u128::from_str_radix(&num, 10).unwrap())
         }
     }
     prop_compose! {
@@ -959,8 +962,8 @@ mod proptests {
             name in any::<String>(),
             symbol in any::<String>(),
             decimals in any::<u8>(),
-            totalSupply in make_nat(),
-            fee in make_nat(),
+            total_supply in make_tokens128(),
+            fee in make_tokens128(),
             principals in vec(make_principal(), 1..7),
             owner_idx in any::<Index>(),
             fee_to_idx in any::<Index>(),
@@ -974,7 +977,7 @@ mod proptests {
                 name,
                 symbol,
                 decimals,
-                totalSupply,
+                totalSupply: total_supply,
                 owner,
                 fee,
                 feeTo: fee_to,
@@ -994,8 +997,8 @@ mod proptests {
     proptest! {
         #[test]
         fn generic_proptest((canister, actions) in canister_and_actions()) {
-            let mut total_minted = Nat::from(0);
-            let mut total_burned = Nat::from(0);
+            let mut total_minted = Tokens128::ZERO;
+            let mut total_burned = Tokens128::ZERO;
             let starting_supply = canister.totalSupply();
             for action in actions {
                 use Action::*;
@@ -1003,11 +1006,11 @@ mod proptests {
                     Mint { minter, recipient, amount } => {
                         MockContext::new().with_caller(minter).inject();
                         let original = canister.totalSupply();
-                        let res = canister.mint(recipient, amount.clone());
+                        let res = canister.mint(recipient, amount);
                         let expected = if minter == canister.owner() {
-                            total_minted += amount.clone();
+                            total_minted = (total_minted + amount).unwrap();
                             assert!(matches!(res, Ok(_)));
-                            original + amount
+                            (original + amount).unwrap()
                         } else {
                             assert_eq!(res, Err(TxError::Unauthorized));
                             original
@@ -1018,14 +1021,14 @@ mod proptests {
                         MockContext::new().with_caller(burner).inject();
                         let original = canister.totalSupply();
                         let balance = canister.balanceOf(burner);
-                        let res = canister.burn(Some(burner), amount.clone());
+                        let res = canister.burn(Some(burner), amount);
                         if balance < amount {
                             prop_assert_eq!(res, Err(TxError::InsufficientBalance));
                             prop_assert_eq!(original, canister.totalSupply());
                         } else {
-                            prop_assert!(matches!(res, Ok(_)));
-                            prop_assert_eq!(original.clone() - amount.clone(), canister.totalSupply());
-                            total_burned += amount.clone();
+                            prop_assert!(matches!(res, Ok(_)), "Burn error: {:?}. Balance: {}, amount: {}", res, balance, amount);
+                            prop_assert_eq!((original - amount).unwrap(), canister.totalSupply());
+                            total_burned = (total_burned + amount).unwrap();
                         }
                     },
                     TransferFrom { caller, from, to, amount } => {
@@ -1033,9 +1036,9 @@ mod proptests {
                         let from_balance = canister.balanceOf(from);
                         let to_balance = canister.balanceOf(to);
                         let (fee , _) = canister.state.borrow().stats.fee_info();
-                        let amount_with_fee = fee.clone() + amount.clone();
-                        let res = canister.transferFrom(from, to, amount.clone());
-                        let _ = canister.approve(from, amount.clone());
+                        let amount_with_fee = (fee + amount).unwrap();
+                        let res = canister.transferFrom(from, to, amount);
+                        let _ = canister.approve(from, amount);
                         let from_allowance = canister.allowance(from, caller);
                         if from == to {
                             prop_assert_eq!(res, Err(TxError::SelfTransfer));
@@ -1055,24 +1058,24 @@ mod proptests {
                         }
 
                         prop_assert!(matches!(res, Ok(_)));
-                        prop_assert_eq!(from_balance - amount_with_fee.clone(), canister.balanceOf(from));
-                        prop_assert_eq!(to_balance + amount, canister.balanceOf(to));
+                        prop_assert_eq!((from_balance - amount_with_fee).unwrap(), canister.balanceOf(from));
+                        prop_assert_eq!((to_balance + amount).unwrap(), canister.balanceOf(to));
                     },
                     TransferWithoutFee{from,to,amount,fee_limit} => {
                         MockContext::new().with_caller(from).inject();
                         let from_balance = canister.balanceOf(from);
                         let to_balance = canister.balanceOf(to);
                         let (fee , fee_to) = canister.state.borrow().stats.fee_info();
-                        let amount_with_fee = amount.clone() + fee.clone();
-                        let res = canister.transfer(to, amount.clone(), fee_limit.clone());
+                        let amount_with_fee = (amount + fee).unwrap();
+                        let res = canister.transfer(to, amount, fee_limit);
 
                         if to == from {
                             prop_assert_eq!(res, Err(TxError::SelfTransfer));
                             return Ok(())
                         }
 
-                        if let Some(fee_limit) = fee_limit.clone() {
-                            if fee_limit.clone() < fee.clone() {
+                        if let Some(fee_limit) = fee_limit {
+                            if fee_limit < fee {
                                 prop_assert_eq!(res, Err(TxError::FeeExceededLimit));
                                 return Ok(())
                             }
@@ -1085,19 +1088,19 @@ mod proptests {
 
                         if fee_to == from  {
                             prop_assert!(matches!(res, Ok(_)));
-                            prop_assert_eq!(from_balance - amount, canister.balanceOf(from));
+                            prop_assert_eq!((from_balance - amount).unwrap(), canister.balanceOf(from));
                             return Ok(());
                         }
 
                         if fee_to == to  {
                             prop_assert!(matches!(res, Ok(_)));
-                            prop_assert_eq!(to_balance + amount + fee, canister.balanceOf(to));
+                            prop_assert_eq!(((to_balance + amount).unwrap() + fee).unwrap(), canister.balanceOf(to));
                             return Ok(());
                         }
 
                         prop_assert!(matches!(res, Ok(_)));
-                        prop_assert_eq!(from_balance - amount_with_fee, canister.balanceOf(from));
-                        prop_assert_eq!(to_balance + amount.clone(), canister.balanceOf(to));
+                        prop_assert_eq!((from_balance - amount_with_fee).unwrap(), canister.balanceOf(from));
+                        prop_assert_eq!((to_balance + amount).unwrap(), canister.balanceOf(to));
 
                     }
                     TransferWithFee { from, to, amount } => {
@@ -1123,23 +1126,23 @@ mod proptests {
 
                         // Sometimes the fee can be sent `to` or `from`
                         if fee_to == from  {
-                            prop_assert_eq!(from_balance - amount + fee, canister.balanceOf(from));
+                            prop_assert_eq!(((from_balance - amount).unwrap() + fee).unwrap(), canister.balanceOf(from));
                             return Ok(());
                         }
 
                         if fee_to == to  {
-                            prop_assert_eq!(to_balance + amount, canister.balanceOf(to));
+                            prop_assert_eq!((to_balance + amount).unwrap(), canister.balanceOf(to));
                             return Ok(());
                         }
 
                         prop_assert!(matches!(res, Ok(_)));
-                        prop_assert_eq!(to_balance.clone() + amount.clone() - fee.clone(), canister.balanceOf(to));
-                        prop_assert_eq!(from_balance.clone() - amount.clone(), canister.balanceOf(from));
+                        prop_assert_eq!(((to_balance + amount).unwrap() - fee).unwrap(), canister.balanceOf(to));
+                        prop_assert_eq!((from_balance - amount).unwrap(), canister.balanceOf(from));
 
                     }
                 }
             }
-            prop_assert_eq!(total_minted.clone() + starting_supply - total_burned.clone(), canister.totalSupply());
+            prop_assert_eq!(((total_minted + starting_supply).unwrap() - total_burned).unwrap(), canister.totalSupply());
         }
     }
 }
