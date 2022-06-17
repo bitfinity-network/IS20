@@ -87,6 +87,7 @@ pub type Allowances = HashMap<Principal, HashMap<Principal, Nat>>;
 pub enum TxError {
     InsufficientBalance,
     InsufficientAllowance,
+    NoAllowance,
     Unauthorized,
     AmountTooSmall,
     FeeExceededLimit,

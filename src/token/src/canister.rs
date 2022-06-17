@@ -42,7 +42,7 @@ enum CanisterUpdate {
     AuctionPeriod(u64),
 }
 
-#[derive(Clone, Canister)]
+#[derive(Debug, Clone, Canister)]
 pub struct TokenCanister {
     #[id]
     principal: Principal,
@@ -276,6 +276,9 @@ impl TokenCanister {
     /// is less than the `balance` of the caller, the transaction will fail with `TxError::InsufficientBalance` error.
     #[update]
     pub fn batchTransfer(&self, transfers: Vec<(Principal, Nat)>) -> Result<Vec<Nat>, TxError> {
+        for (to, _) in transfers.clone() {
+            let _ = CheckedPrincipal::with_recipient(to)?;
+        }
         batch_transfer(self, transfers)
     }
 
