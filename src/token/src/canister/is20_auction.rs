@@ -210,12 +210,11 @@ pub fn accumulated_fees(balances: &Balances) -> Tokens128 {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use common::types::Metadata;
     use ic_canister::ic_kit::mock_principals::{alice, bob};
     use ic_canister::ic_kit::MockContext;
     use test_case::test_case;
 
-    use crate::types::TxError;
+    use crate::types::{Metadata, TxError};
     use ic_canister::Canister;
 
     fn test_context() -> (&'static mut MockContext, TokenCanister) {

@@ -13,6 +13,10 @@ pub struct Ledger {
 }
 
 impl Ledger {
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+
     pub fn len(&self) -> u64 {
         self.vec_offset + self.history.len() as u64
     }
@@ -71,7 +75,6 @@ impl Ledger {
             .iter()
             .filter(|tx| tx.to == user || tx.from == user || tx.caller == Some(user))
             .count()
-            .into()
     }
 
     pub fn transfer(
@@ -82,7 +85,7 @@ impl Ledger {
         fee: Tokens128,
     ) -> TxId {
         let id = self.next_id();
-        self.push(TxRecord::transfer(id.clone(), from, to, amount, fee));
+        self.push(TxRecord::transfer(id, from, to, amount, fee));
 
         id
     }

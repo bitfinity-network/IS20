@@ -94,7 +94,7 @@ pub fn batch_transfer(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use common::types::Metadata;
+    use crate::types::Metadata;
     use ic_canister::ic_kit::mock_principals::{alice, bob, john, xtc};
     use ic_canister::ic_kit::MockContext;
     use ic_canister::Canister;

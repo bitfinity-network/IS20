@@ -57,25 +57,24 @@ pub struct TokenCanister {
 #[allow(non_snake_case)]
 impl TokenCanister {
     #[init]
-    fn init(&self, metadata: Metadata) {
+    pub fn init(&self, metadata: Metadata) {
         self.state
             .borrow_mut()
             .balances
             .0
-            .insert(metadata.owner, metadata.totalSupply.clone());
+            .insert(metadata.owner, metadata.totalSupply);
 
-        self.state.borrow_mut().ledger.mint(
-            metadata.owner,
-            metadata.owner,
-            metadata.totalSupply.clone(),
-        );
+        self.state
+            .borrow_mut()
+            .ledger
+            .mint(metadata.owner, metadata.owner, metadata.totalSupply);
 
         self.state.borrow_mut().stats = metadata.into();
         self.state.borrow_mut().bidding_state.auction_period = DEFAULT_AUCTION_PERIOD;
     }
 
     #[query]
-    fn getTokenInfo(&self) -> TokenInfo {
+    pub fn getTokenInfo(&self) -> TokenInfo {
         let StatsData {
             fee_to,
             deploy_time,
@@ -97,43 +96,43 @@ impl TokenCanister {
     }
 
     #[query]
-    fn getAllowanceSize(&self) -> usize {
+    pub fn getAllowanceSize(&self) -> usize {
         self.state.borrow().allowance_size()
     }
 
     #[query]
-    fn getUserApprovals(&self, who: Principal) -> Vec<(Principal, Tokens128)> {
+    pub fn getUserApprovals(&self, who: Principal) -> Vec<(Principal, Tokens128)> {
         self.state.borrow().user_approvals(who)
     }
 
     #[query]
-    fn isTestToken(&self) -> bool {
+    pub fn isTestToken(&self) -> bool {
         self.state.borrow().stats.is_test_token
     }
 
     #[query]
-    fn name(&self) -> String {
+    pub fn name(&self) -> String {
         self.state.borrow().stats.name.clone()
     }
 
     #[query]
-    fn symbol(&self) -> String {
+    pub fn symbol(&self) -> String {
         self.state.borrow().stats.symbol.clone()
     }
 
     #[query]
-    fn logo(&self) -> String {
+    pub fn logo(&self) -> String {
         self.state.borrow().stats.logo.clone()
     }
 
     #[query]
-    fn decimals(&self) -> u8 {
+    pub fn decimals(&self) -> u8 {
         self.state.borrow().stats.decimals
     }
 
     #[query]
-    fn totalSupply(&self) -> Tokens128 {
-        self.state.borrow().stats.total_supply.clone()
+    pub fn totalSupply(&self) -> Tokens128 {
+        self.state.borrow().stats.total_supply
     }
 
     #[query]
@@ -142,22 +141,22 @@ impl TokenCanister {
     }
 
     #[query]
-    fn allowance(&self, owner: Principal, spender: Principal) -> Tokens128 {
+    pub fn allowance(&self, owner: Principal, spender: Principal) -> Tokens128 {
         self.state.borrow().allowance(owner, spender)
     }
 
     #[query]
-    fn getMetadata(&self) -> Metadata {
+    pub fn getMetadata(&self) -> Metadata {
         self.state.borrow().get_metadata()
     }
 
     #[query]
-    fn historySize(&self) -> u64 {
+    pub fn historySize(&self) -> u64 {
         self.state.borrow().ledger.len()
     }
 
     #[query]
-    fn getTransaction(&self, id: TxId) -> TxRecord {
+    pub fn getTransaction(&self, id: TxId) -> TxRecord {
         self.state.borrow().ledger.get(id).unwrap_or_else(|| {
             ic_canister::ic_kit::ic::trap(&format!("Transaction {} does not exist", id))
         })
@@ -170,7 +169,7 @@ impl TokenCanister {
     /// It returns `PaginatedResult` a struct, which contains `result` which is a list of transactions `Vec<TxRecord>` that meet the requirements of the query,
     /// and `next_id` which is the index of the next transaction to return.
     #[query]
-    fn getTransactions(
+    pub fn getTransactions(
         &self,
         who: Option<Principal>,
         count: usize,
@@ -203,53 +202,53 @@ impl TokenCanister {
     }
 
     #[update]
-    fn setName(&self, name: String) -> Result<(), TxError> {
+    pub fn setName(&self, name: String) -> Result<(), TxError> {
         let caller = CheckedPrincipal::owner(&self.state.borrow_mut().stats)?;
         self.update_stats(caller, CanisterUpdate::Name(name));
         Ok(())
     }
 
     #[update]
-    fn setLogo(&self, logo: String) -> Result<(), TxError> {
+    pub fn setLogo(&self, logo: String) -> Result<(), TxError> {
         let caller = CheckedPrincipal::owner(&self.state.borrow_mut().stats)?;
         self.update_stats(caller, CanisterUpdate::Logo(logo));
         Ok(())
     }
 
     #[update]
-    fn setFee(&self, fee: Tokens128) -> Result<(), TxError> {
+    pub fn setFee(&self, fee: Tokens128) -> Result<(), TxError> {
         let caller = CheckedPrincipal::owner(&self.state.borrow_mut().stats)?;
         self.update_stats(caller, CanisterUpdate::Fee(fee));
         Ok(())
     }
 
     #[update]
-    fn setFeeTo(&self, fee_to: Principal) -> Result<(), TxError> {
+    pub fn setFeeTo(&self, fee_to: Principal) -> Result<(), TxError> {
         let caller = CheckedPrincipal::owner(&self.state.borrow_mut().stats)?;
         self.update_stats(caller, CanisterUpdate::FeeTo(fee_to));
         Ok(())
     }
 
     #[update]
-    fn setOwner(&self, owner: Principal) -> Result<(), TxError> {
+    pub fn setOwner(&self, owner: Principal) -> Result<(), TxError> {
         let caller = CheckedPrincipal::owner(&self.state.borrow_mut().stats)?;
         self.update_stats(caller, CanisterUpdate::Owner(owner));
         Ok(())
     }
 
     #[query]
-    fn owner(&self) -> Principal {
+    pub fn owner(&self) -> Principal {
         self.state.borrow().stats.owner
     }
 
     /// Returns the total number of transactions related to the user `who`.
     #[query]
-    fn getUserTransactionCount(&self, who: Principal) -> usize {
+    pub fn getUserTransactionCount(&self, who: Principal) -> usize {
         self.state.borrow().ledger.get_len_user_history(who)
     }
 
     #[update]
-    fn transfer(
+    pub fn transfer(
         &self,
         to: Principal,
         amount: Tokens128,
@@ -261,8 +260,8 @@ impl TokenCanister {
 
     #[update]
     pub fn transferFrom(&self, from: Principal, to: Principal, amount: Tokens128) -> TxReceipt {
-        let caller = CheckedPrincipal::with_recipient(to)?;
-        transfer_from(self, caller, from, amount)
+        let caller = CheckedPrincipal::from_to(from, to)?;
+        transfer_from(self, caller, amount)
     }
 
     /// Transfers `value` amount to the `to` principal, applying American style fee. This means, that
@@ -282,34 +281,37 @@ impl TokenCanister {
     /// The balance of the caller is reduced by sum of `value + fee` amount for each transfer. If the total sum of `value + fee` for all transfers,
     /// is less than the `balance` of the caller, the transaction will fail with `TxError::InsufficientBalance` error.
     #[update]
-    fn batchTransfer(&self, transfers: Vec<(Principal, Tokens128)>) -> Result<Vec<TxId>, TxError> {
+    pub fn batchTransfer(
+        &self,
+        transfers: Vec<(Principal, Tokens128)>,
+    ) -> Result<Vec<TxId>, TxError> {
         batch_transfer(self, transfers)
     }
 
     #[update]
-    fn approve(&self, spender: Principal, amount: Tokens128) -> TxReceipt {
+    pub fn approve(&self, spender: Principal, amount: Tokens128) -> TxReceipt {
         let caller = CheckedPrincipal::with_recipient(spender)?;
         approve(self, caller, amount)
     }
 
     #[update]
-    async fn approveAndNotify(&self, spender: Principal, amount: Tokens128) -> TxReceipt {
+    pub async fn approveAndNotify(&self, spender: Principal, amount: Tokens128) -> TxReceipt {
         let caller = CheckedPrincipal::with_recipient(spender)?;
         approve_and_notify(self, caller, amount).await
     }
 
     #[update]
-    async fn notify(&self, transaction_id: TxId, to: Principal) -> TxReceipt {
+    pub async fn notify(&self, transaction_id: TxId, to: Principal) -> TxReceipt {
         notify(self, transaction_id, to).await
     }
 
     #[update]
-    async fn consume_notification(&self, transaction_id: TxId) -> TxReceipt {
+    pub async fn consume_notification(&self, transaction_id: TxId) -> TxReceipt {
         consume_notification(self, transaction_id).await
     }
 
     #[update]
-    fn mint(&self, to: Principal, amount: Tokens128) -> TxReceipt {
+    pub fn mint(&self, to: Principal, amount: Tokens128) -> TxReceipt {
         if self.isTestToken() {
             let test_user = CheckedPrincipal::test_user(&self.state.borrow().stats)?;
             mint_test_token(&mut *self.state.borrow_mut(), test_user, to, amount)
@@ -324,7 +326,7 @@ impl TokenCanister {
     /// If `from` is Some(_) but method called not by owner, `TxError::Unauthorized` will be returned.
     /// If owner calls this method and `from` is Some(who), then who's tokens will be burned.
     #[update]
-    fn burn(&self, from: Option<Principal>, amount: Tokens128) -> TxReceipt {
+    pub fn burn(&self, from: Option<Principal>, amount: Tokens128) -> TxReceipt {
         match from {
             None => burn_own_tokens(&mut *self.state.borrow_mut(), amount),
             Some(from) if from == ic_canister::ic_kit::ic::caller() => {
@@ -345,13 +347,13 @@ impl TokenCanister {
     /// less than 1_000_000. The provided cycles are accepted by the canister, and the user bid is
     /// saved for the next auction.
     #[update]
-    fn bidCycles(&self, bidder: Principal) -> Result<u64, AuctionError> {
+    pub fn bidCycles(&self, bidder: Principal) -> Result<u64, AuctionError> {
         bid_cycles(self, bidder)
     }
 
     /// Current information about bids and auction.
     #[query]
-    fn biddingInfo(&self) -> BiddingInfo {
+    pub fn biddingInfo(&self) -> BiddingInfo {
         bidding_info(self)
     }
 
@@ -363,13 +365,13 @@ impl TokenCanister {
     /// The auction will distribute the accumulated fees in proportion to the user cycle bids, and
     /// then will update the fee ratio until the next auction.
     #[update]
-    fn runAuction(&self) -> Result<AuctionInfo, AuctionError> {
+    pub fn runAuction(&self) -> Result<AuctionInfo, AuctionError> {
         run_auction(self)
     }
 
     /// Returns the information about a previously held auction.
     #[query]
-    fn auctionInfo(&self, id: usize) -> Result<AuctionInfo, AuctionError> {
+    pub fn auctionInfo(&self, id: usize) -> Result<AuctionInfo, AuctionError> {
         auction_info(self, id)
     }
 
@@ -379,7 +381,7 @@ impl TokenCanister {
     /// the less proportion of the fees will be transferred to the auction participants. If the amount
     /// of cycles in the canister drops below this value, all the fees will be used for cycle auction.
     #[query]
-    fn getMinCycles(&self) -> u64 {
+    pub fn getMinCycles(&self) -> u64 {
         self.state.borrow().stats.min_cycles
     }
 
@@ -387,7 +389,7 @@ impl TokenCanister {
     ///
     /// Only the owner is allowed to call this method.
     #[update]
-    fn setMinCycles(&self, min_cycles: u64) -> Result<(), TxError> {
+    pub fn setMinCycles(&self, min_cycles: u64) -> Result<(), TxError> {
         let caller = CheckedPrincipal::owner(&self.state.borrow_mut().stats)?;
         self.update_stats(caller, CanisterUpdate::MinCycles(min_cycles));
         Ok(())
@@ -397,7 +399,7 @@ impl TokenCanister {
     ///
     /// Only the owner is allowed to call this method.
     #[update]
-    fn setAuctionPeriod(&self, period_sec: u64) -> Result<(), TxError> {
+    pub fn setAuctionPeriod(&self, period_sec: u64) -> Result<(), TxError> {
         let caller = CheckedPrincipal::owner(&self.state.borrow_mut().stats)?;
         // IC timestamp is in nanoseconds, thus multiplying
         self.update_stats(caller, CanisterUpdate::AuctionPeriod(period_sec));

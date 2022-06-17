@@ -34,7 +34,7 @@ impl CanisterState {
     pub fn allowance(&self, owner: Principal, spender: Principal) -> Tokens128 {
         match self.allowances.get(&owner) {
             Some(inner) => match inner.get(&spender) {
-                Some(value) => value.clone(),
+                Some(value) => *value,
                 None => Tokens128::from(0u128),
             },
             None => Tokens128::from(0u128),
@@ -76,11 +76,7 @@ impl Balances {
     }
 
     pub fn get_holders(&self, start: usize, limit: usize) -> Vec<(Principal, Tokens128)> {
-        let mut balance = self
-            .0
-            .iter()
-            .map(|(&k, v)| (k, v.clone()))
-            .collect::<Vec<_>>();
+        let mut balance = self.0.iter().map(|(&k, v)| (k, *v)).collect::<Vec<_>>();
 
         // Sort balance and principals by the balance
         balance.sort_by(|a, b| b.1.cmp(&a.1));

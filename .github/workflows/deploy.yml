@@ -47,7 +47,7 @@ jobs:
           mkdir -p ${NETWORK}/wasm ${NETWORK}/candid
           cp src/factory/src/token.wasm ${NETWORK}/wasm
           cp src/candid/token-factory.did src/candid/token.did ${NETWORK}/candid/
-          cp target/wasm32-unknown-unknown/release/factory-opt.wasm ${NETWORK}/wasm/token-factory.wasm
+          cp target/wasm32-unknown-unknown/release/factory.wasm ${NETWORK}/wasm/token-factory.wasm
 
       - id: "auth"
         uses: "google-github-actions/auth@v0"

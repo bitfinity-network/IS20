@@ -95,6 +95,8 @@ impl Default for StatsData {
 
 pub type Allowances = HashMap<Principal, HashMap<Principal, Tokens128>>;
 
+// TODO: a wrapper over `ic_helpers::TxError`, this is a most likely
+// place to make tests fail in amm.
 #[derive(CandidType, Debug, PartialEq, Deserialize)]
 pub enum TxError {
     InsufficientBalance,

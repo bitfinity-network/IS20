@@ -83,8 +83,7 @@ mod tests {
     use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 
     use super::*;
-    use crate::types::TxRecord;
-    use common::types::Metadata;
+    use crate::types::{Metadata, TxRecord};
     use ic_canister::ic_kit::mock_principals::{alice, bob};
     use ic_canister::ic_kit::MockContext;
     use ic_canister::{register_failing_virtual_responder, register_virtual_responder, Canister};

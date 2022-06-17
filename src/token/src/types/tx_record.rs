@@ -31,7 +31,7 @@ impl TxRecord {
             to,
             amount,
             fee,
-            timestamp: ic::time().into(),
+            timestamp: ic::time(),
             status: TransactionStatus::Succeeded,
             operation: Operation::Transfer,
         }
@@ -52,7 +52,7 @@ impl TxRecord {
             to,
             amount,
             fee,
-            timestamp: ic::time().into(),
+            timestamp: ic::time(),
             status: TransactionStatus::Succeeded,
             operation: Operation::TransferFrom,
         }
@@ -72,7 +72,7 @@ impl TxRecord {
             to,
             amount,
             fee,
-            timestamp: ic::time().into(),
+            timestamp: ic::time(),
             status: TransactionStatus::Succeeded,
             operation: Operation::Approve,
         }
@@ -86,7 +86,7 @@ impl TxRecord {
             to,
             amount,
             fee: Tokens128::from(0u128),
-            timestamp: ic::time().into(),
+            timestamp: ic::time(),
             status: TransactionStatus::Succeeded,
             operation: Operation::Mint,
         }
@@ -100,7 +100,7 @@ impl TxRecord {
             to: from,
             amount,
             fee: Tokens128::from(0u128),
-            timestamp: ic::time().into(),
+            timestamp: ic::time(),
             status: TransactionStatus::Succeeded,
             operation: Operation::Burn,
         }
@@ -114,7 +114,7 @@ impl TxRecord {
             to,
             amount,
             fee: Tokens128::from(0u128),
-            timestamp: ic::time().into(),
+            timestamp: ic::time(),
             status: TransactionStatus::Succeeded,
             operation: Operation::Auction,
         }

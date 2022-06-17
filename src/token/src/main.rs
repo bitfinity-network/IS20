@@ -16,5 +16,9 @@ fn main() {
     use ic_helpers::tokens::Tokens128;
     use types::*;
 
-    std::print!("{}", ic_canister::generate_idl!());
+    let canister_idl = ic_canister::generate_idl!();
+
+    let result =
+        candid::bindings::candid::compile(&canister_idl.env.env, &Some(canister_idl.actor));
+    print!("{result}");
 }

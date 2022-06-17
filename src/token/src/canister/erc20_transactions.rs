@@ -2,7 +2,7 @@ use ic_cdk::export::Principal;
 use ic_helpers::tokens::Tokens128;
 
 use crate::canister::is20_auction::auction_principal;
-use crate::principal::{CheckedPrincipal, Owner, TestNet, WithRecipient};
+use crate::principal::{CheckedPrincipal, Owner, SenderRecipient, TestNet, WithRecipient};
 use crate::state::{Balances, CanisterState};
 use crate::types::{TxError, TxReceipt};
 
@@ -31,9 +31,7 @@ pub fn transfer(
         }
     }
 
-    if balances.balance_of(&caller.inner())
-        < (amount + fee).ok_or_else(|| TxError::AmountOverflow)?
-    {
+    if balances.balance_of(&caller.inner()) < (amount + fee).ok_or(TxError::AmountOverflow)? {
         return Err(TxError::InsufficientBalance);
     }
 
@@ -48,12 +46,11 @@ pub fn transfer(
 
 pub fn transfer_from(
     canister: &TokenCanister,
-    caller: CheckedPrincipal<WithRecipient>,
-    from: Principal,
+    caller: CheckedPrincipal<SenderRecipient>,
     amount: Tokens128,
 ) -> TxReceipt {
     let mut state = canister.state.borrow_mut();
-    let from_allowance = state.allowance(from, caller.inner());
+    let from_allowance = state.allowance(caller.from(), caller.inner());
     let CanisterState {
         ref mut balances,
         ref bidding_state,
@@ -64,23 +61,24 @@ pub fn transfer_from(
     let (fee, fee_to) = stats.fee_info();
     let fee_ratio = bidding_state.fee_ratio;
 
-    let value_with_fee = (amount + fee).ok_or_else(|| TxError::AmountOverflow)?;
+    let value_with_fee = (amount + fee).ok_or(TxError::AmountOverflow)?;
     if from_allowance < value_with_fee {
         return Err(TxError::InsufficientAllowance);
     }
 
-    let from_balance = balances.balance_of(&from);
+    let from_balance = balances.balance_of(&caller.from());
     if from_balance < value_with_fee {
         return Err(TxError::InsufficientBalance);
     }
 
-    charge_fee(balances, from, fee_to, fee, fee_ratio).expect("never fails due to checks above");
-    transfer_balance(balances, from, caller.recipient(), amount)
+    charge_fee(balances, caller.from(), fee_to, fee, fee_ratio)
+        .expect("never fails due to checks above");
+    transfer_balance(balances, caller.from(), caller.to(), amount)
         .expect("never fails due to checks above");
 
     let allowances = state
         .allowances
-        .get_mut(&from)
+        .get_mut(&caller.from())
         .expect("allowance existing is checked above when check allowance sufficiency");
     let allowance = allowances
         .get_mut(&caller.inner())
@@ -91,13 +89,13 @@ pub fn transfer_from(
         allowances.remove(&caller.inner());
 
         if allowances.is_empty() {
-            state.allowances.remove(&from);
+            state.allowances.remove(&caller.from());
         }
     }
 
     let id = state
         .ledger
-        .transfer_from(caller.inner(), from, caller.recipient(), amount, fee);
+        .transfer_from(caller.inner(), caller.from(), caller.to(), amount, fee);
     Ok(id)
 }
 
@@ -255,7 +253,7 @@ pub(crate) fn charge_fee(
     fee_ratio: f64,
 ) -> Result<(), TxError> {
     // todo: check if this is enforced
-    debug_assert!(fee_ratio >= 0.0 && fee_ratio <= 1.0);
+    debug_assert!((0.0..=1.0).contains(&fee_ratio));
 
     if fee == Tokens128::from(0) {
         return Ok(());
@@ -279,8 +277,7 @@ pub(crate) fn charge_fee(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::types::{Operation, TransactionStatus};
-    use common::types::Metadata;
+    use crate::types::{Metadata, Operation, TransactionStatus};
     use ic_canister::ic_kit::mock_principals::{alice, bob, john, xtc};
     use ic_canister::ic_kit::MockContext;
     use std::collections::HashSet;

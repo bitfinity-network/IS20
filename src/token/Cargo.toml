@@ -1,7 +1,7 @@
 [package]
 edition = "2021"
 name = "token"
-version = "0.1.3"
+version = "0.1.4"
 
 [features]
 default = []
@@ -14,15 +14,9 @@ ic-cdk = "0.5"
 ic-cdk-macros = "0.5"
 num-traits = "0.2"
 serde = "1.0"
-#ic-canister = { git = "https://github.com/infinity-swap/ic-helpers", package = "ic-canister", tag = "v0.3.4" }
-#ic-helpers = { git = "https://github.com/infinity-swap/ic-helpers", package = "ic-helpers", tag = "v0.3.4" }
-#ic-storage = { git = "https://github.com/infinity-swap/ic-helpers", package = "ic-storage", tag = "v0.3.4" }
-#ic-canister = { git = "https://github.com/infinity-swap/ic-helpers", package = "ic-canister", branch = "maxim/CPROD-801-tokens_wrappers" }
-#ic-helpers = { git = "https://github.com/infinity-swap/ic-helpers", package = "ic-helpers", branch = "maxim/CPROD-801-tokens_wrappers" }
-#ic-storage = { git = "https://github.com/infinity-swap/ic-helpers", package = "ic-storage", branch = "maxim/CPROD-801-tokens_wrappers" }
-ic-canister = {path = "../../../ic-helpers/ic-canister/ic-canister"}
-ic-helpers = {path = "../../../ic-helpers/ic-helpers"}
-ic-storage = {path = "../../../ic-helpers/ic-storage"}
+ic-canister = { git = "https://github.com/infinity-swap/canister-sdk", package = "ic-canister", tag = "v0.3.6" }
+ic-helpers = { git = "https://github.com/infinity-swap/canister-sdk", package = "ic-helpers", tag = "v0.3.6" }
+ic-storage = { git = "https://github.com/infinity-swap/canister-sdk", package = "ic-storage", tag = "v0.3.6" }
 ic-certified-map = "0.3"
 serde_cbor = "0.11"
 
