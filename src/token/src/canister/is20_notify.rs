@@ -86,7 +86,7 @@ mod tests {
     use common::types::Metadata;
     use ic_canister::ic_kit::mock_principals::{alice, bob};
     use ic_canister::ic_kit::MockContext;
-    use ic_canister::{register_failing_virtual_responder, register_virtual_responder, Canister};
+    use ic_canister::{register_virtual_responder, Canister};
 
     fn test_canister() -> TokenCanister {
         MockContext::new().with_caller(alice()).inject();
@@ -153,7 +153,7 @@ mod tests {
         canister.notify(id.clone(), bob()).await.unwrap();
 
         MockContext::new().with_caller(bob()).inject();
-        let res = canister.consume_notification(id.clone()).await;
+        let _ = canister.consume_notification(id.clone()).await;
 
         MockContext::new().with_caller(alice()).inject();
         let response = canister.notify(id, bob()).await;
