@@ -86,7 +86,7 @@ mod tests {
     use crate::types::{Metadata, TxRecord};
     use ic_canister::ic_kit::mock_principals::{alice, bob};
     use ic_canister::ic_kit::MockContext;
-    use ic_canister::{register_virtual_responder, Canister};
+    use ic_canister::{register_failing_virtual_responder, register_virtual_responder, Canister};
 
     fn test_canister() -> TokenCanister {
         MockContext::new().with_caller(alice()).inject();
