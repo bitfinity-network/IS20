@@ -7,16 +7,18 @@ use std::rc::Rc;
 
 use crate::{error::TokenFactoryError, state::State};
 use candid::Principal;
-use common::types::Metadata;
 use ic_canister::{init, query, update, Canister};
 use ic_factory::{api::FactoryCanister, error::FactoryError, FactoryConfiguration, FactoryState};
 use ic_helpers::get_canister_bytecode_for;
+use token::types::Metadata;
 
 const FACTORY_WASM_PATH: &str = "../../../target/wasm32-unknown-unknown/release/factory.wasm";
 const DEFAULT_LEDGER_PRINCIPAL: &str = "ryjl3-tyaaa-aaaaa-aaaba-cai";
 const DEFAULT_ICP_FEE: u64 = 10u64.pow(8); // 1 ICP
 
+#[cfg(not(feature = "no_api"))]
 mod inspect_message;
+
 #[derive(Clone, Canister)]
 pub struct TokenFactoryCanister {
     #[id]

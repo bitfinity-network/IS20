@@ -1,7 +1,7 @@
 [package]
 edition = "2021"
 name = "token"
-version = "0.1.3"
+version = "0.1.4"
 
 [features]
 default = []
@@ -10,7 +10,6 @@ no_api = []
 [dependencies]
 assert-panic = "1.0"
 candid = "0.7"
-common = {path = "../common"}
 ic-cdk = "0.5"
 ic-cdk-macros = "0.5"
 num-traits = "0.2"
