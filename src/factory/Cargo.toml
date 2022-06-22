@@ -9,7 +9,6 @@ no_api = []
 
 [dependencies]
 candid = "0.7"
-common = { path = "../common" }
 ic-cdk = "0.5"
 ic-cdk-macros = "0.5"
 ic-canister = { git = "https://github.com/infinity-swap/canister-sdk", package = "ic-canister", tag = "v0.3.8" }
