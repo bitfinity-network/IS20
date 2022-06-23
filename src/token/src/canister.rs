@@ -3,15 +3,10 @@ use std::rc::Rc;
 
 use ic_canister::{init, query, update, Canister};
 use ic_cdk::export::candid::Principal;
-use ic_helpers::tokens::Tokens128;
 
-use crate::canister::is20_notify::{approve_and_notify, consume_notification, notify};
 use crate::core::ISTokenCanister;
-use crate::principal::CheckedPrincipal;
 use crate::state::CanisterState;
-use crate::types::{
-    Metadata, PaginatedResult, StatsData, Timestamp, TokenInfo, TxError, TxId, TxReceipt, TxRecord,
-};
+use crate::types::{Metadata, PaginatedResult, Timestamp, TxId, TxRecord};
 
 pub mod erc20_transactions;
 
@@ -89,22 +84,6 @@ impl TokenCanister {
     #[query]
     pub fn getUserTransactionCount(&self, who: Principal) -> usize {
         self.state.borrow().ledger.get_len_user_history(who)
-    }
-
-    #[update]
-    pub async fn approveAndNotify(&self, spender: Principal, amount: Tokens128) -> TxReceipt {
-        let caller = CheckedPrincipal::with_recipient(spender)?;
-        approve_and_notify(self, caller, amount).await
-    }
-
-    #[update]
-    pub async fn notify(&self, transaction_id: TxId, to: Principal) -> TxReceipt {
-        notify(self, transaction_id, to).await
-    }
-
-    #[update]
-    pub async fn consume_notification(&self, transaction_id: TxId) -> TxReceipt {
-        consume_notification(self, transaction_id).await
     }
 }
 

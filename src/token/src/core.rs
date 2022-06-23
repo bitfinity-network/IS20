@@ -1,4 +1,6 @@
 use std::cell::RefCell;
+use std::future::Future;
+use std::pin::Pin;
 use std::rc::Rc;
 
 use candid::Principal;
@@ -12,6 +14,7 @@ use crate::canister::erc20_transactions::{
 use crate::canister::is20_auction::{
     auction_info, bid_cycles, bidding_info, run_auction, AuctionError, BiddingInfo,
 };
+use crate::canister::is20_notify::{approve_and_notify, consume_notification, notify};
 use crate::canister::is20_transactions::{batch_transfer, transfer_include_fee};
 use crate::canister::TokenCanister;
 use crate::principal::{CheckedPrincipal, Owner};
@@ -19,6 +22,8 @@ use crate::state::CanisterState;
 use crate::types::{
     AuctionInfo, Metadata, StatsData, TokenInfo, TxError, TxId, TxReceipt, TxRecord,
 };
+
+pub type AsyncReturn<'a, T> = Pin<Box<dyn Future<Output = T> + 'a>>;
 
 pub enum CanisterUpdate {
     Name(String),
@@ -315,5 +320,36 @@ pub trait ISTokenCanister: Canister {
         // IC timestamp is in nanoseconds, thus multiplying
         self.update_stats(caller, CanisterUpdate::AuctionPeriod(period_sec));
         Ok(())
+    }
+
+    #[update]
+    fn consume_notification<'a>(&'a self, transaction_id: TxId) -> AsyncReturn<TxReceipt> {
+        // consume_notification(self, transaction_id)
+        let fut = async move { consume_notification(self.canister(), transaction_id).await };
+
+        Box::pin(fut)
+    }
+
+    #[update]
+    fn approveAndNotify<'a>(
+        &'a self,
+        spender: Principal,
+        amount: Tokens128,
+    ) -> AsyncReturn<TxReceipt> {
+        let caller = CheckedPrincipal::with_recipient(spender);
+        let fut = async move {
+            match caller {
+                Ok(caller) => approve_and_notify(self.canister(), caller, amount).await,
+                Err(e) => Err(e).into(),
+            }
+        };
+        Box::pin(fut)
+    }
+
+    #[update]
+    fn notify<'a>(&'a self, transaction_id: TxId, to: Principal) -> AsyncReturn<TxReceipt> {
+        let fut = async move { notify(self.canister(), transaction_id, to).await };
+
+        Box::pin(fut)
     }
 }
