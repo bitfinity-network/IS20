@@ -145,3 +145,12 @@ pub struct PaginatedResult {
     /// This is  the next `id` of the transaction. The `next` is used as offset for the next query if it exits.
     pub next: Option<u128>,
 }
+
+#[derive(Deserialize, CandidType, Clone, Debug, Default)]
+pub struct Map;
+
+// impl Map {
+//     pub fn get(&self, key: Vec<u8>) ->
+
+//     pub fn contains_key(&self, key: Vec<u8>) ->
+// }

@@ -1,10 +1,19 @@
 use crate::ledger::Ledger;
-use crate::types::{Allowances, AuctionInfo, StatsData, Timestamp};
+use crate::types::{Allowances, AuctionInfo, Map, StatsData, Timestamp};
 use candid::{CandidType, Deserialize, Nat, Principal};
 use common::types::Metadata;
 use ic_storage::stable::Versioned;
 use ic_storage::IcStorage;
+use stable_structures::{
+    stable_storage::StableStorage, types::Address, RestrictedMemory, StableBTreeMap,
+};
 use std::collections::HashMap;
+
+const BID_HEAD_MAGIC: &[u8; 3] = b"BDH";
+const BID_HEAD_LAYOUT_VERSION: u8 = 1;
+
+const BID_DATA_MAGIC: &[u8; 3] = b"BDD";
+const BID_DATA_LAYOUT_VERSION: u8 = 1;
 
 #[derive(Debug, Default, CandidType, Deserialize, IcStorage)]
 pub struct CanisterState {
@@ -101,6 +110,45 @@ impl BiddingState {
         let curr_time = ic_canister::ic_kit::ic::time();
         let next_auction = self.last_auction + self.auction_period;
         curr_time >= next_auction
+    }
+
+    pub fn save_header(&self, memory: &RestrictedMemory<StableStorage>) {
+        memory.write_struct::<BiddingStateHeader>(&BiddingStateHeader::from(self), Address(0));
+    }
+
+    pub fn load_header(&mut self, memory: &RestrictedMemory<StableStorage>) {
+        let header: BiddingStateHeader = memory.read_struct(Address(0));
+        assert_eq!(&header.magic, BID_HEAD_MAGIC, "Bad magic.");
+        assert_eq!(
+            header.version, BID_HEAD_LAYOUT_VERSION,
+            "Unsupported version."
+        );
+        self.fee_ratio = header.fee_ratio;
+        self.last_auction = header.last_auction;
+        self.auction_period = header.auction_period;
+        self.cycles_since_auction = header.cycles_since_auction;
+    }
+}
+
+struct BiddingStateHeader {
+    magic: [u8; 3],
+    version: u8,
+    fee_ratio: f64,
+    last_auction: Timestamp,
+    auction_period: Timestamp,
+    cycles_since_auction: u64,
+}
+
+impl From<&BiddingState> for BiddingStateHeader {
+    fn from(value: &BiddingState) -> Self {
+        Self {
+            magic: *BID_HEAD_MAGIC,
+            version: BID_HEAD_LAYOUT_VERSION,
+            fee_ratio: value.fee_ratio,
+            last_auction: value.last_auction,
+            auction_period: value.auction_period,
+            cycles_since_auction: value.cycles_since_auction,
+        }
     }
 }
 

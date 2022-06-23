@@ -47,7 +47,7 @@ pub struct TokenCanister {
     #[id]
     principal: Principal,
 
-    #[state]
+    #[state(stable = false)]
     pub(crate) state: Rc<RefCell<CanisterState>>,
 }
 
