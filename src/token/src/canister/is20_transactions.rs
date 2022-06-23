@@ -6,6 +6,8 @@ use crate::types::{TxError, TxId, TxReceipt};
 use candid::Principal;
 use ic_helpers::tokens::Tokens128;
 
+use super::ISTokenCanister;
+
 /// Transfers `value` amount to the `to` principal, applying American style fee. This means, that
 /// the recipient will receive `value - fee`, and the sender account will be reduced exactly by `value`.
 ///

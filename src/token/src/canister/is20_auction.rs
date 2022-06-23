@@ -10,6 +10,8 @@ use ic_canister::ic_kit::ic;
 use ic_helpers::tokens::Tokens128;
 use std::collections::HashMap;
 
+use super::ISTokenCanister;
+
 // Minimum bidding amount is required, for every update call costs cycles, and we want bidding
 // to add cycles rather then to decrease them. 1M is chosen as one ingress call costs 590K cycles.
 const MIN_BIDDING_AMOUNT: Cycles = 1_000_000;

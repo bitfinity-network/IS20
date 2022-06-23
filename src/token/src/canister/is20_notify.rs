@@ -8,6 +8,8 @@ use crate::canister::TokenCanister;
 use crate::principal::{CheckedPrincipal, WithRecipient};
 use crate::types::{TxError, TxId, TxReceipt};
 
+use super::ISTokenCanister;
+
 pub(crate) async fn approve_and_notify(
     canister: &TokenCanister,
     caller: CheckedPrincipal<WithRecipient>,
@@ -29,7 +31,7 @@ pub(crate) async fn consume_notification(
 
     match state.ledger.notifications.get(&transaction_id) {
         Some(Some(x)) if *x != ic_canister::ic_kit::ic::caller() => {
-            return Err(TxError::Unauthorized)
+            return Err(TxError::Unauthorized);
         }
         Some(_) => {
             if state.ledger.notifications.remove(&transaction_id).is_none() {
@@ -82,11 +84,13 @@ mod tests {
     use std::rc::Rc;
     use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 
-    use super::*;
-    use crate::types::{Metadata, TxRecord};
     use ic_canister::ic_kit::mock_principals::{alice, bob};
     use ic_canister::ic_kit::MockContext;
     use ic_canister::{register_failing_virtual_responder, register_virtual_responder, Canister};
+
+    use crate::types::{Metadata, TxRecord};
+
+    use super::*;
 
     fn test_canister() -> TokenCanister {
         MockContext::new().with_caller(alice()).inject();
@@ -131,6 +135,7 @@ mod tests {
         assert!(is_notified_clone.load(Ordering::Relaxed));
         assert_eq!(counter_copy.load(Ordering::Relaxed), 1);
     }
+
     #[tokio::test]
     async fn notify_non_existing() {
         let canister = test_canister();

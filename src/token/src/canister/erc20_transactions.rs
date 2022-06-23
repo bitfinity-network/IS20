@@ -6,6 +6,7 @@ use crate::principal::{CheckedPrincipal, Owner, SenderRecipient, TestNet, WithRe
 use crate::state::{Balances, CanisterState};
 use crate::types::{TxError, TxReceipt};
 
+use super::ISTokenCanister;
 use super::TokenCanister;
 
 pub fn transfer(
@@ -280,15 +281,17 @@ pub(crate) fn charge_fee(
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use crate::types::{Metadata, Operation, TransactionStatus};
-    use ic_canister::ic_kit::mock_principals::{alice, bob, john, xtc};
-    use ic_canister::ic_kit::MockContext;
     use std::collections::HashSet;
     use std::iter::FromIterator;
 
-    use crate::canister::MAX_TRANSACTION_QUERY_LEN;
+    use ic_canister::ic_kit::mock_principals::{alice, bob, john, xtc};
+    use ic_canister::ic_kit::MockContext;
     use ic_canister::Canister;
+
+    use crate::canister::MAX_TRANSACTION_QUERY_LEN;
+    use crate::types::{Metadata, Operation, TransactionStatus};
+
+    use super::*;
 
     fn test_context() -> (&'static MockContext, TokenCanister) {
         let context = MockContext::new().with_caller(alice()).inject();
@@ -693,7 +696,7 @@ mod tests {
             HashSet::from_iter(
                 vec![
                     (bob(), Tokens128::from(200)),
-                    (john(), Tokens128::from(1000))
+                    (john(), Tokens128::from(1000)),
                 ]
                 .iter()
             )
@@ -833,13 +836,16 @@ mod tests {
 
 #[cfg(test)]
 mod proptests {
-    use super::*;
-    use crate::types::Metadata;
     use ic_canister::ic_kit::MockContext;
     use ic_canister::Canister;
+    use ic_helpers::tokens::Tokens256;
     use proptest::collection::vec;
     use proptest::prelude::*;
     use proptest::sample::Index;
+
+    use crate::types::Metadata;
+
+    use super::*;
 
     #[derive(Debug, Clone, PartialEq, Eq)]
     enum Action {
@@ -952,7 +958,8 @@ mod proptests {
     }
 
     prop_compose! {
-        fn make_tokens128() (num in "[0-9]{1,4}") -> Tokens128 {
+        fn make_tokens128() (num in "[0-9]{1,10}") -> Tokens128 {
+            eprintln!("{}", num);
             Tokens128::from(u128::from_str_radix(&num, 10).unwrap())
         }
     }

@@ -1,6 +1,7 @@
 #![allow(dead_code)]
 
 mod canister;
+mod core;
 mod ledger;
 mod principal;
 mod state;
