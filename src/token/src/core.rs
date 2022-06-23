@@ -41,47 +41,47 @@ pub trait ISTokenCanister: Canister {
 
     fn canister(&self) -> &TokenCanister;
 
-    #[query]
+    #[query(trait = true)]
     fn isTestToken(&self) -> bool {
         self.state().borrow().stats.is_test_token
     }
 
-    #[query]
+    #[query(trait = true)]
     fn name(&self) -> String {
         self.state().borrow().stats.name.clone()
     }
 
-    #[query]
+    #[query(trait = true)]
     fn symbol(&self) -> String {
         self.state().borrow().stats.symbol.clone()
     }
 
-    #[query]
+    #[query(trait = true)]
     fn logo(&self) -> String {
         self.state().borrow().stats.logo.clone()
     }
 
-    #[query]
+    #[query(trait = true)]
     fn decimals(&self) -> u8 {
         self.state().borrow().stats.decimals
     }
 
-    #[query]
+    #[query(trait = true)]
     fn totalSupply(&self) -> Tokens128 {
         self.state().borrow().stats.total_supply
     }
 
-    #[query]
+    #[query(trait = true)]
     fn owner(&self) -> Principal {
         self.state().borrow().stats.owner
     }
 
-    #[query]
+    #[query(trait = true)]
     fn getMetadata(&self) -> Metadata {
         self.state().borrow().get_metadata()
     }
 
-    #[query]
+    #[query(trait = true)]
     fn getTokenInfo(&self) -> TokenInfo {
         let StatsData {
             fee_to,
@@ -98,32 +98,32 @@ pub trait ISTokenCanister: Canister {
         }
     }
 
-    #[query]
+    #[query(trait = true)]
     fn getHolders(&self, start: usize, limit: usize) -> Vec<(Principal, Tokens128)> {
         self.state().borrow().balances.get_holders(start, limit)
     }
 
-    #[query]
+    #[query(trait = true)]
     fn getAllowanceSize(&self) -> usize {
         self.state().borrow().allowance_size()
     }
 
-    #[query]
+    #[query(trait = true)]
     fn getUserApprovals(&self, who: Principal) -> Vec<(Principal, Tokens128)> {
         self.state().borrow().user_approvals(who)
     }
 
-    #[query]
+    #[query(trait = true)]
     fn balanceOf(&self, holder: Principal) -> Tokens128 {
         self.state().borrow().balances.balance_of(&holder)
     }
 
-    #[query]
+    #[query(trait = true)]
     fn allowance(&self, owner: Principal, spender: Principal) -> Tokens128 {
         self.state().borrow().allowance(owner, spender)
     }
 
-    #[query]
+    #[query(trait = true)]
     fn historySize(&self) -> u64 {
         self.state().borrow().ledger.len()
     }
@@ -143,49 +143,49 @@ pub trait ISTokenCanister: Canister {
         }
     }
 
-    #[update]
+    #[update(trait = true)]
     fn setName(&self, name: String) -> Result<(), TxError> {
         let caller = CheckedPrincipal::owner(&self.state().borrow_mut().stats)?;
         self.update_stats(caller, CanisterUpdate::Name(name));
         Ok(())
     }
 
-    #[update]
+    #[update(trait = true)]
     fn setLogo(&self, logo: String) -> Result<(), TxError> {
         let caller = CheckedPrincipal::owner(&self.state().borrow_mut().stats)?;
         self.update_stats(caller, CanisterUpdate::Logo(logo));
         Ok(())
     }
 
-    #[update]
+    #[update(trait = true)]
     fn setFee(&self, fee: Tokens128) -> Result<(), TxError> {
         let caller = CheckedPrincipal::owner(&self.state().borrow_mut().stats)?;
         self.update_stats(caller, CanisterUpdate::Fee(fee));
         Ok(())
     }
 
-    #[update]
+    #[update(trait = true)]
     fn setFeeTo(&self, fee_to: Principal) -> Result<(), TxError> {
         let caller = CheckedPrincipal::owner(&self.state().borrow_mut().stats)?;
         self.update_stats(caller, CanisterUpdate::FeeTo(fee_to));
         Ok(())
     }
 
-    #[update]
+    #[update(trait = true)]
     fn setOwner(&self, owner: Principal) -> Result<(), TxError> {
         let caller = CheckedPrincipal::owner(&self.state().borrow_mut().stats)?;
         self.update_stats(caller, CanisterUpdate::Owner(owner));
         Ok(())
     }
 
-    #[update]
+    #[update(trait = true)]
     fn approve(&self, spender: Principal, amount: Tokens128) -> TxReceipt {
         let caller = CheckedPrincipal::with_recipient(spender)?;
         approve(self.canister(), caller, amount)
     }
 
     /********************** TRANSFERS ***********************/
-    #[update]
+    #[update(trait = true)]
     fn transfer(
         &self,
         to: Principal,
@@ -196,7 +196,7 @@ pub trait ISTokenCanister: Canister {
         transfer(self.canister(), caller, amount, fee_limit)
     }
 
-    #[update]
+    #[update(trait = true)]
     fn transferFrom(&self, from: Principal, to: Principal, amount: Tokens128) -> TxReceipt {
         let caller = CheckedPrincipal::from_to(from, to)?;
         transfer_from(self.canister(), caller, amount)
@@ -207,7 +207,7 @@ pub trait ISTokenCanister: Canister {
     ///
     /// Note, that the `value` cannot be less than the `fee` amount. If the value given is too small,
     /// transaction will fail with `TxError::AmountTooSmall` error.
-    #[update]
+    #[update(trait = true)]
     fn transferIncludeFee(&self, to: Principal, amount: Tokens128) -> TxReceipt {
         let caller = CheckedPrincipal::with_recipient(to)?;
         transfer_include_fee(self.canister(), caller, amount)
@@ -218,7 +218,7 @@ pub trait ISTokenCanister: Canister {
     /// is set, the `fee` amount is applied to each transfer.
     /// The balance of the caller is reduced by sum of `value + fee` amount for each transfer. If the total sum of `value + fee` for all transfers,
     /// is less than the `balance` of the caller, the transaction will fail with `TxError::InsufficientBalance` error.
-    #[update]
+    #[update(trait = true)]
     fn batchTransfer(&self, transfers: Vec<(Principal, Tokens128)>) -> Result<Vec<TxId>, TxError> {
         for (to, _) in transfers.clone() {
             let _ = CheckedPrincipal::with_recipient(to)?;
@@ -226,7 +226,7 @@ pub trait ISTokenCanister: Canister {
         batch_transfer(self.canister(), transfers)
     }
 
-    #[update]
+    #[update(trait = true)]
     fn mint(&self, to: Principal, amount: Tokens128) -> TxReceipt {
         if self.isTestToken() {
             let test_user = CheckedPrincipal::test_user(&self.state().borrow().stats)?;
@@ -241,7 +241,7 @@ pub trait ISTokenCanister: Canister {
     /// If `from` is None, then caller's tokens will be burned.
     /// If `from` is Some(_) but method called not by owner, `TxError::Unauthorized` will be returned.
     /// If owner calls this method and `from` is Some(who), then who's tokens will be burned.
-    #[update]
+    #[update(trait = true)]
     fn burn(&self, from: Option<Principal>, amount: Tokens128) -> TxReceipt {
         match from {
             None => burn_own_tokens(&mut *self.state().borrow_mut(), amount),
@@ -262,13 +262,13 @@ pub trait ISTokenCanister: Canister {
     /// This method must be called with the cycles provided in the call. The amount of cycles cannot be
     /// less than 1_000_000. The provided cycles are accepted by the canister, and the user bid is
     /// saved for the next auction.
-    #[update]
+    #[update(trait = true)]
     fn bidCycles(&self, bidder: Principal) -> Result<u64, AuctionError> {
         bid_cycles(self.canister(), bidder)
     }
 
     /// Current information about bids and auction.
-    #[query]
+    #[update(trait = true)]
     fn biddingInfo(&self) -> BiddingInfo {
         bidding_info(self.canister())
     }
@@ -280,13 +280,13 @@ pub trait ISTokenCanister: Canister {
     ///
     /// The auction will distribute the accumulated fees in proportion to the user cycle bids, and
     /// then will update the fee ratio until the next auction.
-    #[update]
+    #[update(trait = true)]
     fn runAuction(&self) -> Result<AuctionInfo, AuctionError> {
         run_auction(self.canister())
     }
 
     /// Returns the information about a previously held auction.
-    #[query]
+    #[update(trait = true)]
     fn auctionInfo(&self, id: usize) -> Result<AuctionInfo, AuctionError> {
         auction_info(self.canister(), id)
     }
@@ -296,7 +296,7 @@ pub trait ISTokenCanister: Canister {
     /// This value affects the fee ratio set by the auctions. The more cycles available in the canister
     /// the less proportion of the fees will be transferred to the auction participants. If the amount
     /// of cycles in the canister drops below this value, all the fees will be used for cycle auction.
-    #[query]
+    #[update(trait = true)]
     fn getMinCycles(&self) -> u64 {
         self.state().borrow().stats.min_cycles
     }
@@ -304,7 +304,7 @@ pub trait ISTokenCanister: Canister {
     /// Sets the minimum cycles for the canister. For more information about this value, read [get_min_cycles].
     ///
     /// Only the owner is allowed to call this method.
-    #[update]
+    #[update(trait = true)]
     fn setMinCycles(&self, min_cycles: u64) -> Result<(), TxError> {
         let caller = CheckedPrincipal::owner(&self.state().borrow_mut().stats)?;
         self.update_stats(caller, CanisterUpdate::MinCycles(min_cycles));
@@ -314,7 +314,7 @@ pub trait ISTokenCanister: Canister {
     /// Sets the minimum time between two consecutive auctions, in seconds.
     ///
     /// Only the owner is allowed to call this method.
-    #[update]
+    #[update(trait = true)]
     fn setAuctionPeriod(&self, period_sec: u64) -> Result<(), TxError> {
         let caller = CheckedPrincipal::owner(&self.state().borrow_mut().stats)?;
         // IC timestamp is in nanoseconds, thus multiplying
@@ -322,7 +322,7 @@ pub trait ISTokenCanister: Canister {
         Ok(())
     }
 
-    #[update]
+    #[update(trait = true)]
     fn consume_notification<'a>(&'a self, transaction_id: TxId) -> AsyncReturn<TxReceipt> {
         // consume_notification(self, transaction_id)
         let fut = async move { consume_notification(self.canister(), transaction_id).await };
@@ -330,7 +330,7 @@ pub trait ISTokenCanister: Canister {
         Box::pin(fut)
     }
 
-    #[update]
+    #[update(trait = true)]
     fn approveAndNotify<'a>(
         &'a self,
         spender: Principal,
@@ -346,7 +346,7 @@ pub trait ISTokenCanister: Canister {
         Box::pin(fut)
     }
 
-    #[update]
+    #[update(trait = true)]
     fn notify<'a>(&'a self, transaction_id: TxId, to: Principal) -> AsyncReturn<TxReceipt> {
         let fut = async move { notify(self.canister(), transaction_id, to).await };
 
