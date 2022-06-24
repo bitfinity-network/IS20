@@ -413,10 +413,14 @@ impl TokenCanister {
 #[cfg(test)]
 mod test {
     use super::*;
+    use ic_canister::ic_kit::MockContext;
 
     #[test]
     fn test_upgrade_from_previous() {
         use ic_storage::stable::write;
+
+        MockContext::new().inject();
+
         write(&()).unwrap();
         let canister = TokenCanister::init_instance();
         canister.__post_upgrade_inst();
@@ -424,6 +428,8 @@ mod test {
 
     #[test]
     fn test_upgrade_from_current() {
+        MockContext::new().inject();
+
         // Set a value on the state...
         let canister = TokenCanister::init_instance();
         let mut state = canister.state.borrow_mut();
