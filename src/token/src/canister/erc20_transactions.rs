@@ -227,6 +227,10 @@ pub(crate) fn transfer_balance(
     to: Principal,
     amount: Tokens128,
 ) -> Result<(), TxError> {
+    if amount == Tokens128::ZERO {
+        return Ok(());
+    }
+
     {
         let from_balance = balances
             .0
@@ -416,7 +420,7 @@ mod tests {
         assert_eq!(canister.historySize(), 1);
 
         const COUNT: u64 = 5;
-        let mut ts = ic_canister::ic_kit::ic::time().into();
+        let mut ts = ic_canister::ic_kit::ic::time();
         for i in 0..COUNT {
             ctx.add_time(10);
             let id = canister
@@ -471,7 +475,7 @@ mod tests {
         assert_eq!(canister.historySize(), 1);
 
         const COUNT: u64 = 5;
-        let mut ts = ic_canister::ic_kit::ic::time().into();
+        let mut ts = ic_canister::ic_kit::ic::time();
         for i in 0..COUNT {
             ctx.add_time(10);
             let id = canister
@@ -527,7 +531,7 @@ mod tests {
     fn burn_from() {
         let canister = test_canister();
         let bob_balance = Tokens128::from(1000);
-        canister.mint(bob(), bob_balance.clone()).unwrap();
+        canister.mint(bob(), bob_balance).unwrap();
         assert_eq!(canister.balanceOf(bob()), bob_balance);
 
         canister.burn(Some(bob()), Tokens128::from(100)).unwrap();
@@ -558,7 +562,7 @@ mod tests {
         assert_eq!(canister.historySize(), 1);
 
         const COUNT: u64 = 5;
-        let mut ts = ic_canister::ic_kit::ic::time().into();
+        let mut ts = ic_canister::ic_kit::ic::time();
         for i in 0..COUNT {
             ctx.add_time(10);
             let id = canister
@@ -646,7 +650,7 @@ mod tests {
         context.update_caller(bob());
 
         const COUNT: u64 = 5;
-        let mut ts = ic_canister::ic_kit::ic::time().into();
+        let mut ts = ic_canister::ic_kit::ic::time();
         for i in 0..COUNT {
             ctx.add_time(10);
             let id = canister
@@ -746,7 +750,7 @@ mod tests {
         assert_eq!(canister.historySize(), 1);
 
         const COUNT: u64 = 5;
-        let mut ts = ic_canister::ic_kit::ic::time().into();
+        let mut ts = ic_canister::ic_kit::ic::time();
         for i in 0..COUNT {
             ctx.add_time(10);
             let id = canister
@@ -953,7 +957,7 @@ mod proptests {
 
     prop_compose! {
         fn make_tokens128() (num in "[0-9]{1,4}") -> Tokens128 {
-            Tokens128::from(u128::from_str_radix(&num, 10).unwrap())
+            Tokens128::from(str::parse::<u128>(&num).unwrap())
         }
     }
     prop_compose! {
@@ -1108,18 +1112,18 @@ mod proptests {
                         let from_balance = canister.balanceOf(from);
                         let to_balance = canister.balanceOf(to);
                         let (fee , fee_to) = canister.state.borrow().stats.fee_info();
-                        let res = canister.transferIncludeFee(to, amount.clone());
+                        let res = canister.transferIncludeFee(to, amount);
 
                         if to == from {
                             prop_assert_eq!(res, Err(TxError::SelfTransfer));
                             return Ok(())
                         }
 
-                        if amount.clone() <= fee.clone()  {
+                        if amount <= fee  {
                             prop_assert_eq!(res, Err(TxError::AmountTooSmall));
                             return Ok(());
                         }
-                        if from_balance < amount.clone(){
+                        if from_balance < amount {
                             prop_assert_eq!(res, Err(TxError::InsufficientBalance));
                             return Ok(());
                         }
