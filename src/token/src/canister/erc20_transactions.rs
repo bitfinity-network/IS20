@@ -7,24 +7,18 @@ use crate::state::{Balances, CanisterState};
 use crate::types::{TxError, TxReceipt};
 
 use super::ISTokenCanister;
-use super::TokenCanister;
 
 pub fn transfer(
-    canister: &TokenCanister,
+    canister: &impl ISTokenCanister,
     caller: CheckedPrincipal<WithRecipient>,
     amount: Tokens128,
     fee_limit: Option<Tokens128>,
 ) -> TxReceipt {
-    let CanisterState {
-        ref mut balances,
-        ref mut ledger,
-        ref stats,
-        ref bidding_state,
-        ..
-    } = *canister.state.borrow_mut();
+    let state = canister.state();
+    let mut state = state.borrow_mut();
 
-    let (fee, fee_to) = stats.fee_info();
-    let fee_ratio = bidding_state.fee_ratio;
+    let (fee, fee_to) = state.stats.fee_info();
+    let fee_ratio = state.bidding_state.fee_ratio;
 
     if let Some(fee_limit) = fee_limit {
         if fee > fee_limit {
@@ -32,25 +26,33 @@ pub fn transfer(
         }
     }
 
-    if balances.balance_of(&caller.inner()) < (amount + fee).ok_or(TxError::AmountOverflow)? {
+    if state.balances.balance_of(&caller.inner()) < (amount + fee).ok_or(TxError::AmountOverflow)? {
         return Err(TxError::InsufficientBalance);
     }
 
-    charge_fee(balances, caller.inner(), fee_to, fee, fee_ratio)
+    charge_fee(&mut state.balances, caller.inner(), fee_to, fee, fee_ratio)
         .expect("never fails due to checks above");
-    transfer_balance(balances, caller.inner(), caller.recipient(), amount)
-        .expect("never fails due to checks above");
+    transfer_balance(
+        &mut state.balances,
+        caller.inner(),
+        caller.recipient(),
+        amount,
+    )
+    .expect("never fails due to checks above");
 
-    let id = ledger.transfer(caller.inner(), caller.recipient(), amount, fee);
+    let id = state
+        .ledger
+        .transfer(caller.inner(), caller.recipient(), amount, fee);
     Ok(id)
 }
 
 pub fn transfer_from(
-    canister: &TokenCanister,
+    canister: &impl ISTokenCanister,
     caller: CheckedPrincipal<SenderRecipient>,
     amount: Tokens128,
 ) -> TxReceipt {
-    let mut state = canister.state.borrow_mut();
+    let state = canister.state();
+    let mut state = state.borrow_mut();
     let from_allowance = state.allowance(caller.from(), caller.inner());
     let CanisterState {
         ref mut balances,
@@ -101,12 +103,12 @@ pub fn transfer_from(
 }
 
 pub fn approve(
-    canister: &TokenCanister,
+    canister: &impl ISTokenCanister,
     caller: CheckedPrincipal<WithRecipient>,
     amount: Tokens128,
 ) -> TxReceipt {
-    let mut state = canister.state.borrow_mut();
-
+    let state = canister.state();
+    let mut state = state.borrow_mut();
     let CanisterState {
         ref mut bidding_state,
         ref mut balances,
@@ -288,7 +290,7 @@ mod tests {
     use ic_canister::ic_kit::MockContext;
     use ic_canister::Canister;
 
-    use crate::canister::MAX_TRANSACTION_QUERY_LEN;
+    use crate::core::MAX_TRANSACTION_QUERY_LEN;
     use crate::types::{Metadata, Operation, TransactionStatus};
 
     use super::*;
@@ -959,7 +961,6 @@ mod proptests {
 
     prop_compose! {
         fn make_tokens128() (num in "[0-9]{1,10}") -> Tokens128 {
-            eprintln!("{}", num);
             Tokens128::from(u128::from_str_radix(&num, 10).unwrap())
         }
     }

@@ -1,10 +1,10 @@
+use candid::Principal;
+use ic_helpers::tokens::Tokens128;
+
 use crate::canister::erc20_transactions::{charge_fee, transfer_balance};
-use crate::canister::TokenCanister;
 use crate::principal::{CheckedPrincipal, WithRecipient};
 use crate::state::CanisterState;
 use crate::types::{TxError, TxId, TxReceipt};
-use candid::Principal;
-use ic_helpers::tokens::Tokens128;
 
 use super::ISTokenCanister;
 
@@ -14,17 +14,19 @@ use super::ISTokenCanister;
 /// Note, that the `value` cannot be less than the `fee` amount. If the value given is too small,
 /// transaction will fail with `TxError::AmountTooSmall` error.
 pub fn transfer_include_fee(
-    canister: &TokenCanister,
+    canister: &impl ISTokenCanister,
     caller: CheckedPrincipal<WithRecipient>,
     amount: Tokens128,
 ) -> TxReceipt {
+    let state = canister.state();
+    let mut state = state.borrow_mut();
     let CanisterState {
         ref mut balances,
         ref mut ledger,
         ref bidding_state,
         ref stats,
         ..
-    } = *canister.state.borrow_mut();
+    } = *state;
 
     let (fee, fee_to) = stats.fee_info();
     let fee_ratio = bidding_state.fee_ratio;
@@ -52,11 +54,12 @@ pub fn transfer_include_fee(
 }
 
 pub fn batch_transfer(
-    canister: &TokenCanister,
+    canister: &impl ISTokenCanister,
     transfers: Vec<(Principal, Tokens128)>,
 ) -> Result<Vec<TxId>, TxError> {
     let from = ic_canister::ic_kit::ic::caller();
-    let mut state = canister.state.borrow_mut();
+    let state = canister.state();
+    let mut state = state.borrow_mut();
 
     let mut total_value = Tokens128::from(0u128);
     for target in transfers.iter() {
@@ -95,11 +98,13 @@ pub fn batch_transfer(
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use crate::types::Metadata;
     use ic_canister::ic_kit::mock_principals::{alice, bob, john, xtc};
     use ic_canister::ic_kit::MockContext;
     use ic_canister::Canister;
+
+    use crate::types::Metadata;
+
+    use super::*;
 
     fn test_canister() -> TokenCanister {
         MockContext::new().with_caller(alice()).inject();

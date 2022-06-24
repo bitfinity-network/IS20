@@ -4,14 +4,13 @@ use candid::Principal;
 use ic_canister::virtual_canister_notify;
 use ic_helpers::tokens::Tokens128;
 
-use crate::canister::TokenCanister;
 use crate::principal::{CheckedPrincipal, WithRecipient};
 use crate::types::{TxError, TxId, TxReceipt};
 
 use super::ISTokenCanister;
 
 pub(crate) async fn approve_and_notify(
-    canister: &TokenCanister,
+    canister: &impl ISTokenCanister,
     caller: CheckedPrincipal<WithRecipient>,
     amount: Tokens128,
 ) -> TxReceipt {
@@ -24,11 +23,11 @@ pub(crate) async fn approve_and_notify(
 }
 
 pub(crate) async fn consume_notification(
-    canister: &TokenCanister,
+    canister: &impl ISTokenCanister,
     transaction_id: TxId,
 ) -> TxReceipt {
-    let mut state = canister.state.borrow_mut();
-
+    let state = canister.state();
+    let mut state = state.borrow_mut();
     match state.ledger.notifications.get(&transaction_id) {
         Some(Some(x)) if *x != ic_canister::ic_kit::ic::caller() => {
             return Err(TxError::Unauthorized);
@@ -46,12 +45,12 @@ pub(crate) async fn consume_notification(
 
 /// This is a one-way call
 pub(crate) async fn notify(
-    canister: &TokenCanister,
+    canister: &impl ISTokenCanister,
     transaction_id: TxId,
     to: Principal,
 ) -> TxReceipt {
     let tx = canister
-        .state
+        .state()
         .borrow()
         .ledger
         .get(transaction_id)
@@ -62,7 +61,7 @@ pub(crate) async fn notify(
     }
 
     match canister
-        .state
+        .state()
         .borrow_mut()
         .ledger
         .notifications
@@ -84,6 +83,7 @@ mod tests {
     use std::rc::Rc;
     use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 
+    use crate::canister::TokenCanister;
     use ic_canister::ic_kit::mock_principals::{alice, bob};
     use ic_canister::ic_kit::MockContext;
     use ic_canister::{register_failing_virtual_responder, register_virtual_responder, Canister};

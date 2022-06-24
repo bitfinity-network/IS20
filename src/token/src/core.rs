@@ -1,10 +1,8 @@
 use std::cell::RefCell;
-use std::future::Future;
-use std::pin::Pin;
 use std::rc::Rc;
 
 use candid::Principal;
-use ic_canister::{query, update, Canister};
+use ic_canister::{init, query, update, AsyncReturn, Canister};
 use ic_helpers::tokens::Tokens128;
 
 use crate::canister::erc20_transactions::{
@@ -16,14 +14,16 @@ use crate::canister::is20_auction::{
 };
 use crate::canister::is20_notify::{approve_and_notify, consume_notification, notify};
 use crate::canister::is20_transactions::{batch_transfer, transfer_include_fee};
-use crate::canister::TokenCanister;
 use crate::principal::{CheckedPrincipal, Owner};
 use crate::state::CanisterState;
 use crate::types::{
-    AuctionInfo, Metadata, StatsData, TokenInfo, TxError, TxId, TxReceipt, TxRecord,
+    AuctionInfo, Metadata, PaginatedResult, StatsData, Timestamp, TokenInfo, TxError, TxId,
+    TxReceipt, TxRecord,
 };
 
-pub type AsyncReturn<'a, T> = Pin<Box<dyn Future<Output = T> + 'a>>;
+pub(crate) const MAX_TRANSACTION_QUERY_LEN: usize = 1000;
+// 1 day in nanoseconds.
+const DEFAULT_AUCTION_PERIOD: Timestamp = 24 * 60 * 60 * 1_000_000;
 
 pub enum CanisterUpdate {
     Name(String),
@@ -36,10 +36,25 @@ pub enum CanisterUpdate {
 }
 
 #[allow(non_snake_case)]
-pub trait ISTokenCanister: Canister {
+pub trait ISTokenCanister: Canister + Sized {
     fn state(&self) -> Rc<RefCell<CanisterState>>;
 
-    fn canister(&self) -> &TokenCanister;
+    #[init(trait = true)]
+    fn init(&self, metadata: Metadata) {
+        self.state()
+            .borrow_mut()
+            .balances
+            .0
+            .insert(metadata.owner, metadata.totalSupply);
+
+        self.state()
+            .borrow_mut()
+            .ledger
+            .mint(metadata.owner, metadata.owner, metadata.totalSupply);
+
+        self.state().borrow_mut().stats = metadata.into();
+        self.state().borrow_mut().bidding_state.auction_period = DEFAULT_AUCTION_PERIOD;
+    }
 
     #[query(trait = true)]
     fn isTestToken(&self) -> bool {
@@ -181,7 +196,7 @@ pub trait ISTokenCanister: Canister {
     #[update(trait = true)]
     fn approve(&self, spender: Principal, amount: Tokens128) -> TxReceipt {
         let caller = CheckedPrincipal::with_recipient(spender)?;
-        approve(self.canister(), caller, amount)
+        approve(self, caller, amount)
     }
 
     /********************** TRANSFERS ***********************/
@@ -193,13 +208,13 @@ pub trait ISTokenCanister: Canister {
         fee_limit: Option<Tokens128>,
     ) -> TxReceipt {
         let caller = CheckedPrincipal::with_recipient(to)?;
-        transfer(self.canister(), caller, amount, fee_limit)
+        transfer(self, caller, amount, fee_limit)
     }
 
     #[update(trait = true)]
     fn transferFrom(&self, from: Principal, to: Principal, amount: Tokens128) -> TxReceipt {
         let caller = CheckedPrincipal::from_to(from, to)?;
-        transfer_from(self.canister(), caller, amount)
+        transfer_from(self, caller, amount)
     }
 
     /// Transfers `value` amount to the `to` principal, applying American style fee. This means, that
@@ -210,7 +225,7 @@ pub trait ISTokenCanister: Canister {
     #[update(trait = true)]
     fn transferIncludeFee(&self, to: Principal, amount: Tokens128) -> TxReceipt {
         let caller = CheckedPrincipal::with_recipient(to)?;
-        transfer_include_fee(self.canister(), caller, amount)
+        transfer_include_fee(self, caller, amount)
     }
 
     /// Takes a list of transfers, each of which is a pair of `to` and `value` fields, it returns a `TxReceipt` which contains
@@ -223,7 +238,7 @@ pub trait ISTokenCanister: Canister {
         for (to, _) in transfers.clone() {
             let _ = CheckedPrincipal::with_recipient(to)?;
         }
-        batch_transfer(self.canister(), transfers)
+        batch_transfer(self, transfers)
     }
 
     #[update(trait = true)]
@@ -264,13 +279,13 @@ pub trait ISTokenCanister: Canister {
     /// saved for the next auction.
     #[update(trait = true)]
     fn bidCycles(&self, bidder: Principal) -> Result<u64, AuctionError> {
-        bid_cycles(self.canister(), bidder)
+        bid_cycles(self, bidder)
     }
 
     /// Current information about bids and auction.
     #[update(trait = true)]
     fn biddingInfo(&self) -> BiddingInfo {
-        bidding_info(self.canister())
+        bidding_info(self)
     }
 
     /// Starts the cycle auction.
@@ -282,13 +297,13 @@ pub trait ISTokenCanister: Canister {
     /// then will update the fee ratio until the next auction.
     #[update(trait = true)]
     fn runAuction(&self) -> Result<AuctionInfo, AuctionError> {
-        run_auction(self.canister())
+        run_auction(self)
     }
 
     /// Returns the information about a previously held auction.
     #[update(trait = true)]
     fn auctionInfo(&self, id: usize) -> Result<AuctionInfo, AuctionError> {
-        auction_info(self.canister(), id)
+        auction_info(self, id)
     }
 
     /// Returns the minimum cycles set for the canister.
@@ -324,8 +339,7 @@ pub trait ISTokenCanister: Canister {
 
     #[update(trait = true)]
     fn consume_notification<'a>(&'a self, transaction_id: TxId) -> AsyncReturn<TxReceipt> {
-        // consume_notification(self, transaction_id)
-        let fut = async move { consume_notification(self.canister(), transaction_id).await };
+        let fut = async move { consume_notification(self, transaction_id).await };
 
         Box::pin(fut)
     }
@@ -339,7 +353,7 @@ pub trait ISTokenCanister: Canister {
         let caller = CheckedPrincipal::with_recipient(spender);
         let fut = async move {
             match caller {
-                Ok(caller) => approve_and_notify(self.canister(), caller, amount).await,
+                Ok(caller) => approve_and_notify(self, caller, amount).await,
                 Err(e) => Err(e).into(),
             }
         };
@@ -348,8 +362,45 @@ pub trait ISTokenCanister: Canister {
 
     #[update(trait = true)]
     fn notify<'a>(&'a self, transaction_id: TxId, to: Principal) -> AsyncReturn<TxReceipt> {
-        let fut = async move { notify(self.canister(), transaction_id, to).await };
+        let fut = async move { notify(self, transaction_id, to).await };
 
         Box::pin(fut)
+    }
+
+    /********************** Transactions ***********************/
+    #[query(trait = true)]
+    fn getTransaction(&self, id: TxId) -> TxRecord {
+        self.state().borrow().ledger.get(id).unwrap_or_else(|| {
+            ic_canister::ic_kit::ic::trap(&format!("Transaction {} does not exist", id))
+        })
+    }
+
+    /// Returns a list of transactions in paginated form. The `who` is optional, if given, only transactions of the `who` are
+    /// returned. `count` is the number of transactions to return, `transaction_id` is the transaction index which is used as
+    /// the offset of the first transaction to return, any
+    ///
+    /// It returns `PaginatedResult` a struct, which contains `result` which is a list of transactions `Vec<TxRecord>` that meet the requirements of the query,
+    /// and `next_id` which is the index of the next transaction to return.
+    #[query(trait = true)]
+    fn getTransactions(
+        &self,
+        who: Option<Principal>,
+        count: usize,
+        transaction_id: Option<TxId>,
+    ) -> PaginatedResult {
+        if count > MAX_TRANSACTION_QUERY_LEN {
+            ic_canister::ic_kit::ic::trap("Too many transactions requested");
+        }
+
+        self.state()
+            .borrow()
+            .ledger
+            .get_transactions(who, count, transaction_id)
+    }
+
+    /// Returns the total number of transactions related to the user `who`.
+    #[query(trait = true)]
+    fn getUserTransactionCount(&self, who: Principal) -> usize {
+        self.state().borrow().ledger.get_len_user_history(who)
     }
 }
