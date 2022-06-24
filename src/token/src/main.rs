@@ -15,11 +15,12 @@ fn main() {
     use canister::is20_auction::{AuctionError, BiddingInfo};
     use ic_cdk::export::candid::Principal;
     use ic_helpers::tokens::Tokens128;
+    use token::canister::TokenCanister;
+    use token::core::ISTokenCanister;
     use types::*;
 
-    let canister_idl = ic_canister::generate_idl!();
+    let trait_idl = <TokenCanister as ISTokenCanister>::get_idl();
 
-    let result =
-        candid::bindings::candid::compile(&canister_idl.env.env, &Some(canister_idl.actor));
+    let result = candid::bindings::candid::compile(&trait_idl.env.env, &Some(trait_idl.actor));
     print!("{result}");
 }
