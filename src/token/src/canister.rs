@@ -1,6 +1,7 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
+use ic_canister::generate_exports;
 use ic_canister::Canister;
 use ic_cdk::export::candid::Principal;
 
@@ -30,6 +31,8 @@ impl ISTokenCanister for TokenCanister {
         self.state.clone()
     }
 }
+
+generate_exports!(TokenCanister);
 
 #[cfg(test)]
 mod test {

@@ -403,4 +403,11 @@ pub trait ISTokenCanister: Canister + Sized {
     fn getUserTransactionCount(&self, who: Principal) -> usize {
         self.state().borrow().ledger.get_len_user_history(who)
     }
+
+    // Important: This function *must* be defined to be the
+    // last one in the trait because it depends on the order
+    // of expansion of update/query(trait = true) methods.
+    fn get_idl() -> ic_canister::Idl {
+        ic_canister::generate_idl!()
+    }
 }
