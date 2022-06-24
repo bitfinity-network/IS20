@@ -286,6 +286,7 @@ mod tests {
     use std::collections::HashSet;
     use std::iter::FromIterator;
 
+    use crate::canister::TokenCanister;
     use ic_canister::ic_kit::mock_principals::{alice, bob, john, xtc};
     use ic_canister::ic_kit::MockContext;
     use ic_canister::Canister;
@@ -838,6 +839,7 @@ mod tests {
 
 #[cfg(test)]
 mod proptests {
+    use crate::canister::TokenCanister;
     use ic_canister::ic_kit::MockContext;
     use ic_canister::Canister;
     use ic_helpers::tokens::Tokens256;

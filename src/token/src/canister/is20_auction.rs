@@ -215,6 +215,7 @@ pub fn accumulated_fees(balances: &Balances) -> Tokens128 {
 
 #[cfg(test)]
 mod tests {
+    use crate::canister::TokenCanister;
     use ic_canister::ic_kit::mock_principals::{alice, bob};
     use ic_canister::ic_kit::MockContext;
     use ic_canister::Canister;

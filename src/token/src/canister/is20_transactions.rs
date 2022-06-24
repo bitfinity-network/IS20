@@ -98,6 +98,7 @@ pub fn batch_transfer(
 
 #[cfg(test)]
 mod tests {
+    use crate::canister::TokenCanister;
     use ic_canister::ic_kit::mock_principals::{alice, bob, john, xtc};
     use ic_canister::ic_kit::MockContext;
     use ic_canister::Canister;
