@@ -388,14 +388,12 @@ pub trait ISTokenCanister: Canister + Sized {
         count: usize,
         transaction_id: Option<TxId>,
     ) -> PaginatedResult {
-        if count > MAX_TRANSACTION_QUERY_LEN {
-            ic_canister::ic_kit::ic::trap("Too many transactions requested");
-        }
-
-        self.state()
-            .borrow()
-            .ledger
-            .get_transactions(who, count, transaction_id)
+        // We don't trap if the transaction count is greater than the MAX_TRANSACTION_QUERY_LEN, we take the MAX_TRANSACTION_QUERY_LEN instead.
+        self.state().borrow().ledger.get_transactions(
+            who,
+            count.min(MAX_TRANSACTION_QUERY_LEN),
+            transaction_id,
+        )
     }
 
     /// Returns the total number of transactions related to the user `who`.

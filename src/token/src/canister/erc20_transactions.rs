@@ -291,7 +291,6 @@ mod tests {
     use ic_canister::ic_kit::MockContext;
     use ic_canister::Canister;
 
-    use crate::core::MAX_TRANSACTION_QUERY_LEN;
     use crate::types::{Metadata, Operation, TransactionStatus};
 
     use super::*;
@@ -814,13 +813,6 @@ mod tests {
 
     #[test]
     #[should_panic]
-    fn get_transactions_over_limit() {
-        let canister = test_canister();
-        canister.getTransactions(None, (MAX_TRANSACTION_QUERY_LEN + 1) as usize, None);
-    }
-
-    #[test]
-    #[should_panic]
     fn get_transaction_not_existing() {
         let canister = test_canister();
         canister.getTransaction(2);
@@ -842,7 +834,6 @@ mod proptests {
     use crate::canister::TokenCanister;
     use ic_canister::ic_kit::MockContext;
     use ic_canister::Canister;
-    use ic_helpers::tokens::Tokens256;
     use proptest::collection::vec;
     use proptest::prelude::*;
     use proptest::sample::Index;
