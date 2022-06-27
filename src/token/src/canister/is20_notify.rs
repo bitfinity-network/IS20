@@ -154,10 +154,10 @@ mod tests {
         let id = canister
             .transfer(bob(), Tokens128::from(100), None)
             .unwrap();
-        canister.notify(id.clone(), bob()).await.unwrap();
+        canister.notify(id, bob()).await.unwrap();
 
         MockContext::new().with_caller(bob()).inject();
-        let _ = canister.consume_notification(id.clone()).await;
+        let _ = canister.consume_notification(id).await;
 
         MockContext::new().with_caller(alice()).inject();
         let response = canister.notify(id, bob()).await;
@@ -177,14 +177,14 @@ mod tests {
         let id = canister
             .transfer(bob(), Tokens128::from(100), None)
             .unwrap();
-        let response = canister.notify(id.clone(), bob()).await;
+        let response = canister.notify(id, bob()).await;
         assert_eq!(
             response,
             Err(TxError::NotificationFailed { transaction_id: 1 })
         );
 
         register_virtual_responder(bob(), "transaction_notification", move |_: (TxRecord,)| {});
-        let response = canister.notify(id.clone(), bob()).await;
+        let response = canister.notify(id, bob()).await;
         assert!(response.is_ok())
     }
 }
