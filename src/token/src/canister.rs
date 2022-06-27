@@ -11,14 +11,14 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 use candid::Principal;
-use ic_canister::{init, query, update, AsyncReturn, Canister};
+use ic_canister::{query, update, AsyncReturn, Canister};
 use ic_helpers::tokens::Tokens128;
 
 use crate::principal::{CheckedPrincipal, Owner};
 use crate::state::CanisterState;
 use crate::types::{
-    AuctionInfo, Metadata, PaginatedResult, StatsData, Timestamp, TokenInfo, TxError, TxId,
-    TxReceipt, TxRecord,
+    AuctionInfo, Metadata, PaginatedResult, StatsData, TokenInfo, TxError, TxId, TxReceipt,
+    TxRecord,
 };
 use erc20_transactions::{
     approve, burn_as_owner, burn_own_tokens, mint_as_owner, mint_test_token, transfer,
@@ -31,8 +31,6 @@ use is20_notify::{approve_and_notify, consume_notification, notify};
 use is20_transactions::{batch_transfer, transfer_include_fee};
 
 pub(crate) const MAX_TRANSACTION_QUERY_LEN: usize = 1000;
-// 1 day in nanoseconds.
-const DEFAULT_AUCTION_PERIOD: Timestamp = 24 * 60 * 60 * 1_000_000;
 
 pub enum CanisterUpdate {
     Name(String),
@@ -47,23 +45,6 @@ pub enum CanisterUpdate {
 #[allow(non_snake_case)]
 pub trait TokenCanister: Canister + Sized {
     fn state(&self) -> Rc<RefCell<CanisterState>>;
-
-    #[init(trait = true)]
-    fn init(&self, metadata: Metadata) {
-        self.state()
-            .borrow_mut()
-            .balances
-            .0
-            .insert(metadata.owner, metadata.totalSupply);
-
-        self.state()
-            .borrow_mut()
-            .ledger
-            .mint(metadata.owner, metadata.owner, metadata.totalSupply);
-
-        self.state().borrow_mut().stats = metadata.into();
-        self.state().borrow_mut().bidding_state.auction_period = DEFAULT_AUCTION_PERIOD;
-    }
 
     #[query(trait = true)]
     fn isTestToken(&self) -> bool {

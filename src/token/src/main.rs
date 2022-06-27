@@ -14,8 +14,11 @@ fn main() {}
 fn main() {
     use token::canister::TokenCanister;
     use token::exports::TokenCanisterExports;
+    use token::types::Metadata;
 
-    let trait_idl = <TokenCanisterExports as TokenCanister>::get_idl();
+    let mut trait_idl = <TokenCanisterExports as TokenCanister>::get_idl();
+    let token_idl = ic_canister::generate_idl!();
+    trait_idl.merge(&token_idl);
 
     let result = candid::bindings::candid::compile(&trait_idl.env.env, &Some(trait_idl.actor));
     print!("{result}");

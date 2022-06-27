@@ -2,12 +2,18 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 use ic_canister::generate_exports;
+use ic_canister::init;
 use ic_canister::Canister;
 use ic_canister::PreUpdate;
 use ic_cdk::export::candid::Principal;
 
 use crate::canister::TokenCanister;
 use crate::state::CanisterState;
+use crate::types::Metadata;
+use crate::types::Timestamp;
+
+// 1 day in nanoseconds.
+const DEFAULT_AUCTION_PERIOD: Timestamp = 24 * 60 * 60 * 1_000_000;
 
 #[derive(Debug, Clone, Canister)]
 pub struct TokenCanisterExports {
@@ -29,6 +35,25 @@ impl PreUpdate for TokenCanisterExports {
 impl TokenCanister for TokenCanisterExports {
     fn state(&self) -> Rc<RefCell<CanisterState>> {
         self.state.clone()
+    }
+}
+
+impl TokenCanisterExports {
+    #[init]
+    pub fn init(&self, metadata: Metadata) {
+        self.state
+            .borrow_mut()
+            .balances
+            .0
+            .insert(metadata.owner, metadata.totalSupply);
+
+        self.state
+            .borrow_mut()
+            .ledger
+            .mint(metadata.owner, metadata.owner, metadata.totalSupply);
+
+        self.state.borrow_mut().stats = metadata.into();
+        self.state.borrow_mut().bidding_state.auction_period = DEFAULT_AUCTION_PERIOD;
     }
 }
 
