@@ -9,7 +9,6 @@ use ic_cdk::export::candid::Principal;
 use crate::canister::TokenCanister;
 use crate::state::CanisterState;
 
-
 #[derive(Debug, Clone, Canister)]
 pub struct TokenCanisterExports {
     #[id]
@@ -19,7 +18,13 @@ pub struct TokenCanisterExports {
     pub(crate) state: Rc<RefCell<CanisterState>>,
 }
 
-impl PreUpdate for TokenCanisterExports {}
+impl PreUpdate for TokenCanisterExports {
+    fn pre_update(&self, _method_name: &str, _method_type: ic_canister::MethodType) {
+        if let Err(auction_error) = self.runAuction() {
+            ic_cdk::println!("Auction error: {auction_error:#?}");
+        }
+    }
+}
 
 impl TokenCanister for TokenCanisterExports {
     fn state(&self) -> Rc<RefCell<CanisterState>> {
