@@ -190,13 +190,16 @@ impl TokenFactoryCanister {
 
         Ok(())
     }
-}
 
-impl FactoryCanister for TokenFactoryCanister {
-    fn get_canister_bytecode(&self) -> Option<Vec<u8>> {
-        self.state.borrow().token_wasm.clone()
+    #[update]
+    pub async fn upgrade(&mut self) -> Result<Vec<Principal>, FactoryError> {
+        let wasm = self.state.borrow().token_wasm.clone();
+        let result = FactoryCanister::upgrade(self, wasm).await;
+        result
     }
 }
+
+impl FactoryCanister for TokenFactoryCanister {}
 
 #[cfg(test)]
 mod tests {
