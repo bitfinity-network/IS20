@@ -6,10 +6,10 @@ use crate::principal::{CheckedPrincipal, Owner, SenderRecipient, TestNet, WithRe
 use crate::state::{Balances, CanisterState};
 use crate::types::{TxError, TxReceipt};
 
-use super::ISTokenCanister;
+use super::TokenCanister;
 
 pub fn transfer(
-    canister: &impl ISTokenCanister,
+    canister: &impl TokenCanister,
     caller: CheckedPrincipal<WithRecipient>,
     amount: Tokens128,
     fee_limit: Option<Tokens128>,
@@ -47,7 +47,7 @@ pub fn transfer(
 }
 
 pub fn transfer_from(
-    canister: &impl ISTokenCanister,
+    canister: &impl TokenCanister,
     caller: CheckedPrincipal<SenderRecipient>,
     amount: Tokens128,
 ) -> TxReceipt {
@@ -103,7 +103,7 @@ pub fn transfer_from(
 }
 
 pub fn approve(
-    canister: &impl ISTokenCanister,
+    canister: &impl TokenCanister,
     caller: CheckedPrincipal<WithRecipient>,
     amount: Tokens128,
 ) -> TxReceipt {
@@ -290,7 +290,7 @@ mod tests {
     use std::collections::HashSet;
     use std::iter::FromIterator;
 
-    use crate::canister::TokenCanister;
+    use crate::exports::TokenCanisterExports;
     use ic_canister::ic_kit::mock_principals::{alice, bob, john, xtc};
     use ic_canister::ic_kit::MockContext;
     use ic_canister::Canister;
@@ -299,10 +299,10 @@ mod tests {
 
     use super::*;
 
-    fn test_context() -> (&'static MockContext, TokenCanister) {
+    fn test_context() -> (&'static MockContext, TokenCanisterExports) {
         let context = MockContext::new().with_caller(alice()).inject();
 
-        let canister = TokenCanister::init_instance();
+        let canister = TokenCanisterExports::init_instance();
         canister.init(Metadata {
             logo: "".to_string(),
             name: "".to_string(),
@@ -318,7 +318,7 @@ mod tests {
         (context, canister)
     }
 
-    fn test_canister() -> TokenCanister {
+    fn test_canister() -> TokenCanisterExports {
         let (_, canister) = test_context();
         canister
     }
@@ -835,7 +835,7 @@ mod tests {
 
 #[cfg(test)]
 mod proptests {
-    use crate::canister::TokenCanister;
+    use crate::exports::TokenCanisterExports;
     use ic_canister::ic_kit::MockContext;
     use ic_canister::Canister;
     use proptest::collection::vec;
@@ -972,7 +972,7 @@ mod proptests {
             principals in vec(make_principal(), 1..7),
             owner_idx in any::<Index>(),
             fee_to_idx in any::<Index>(),
-        )-> (TokenCanister, Vec<Principal>) {
+        )-> (TokenCanisterExports, Vec<Principal>) {
             // pick two random principals (they could very well be the same principal twice)
             let owner = principals[owner_idx.index(principals.len())];
             let fee_to = principals[fee_to_idx.index(principals.len())];
@@ -988,12 +988,12 @@ mod proptests {
                 feeTo: fee_to,
                 isTestToken: None,
             };
-            let canister = TokenCanister::init_instance();
+            let canister = TokenCanisterExports::init_instance();
             canister.init(meta);
             (canister, principals)
         }
     }
-    fn canister_and_actions() -> impl Strategy<Value = (TokenCanister, Vec<Action>)> {
+    fn canister_and_actions() -> impl Strategy<Value = (TokenCanisterExports, Vec<Action>)> {
         make_canister().prop_flat_map(|(canister, principals)| {
             let actions = vec(make_action(principals), 1..7);
             (Just(canister), actions)

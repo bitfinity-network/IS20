@@ -11,7 +11,7 @@ use crate::ledger::Ledger;
 use crate::state::{AuctionHistory, Balances, BiddingState, CanisterState};
 use crate::types::{AuctionInfo, Cycles, StatsData, Timestamp};
 
-use super::ISTokenCanister;
+use super::TokenCanister;
 
 // Minimum bidding amount is required, for every update call costs cycles, and we want bidding
 // to add cycles rather then to decrease them. 1M is chosen as one ingress call costs 590K cycles.
@@ -60,7 +60,7 @@ pub enum AuctionError {
 }
 
 pub(crate) fn bid_cycles(
-    canister: &impl ISTokenCanister,
+    canister: &impl TokenCanister,
     bidder: Principal,
 ) -> Result<Cycles, AuctionError> {
     let amount = ic::msg_cycles_available();
@@ -78,7 +78,7 @@ pub(crate) fn bid_cycles(
     Ok(amount_accepted)
 }
 
-pub(crate) fn bidding_info(canister: &impl ISTokenCanister) -> BiddingInfo {
+pub(crate) fn bidding_info(canister: &impl TokenCanister) -> BiddingInfo {
     let state = canister.state();
     let state = state.borrow();
     let bidding_state = &state.bidding_state;
@@ -94,7 +94,7 @@ pub(crate) fn bidding_info(canister: &impl ISTokenCanister) -> BiddingInfo {
     }
 }
 
-pub(crate) fn run_auction(canister: &impl ISTokenCanister) -> Result<AuctionInfo, AuctionError> {
+pub(crate) fn run_auction(canister: &impl TokenCanister) -> Result<AuctionInfo, AuctionError> {
     let state = canister.state();
     let mut state = state.borrow_mut();
 
@@ -118,7 +118,7 @@ pub(crate) fn run_auction(canister: &impl ISTokenCanister) -> Result<AuctionInfo
 }
 
 pub(crate) fn auction_info(
-    canister: &impl ISTokenCanister,
+    canister: &impl TokenCanister,
     id: usize,
 ) -> Result<AuctionInfo, AuctionError> {
     canister
@@ -215,7 +215,7 @@ pub fn accumulated_fees(balances: &Balances) -> Tokens128 {
 
 #[cfg(test)]
 mod tests {
-    use crate::canister::TokenCanister;
+    use crate::exports::TokenCanisterExports;
     use ic_canister::ic_kit::mock_principals::{alice, bob};
     use ic_canister::ic_kit::MockContext;
     use ic_canister::Canister;
@@ -225,10 +225,10 @@ mod tests {
 
     use super::*;
 
-    fn test_context() -> (&'static mut MockContext, TokenCanister) {
+    fn test_context() -> (&'static mut MockContext, TokenCanisterExports) {
         let context = MockContext::new().with_caller(alice()).inject();
 
-        let canister = TokenCanister::init_instance();
+        let canister = TokenCanisterExports::init_instance();
         canister.init(Metadata {
             logo: "".to_string(),
             name: "".to_string(),
