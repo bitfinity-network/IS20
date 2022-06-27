@@ -24,10 +24,10 @@ pub(crate) async fn consume_notification(
     canister: &TokenCanister,
     transaction_id: Nat,
 ) -> TxReceipt {
-    let mut state = canister.state.borrow_mut();
+    let state = canister.state.borrow();
 
     match state.ledger.notifications.get(&transaction_id) {
-        Some(Some(x)) if *x != ic_canister::ic_kit::ic::caller() => {
+        Some(Some(x)) if x != ic_canister::ic_kit::ic::caller() => {
             return Err(TxError::Unauthorized)
         }
         Some(_) => {
@@ -58,15 +58,10 @@ pub(crate) async fn notify(
         return Err(TxError::Unauthorized);
     }
 
-    match canister
-        .state
-        .borrow_mut()
-        .ledger
-        .notifications
-        .get_mut(&transaction_id)
-    {
-        Some(Some(dest)) if *dest != to => return Err(TxError::Unauthorized),
-        Some(x) => *x = Some(to),
+    let notification = &canister.state.borrow().ledger.notifications;
+    match notification.get(&transaction_id) {
+        Some(Some(dest)) if dest != to => return Err(TxError::Unauthorized),
+        Some(_) => notification.insert(transaction_id.clone(), Some(to)),
         None => return Err(TxError::AlreadyActioned),
     }
 

@@ -1,13 +1,17 @@
-use crate::types::{PaginatedResult, PendingNotifications, TxRecord};
+use crate::state::STABLE_MAP;
+use crate::types::{PaginatedResult, PendingNotifications, TxRecord, TxRecordStable};
 use candid::{CandidType, Deserialize, Nat, Principal};
 use num_traits::ToPrimitive;
+use stable_structures::{stable_storage::StableStorage, RestrictedMemory};
 
 const MAX_HISTORY_LENGTH: usize = 1_000_000;
 const HISTORY_REMOVAL_BATCH_SIZE: usize = 10_000;
+const LEDGER_HEAD_MAGIC: &[u8; 3] = b"LER";
+const LEDGER_HEAD_LAYOUT_VERSION: u8 = 1;
 
 #[derive(Debug, Default, CandidType, Deserialize)]
 pub struct Ledger {
-    history: Vec<TxRecord>,
+    history: TxRecordStable,
     vec_offset: Nat,
     pub notifications: PendingNotifications,
 }
@@ -22,7 +26,7 @@ impl Ledger {
     }
 
     pub fn get(&self, id: &Nat) -> Option<TxRecord> {
-        self.history.get(self.get_index(id)?).cloned()
+        self.history.get(self.get_index(id)?)
     }
 
     pub fn get_transactions(
@@ -32,8 +36,16 @@ impl Ledger {
         transaction_id: Option<u128>,
     ) -> PaginatedResult {
         let count = count as usize;
-        let mut transactions = self
-            .history
+        let mut buf = vec![];
+        STABLE_MAP.with(|s| {
+            let map = s.borrow();
+            for (k, _) in self.history.index.range(None, None, &map) {
+                let key = self.history.index.key_decode::<u64>(&k) as usize;
+                buf.push(self.history.get(key).unwrap());
+            }
+        });
+
+        let mut transactions = buf
             .iter()
             .rev()
             .filter(|tx| who.map_or(true, |c| c == tx.from || c == tx.to || Some(c) == tx.caller))
@@ -54,9 +66,9 @@ impl Ledger {
         }
     }
 
-    pub fn iter(&self) -> impl DoubleEndedIterator<Item = &TxRecord> {
-        self.history.iter()
-    }
+    // pub fn iter(&self) -> impl DoubleEndedIterator<Item = &TxRecord> {
+    //     self.history.iter()
+    // }
 
     fn get_index(&self, id: &Nat) -> Option<usize> {
         if *id < self.vec_offset {
@@ -68,8 +80,16 @@ impl Ledger {
     }
 
     pub fn get_len_user_history(&self, user: Principal) -> Nat {
-        self.history
-            .iter()
+        let mut buf = vec![];
+        STABLE_MAP.with(|s| {
+            let map = s.borrow();
+            for (k, _) in self.history.index.range(None, None, &map) {
+                let key = self.history.index.key_decode::<u64>(&k) as usize;
+                buf.push(self.history.get(key).unwrap());
+            }
+        });
+
+        buf.iter()
             .filter(|tx| tx.to == user || tx.from == user || tx.caller == Some(user))
             .count()
             .into()
@@ -141,6 +161,20 @@ impl Ledger {
         self.push(TxRecord::auction(id, to, amount))
     }
 
+    pub fn save_header(&self, memory: &RestrictedMemory<StableStorage>) {
+        memory.write_struct::<LedgerHeader>(&LedgerHeader::from(self), 0);
+    }
+
+    pub fn load_header(&mut self, memory: &RestrictedMemory<StableStorage>) {
+        let header: LedgerHeader = memory.read_struct(0);
+        assert_eq!(&header.magic, LEDGER_HEAD_MAGIC, "Bad magic.");
+        assert_eq!(
+            header.version, LEDGER_HEAD_LAYOUT_VERSION,
+            "Unsupported version."
+        );
+        self.vec_offset = header.vec_offset;
+    }
+
     fn push(&mut self, record: TxRecord) {
         self.history.push(record.clone());
         self.notifications.insert(record.index, None);
@@ -150,11 +184,44 @@ impl Ledger {
             // often relocation of the history vec.
             // This removal code can later be changed to moving old history records into another
             // storage.
-            for record in &self.history[..HISTORY_REMOVAL_BATCH_SIZE] {
+            let mut buf = vec![];
+            let mut keys = vec![];
+            STABLE_MAP.with(|s| {
+                let map = s.borrow();
+                for (i, (k, _)) in self.history.index.range(None, None, &map).enumerate() {
+                    if i >= HISTORY_REMOVAL_BATCH_SIZE {
+                        break;
+                    };
+                    let key = self.history.index.key_decode::<u64>(&k) as usize;
+                    keys.push(key);
+                    buf.push(self.history.get(key).unwrap());
+                }
+            });
+
+            for record in buf.iter() {
                 self.notifications.remove(&record.index.clone());
             }
-            self.history = self.history[HISTORY_REMOVAL_BATCH_SIZE..].into();
+            for key in keys.iter() {
+                self.history.remove(*key);
+            }
+            // todo add the vec_offset to id when find the TxRecordStable.
             self.vec_offset += HISTORY_REMOVAL_BATCH_SIZE;
+        }
+    }
+}
+
+struct LedgerHeader {
+    magic: [u8; 3],
+    version: u8,
+    vec_offset: Nat,
+}
+
+impl From<&Ledger> for LedgerHeader {
+    fn from(value: &Ledger) -> Self {
+        Self {
+            magic: *LEDGER_HEAD_MAGIC,
+            version: LEDGER_HEAD_LAYOUT_VERSION,
+            vec_offset: value.vec_offset.clone(),
         }
     }
 }

@@ -1,4 +1,4 @@
-use crate::state::CanisterState;
+use crate::state::{CanisterState, STABLE_MAP};
 use candid::{Nat, Principal};
 use ic_cdk_macros::inspect_message;
 use ic_storage::IcStorage;
@@ -77,7 +77,7 @@ fn inspect_message() {
             let state = CanisterState::get();
             let state = state.borrow();
             let balances = &state.balances;
-            if !balances.0.contains_key(&caller) {
+            if !balances.contains_key(&caller) {
                 ic_cdk::trap("Transaction method is not called by a stakeholder. Rejecting.");
             }
 
@@ -99,15 +99,13 @@ fn inspect_message() {
             // Check if the caller has allowance for this transfer.
             let allowances = &state.allowances;
             let (from, _, value) = ic_cdk::api::call::arg_data::<(Principal, Principal, Nat)>();
-            if let Some(user_allowances) = allowances.get(&caller) {
-                if let Some(allowance) = user_allowances.get(&from) {
-                    if value <= *allowance {
-                        ic_cdk::api::call::accept_message();
-                    } else {
-                        ic_cdk::trap("Allowance amount is less then the requested transfer amount. Rejecting.");
-                    }
+            if let Some(allowance) = allowances.get(&caller, &from) {
+                if value <= allowance {
+                    ic_cdk::api::call::accept_message();
                 } else {
-                    ic_cdk::trap("Caller is not allowed to transfer tokens for the requested principal. Rejecting.");
+                    ic_cdk::trap(
+                        "Allowance amount is less then the requested transfer amount. Rejecting.",
+                    );
                 }
             } else {
                 ic_cdk::trap("Caller is not allowed to transfer tokens for the requested principal. Rejecting.");
@@ -132,7 +130,7 @@ fn inspect_message() {
             let (tx_id,) = ic_cdk::api::call::arg_data::<(Nat,)>();
 
             match notifications.get(&tx_id) {
-                Some(Some(x)) if *x != ic_canister::ic_kit::ic::caller() => {
+                Some(Some(x)) if x != ic_canister::ic_kit::ic::caller() => {
                     ic_cdk::trap("Unauthorized")
                 }
                 Some(_) => {
@@ -151,7 +149,10 @@ fn inspect_message() {
             let state = state.borrow();
             let bidding_state = &state.bidding_state;
             if bidding_state.is_auction_due()
-                && (bidding_state.bids.contains_key(&caller) || caller == state.stats.owner)
+                && (STABLE_MAP.with(|s| {
+                    let map = s.borrow();
+                    bidding_state.bids.contains_key::<Principal>(&caller, &map)
+                }) || caller == state.stats.owner)
             {
                 ic_cdk::api::call::accept_message();
             } else {

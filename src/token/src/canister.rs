@@ -58,7 +58,6 @@ impl TokenCanister {
         self.state
             .borrow_mut()
             .balances
-            .0
             .insert(metadata.owner, metadata.totalSupply.clone());
 
         self.state.borrow_mut().ledger.mint(
@@ -83,7 +82,7 @@ impl TokenCanister {
             feeTo: fee_to,
             historySize: self.state.borrow().ledger.len(),
             deployTime: deploy_time,
-            holderNumber: self.state.borrow().balances.0.len(),
+            holderNumber: self.state.borrow().balances.len(),
             cycles: ic_canister::ic_kit::ic::balance(),
         }
     }

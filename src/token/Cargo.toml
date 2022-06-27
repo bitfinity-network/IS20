@@ -18,8 +18,7 @@ serde = "1.0"
 ic-canister = { git = "https://github.com/infinity-swap/canister-sdk", package = "ic-canister", tag = "v0.3.8" }
 ic-helpers = { git = "https://github.com/infinity-swap/canister-sdk", package = "ic-helpers", tag = "v0.3.8" }
 ic-storage = { git = "https://github.com/infinity-swap/canister-sdk", package = "ic-storage", tag = "v0.3.8" }
-# stable-structures = { git = "https://github.com/aewc/ic" }
-stable-structures = { path = "/Users/flyq/workspace/github-aewc/ic/rs/stable-structures"}
+stable-structures = { git = "https://github.com/aewc/ic" }
 ic-certified-map = "0.3"
 serde_cbor = "0.11"
 

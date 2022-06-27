@@ -1,5 +1,3 @@
-use std::collections::HashMap;
-
 use candid::Nat;
 use ic_cdk::export::Principal;
 
@@ -75,20 +73,16 @@ pub fn transfer_from(
     _transfer(balances, caller.from(), caller.to(), value.clone());
 
     let allowances = &mut state.allowances;
-    match allowances.get(&caller.from()) {
-        Some(inner) => {
-            let result = inner.get(&caller.inner()).unwrap().clone();
-            let mut temp = inner.clone();
+    match allowances.get(&caller.from(), &caller.inner()) {
+        Some(result) => {
             if result.clone() - value_with_fee.clone() != 0 {
-                temp.insert(caller.inner(), result - value_with_fee);
-                allowances.insert(caller.from(), temp);
+                allowances
+                    .insert(&caller.from(), &caller.inner(), result - value_with_fee)
+                    .unwrap_or_else(|e| {
+                        ic_canister::ic_kit::ic::trap(&format!("failed to serialize key: {}", e))
+                    });
             } else {
-                temp.remove(&caller.inner());
-                if temp.is_empty() {
-                    allowances.remove(&caller.from());
-                } else {
-                    allowances.insert(caller.from(), temp);
-                }
+                allowances.remove(&caller.from(), &caller.inner());
             }
         }
         None => return Err(TxError::NoAllowance),
@@ -123,27 +117,17 @@ pub fn approve(
     _charge_fee(balances, caller.inner(), fee_to, fee.clone(), fee_ratio);
     let v = value.clone() + fee.clone();
 
-    match state.allowances.get(&caller.inner()) {
-        Some(inner) => {
-            let mut temp = inner.clone();
-            if v != 0 {
-                temp.insert(caller.recipient(), v);
-                state.allowances.insert(caller.inner(), temp);
-            } else {
-                temp.remove(&caller.recipient());
-                if temp.is_empty() {
-                    state.allowances.remove(&caller.inner());
-                } else {
-                    state.allowances.insert(caller.inner(), temp);
-                }
-            }
-        }
-        None if v != 0 => {
-            let mut inner = HashMap::new();
-            inner.insert(caller.recipient(), v);
-            state.allowances.insert(caller.inner(), inner);
-        }
-        None => {}
+    if v != 0 {
+        state
+            .allowances
+            .insert(&caller.inner(), &caller.recipient(), v)
+            .unwrap_or_else(|e| {
+                ic_canister::ic_kit::ic::trap(&format!("failed to serialize key: {}", e))
+            });
+    } else {
+        state
+            .allowances
+            .remove(&caller.inner(), &caller.recipient());
     }
 
     let id = state
@@ -156,7 +140,7 @@ fn mint(canister: &TokenCanister, caller: Principal, to: Principal, amount: Nat)
     {
         let balances = &mut canister.state.borrow_mut().balances;
         let to_balance = balances.balance_of(&to);
-        balances.0.insert(to, to_balance + amount.clone());
+        balances.insert(to, to_balance + amount.clone());
     }
 
     let mut state = canister.state.borrow_mut();
@@ -186,13 +170,13 @@ pub(crate) fn mint_as_owner(
 
 fn burn(canister: &TokenCanister, caller: Principal, from: Principal, amount: Nat) -> TxReceipt {
     {
-        let mut state = canister.state.borrow_mut();
+        let state = canister.state.borrow();
         let balance = state.balances.balance_of(&from);
         if balance < amount {
             return Err(TxError::InsufficientBalance);
         }
 
-        state.balances.0.insert(from, balance - amount.clone());
+        state.balances.insert(from, balance - amount.clone());
     }
 
     let mut state = canister.state.borrow_mut();
@@ -220,14 +204,14 @@ pub fn _transfer(balances: &mut Balances, from: Principal, to: Principal, value:
     let from_balance = balances.balance_of(&from);
     let from_balance_new = from_balance - value.clone();
     if from_balance_new != 0 {
-        balances.0.insert(from, from_balance_new);
+        balances.insert(from, from_balance_new);
     } else {
-        balances.0.remove(&from);
+        balances.remove(&from);
     }
     let to_balance = balances.balance_of(&to);
     let to_balance_new = to_balance + value;
     if to_balance_new != 0 {
-        balances.0.insert(to, to_balance_new);
+        balances.insert(to, to_balance_new);
     }
 }
 

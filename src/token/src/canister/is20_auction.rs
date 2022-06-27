@@ -3,11 +3,10 @@
 use crate::canister::erc20_transactions::_transfer;
 use crate::canister::TokenCanister;
 use crate::ledger::Ledger;
-use crate::state::{AuctionHistory, Balances, BiddingState, CanisterState};
+use crate::state::{AuctionHistory, Balances, BiddingState, CanisterState, STABLE_MAP};
 use crate::types::{AuctionInfo, StatsData, Timestamp};
 use candid::{CandidType, Deserialize, Nat, Principal};
 use ic_canister::ic_kit::ic;
-use std::collections::HashMap;
 
 // Minimum bidding amount is required, for every update call costs cycles, and we want bidding
 // to add cycles rather then to decrease them. 1M is chosen as one ingress call costs 590K cycles.
@@ -65,7 +64,20 @@ pub(crate) fn bid_cycles(canister: &TokenCanister, bidder: Principal) -> Result<
 
     let amount_accepted = ic::msg_cycles_accept(amount);
     bidding_state.cycles_since_auction += amount_accepted;
-    *bidding_state.bids.entry(bidder).or_insert(0) += amount_accepted;
+    STABLE_MAP.with(|s| {
+        let mut map = s.borrow_mut();
+        let mut value = bidding_state
+            .bids
+            .get::<Principal, u64>(&bidder, &map)
+            .unwrap_or(0);
+        value += amount_accepted;
+        bidding_state
+            .bids
+            .insert(&bidder, &value, &mut map)
+            .unwrap_or_else(|e| {
+                ic_canister::ic_kit::ic::trap(&format!("failed to update bidder and value: {}", e))
+            });
+    });
 
     Ok(amount_accepted)
 }
@@ -74,13 +86,21 @@ pub(crate) fn bidding_info(canister: &TokenCanister) -> BiddingInfo {
     let state = canister.state.borrow();
     let bidding_state = &state.bidding_state;
     let balances = &state.balances;
+    let caller = ic::caller();
+    let caller_cycles = STABLE_MAP.with(|s| {
+        let map = s.borrow();
+        bidding_state
+            .bids
+            .get::<Principal, u64>(&caller, &map)
+            .unwrap_or(0)
+    });
 
     BiddingInfo {
         fee_ratio: bidding_state.fee_ratio,
         last_auction: bidding_state.last_auction,
         auction_period: bidding_state.auction_period,
         total_cycles: bidding_state.cycles_since_auction,
-        caller_cycles: bidding_state.bids.get(&ic::caller()).cloned().unwrap_or(0),
+        caller_cycles,
         accumulated_fees: accumulated_fees(balances),
     }
 }
@@ -117,17 +137,20 @@ pub(crate) fn auction_info(
         .auction_history
         .0
         .get(id)
-        .cloned()
         .ok_or(AuctionError::AuctionNotFound)
 }
 
 fn perform_auction(
     ledger: &mut Ledger,
-    bidding_state: &mut BiddingState,
+    bidding_state: &BiddingState,
     balances: &mut Balances,
     auction_history: &mut AuctionHistory,
 ) -> Result<AuctionInfo, AuctionError> {
-    if bidding_state.bids.is_empty() {
+    let is_empty = STABLE_MAP.with(|s| {
+        let map = s.borrow();
+        bidding_state.bids.is_empty(&map)
+    });
+    if is_empty {
         return Err(AuctionError::NoBids);
     }
 
@@ -136,12 +159,21 @@ fn perform_auction(
     let total_cycles = bidding_state.cycles_since_auction;
 
     let first_id = ledger.len();
+    let mut temp: Vec<(Principal, Nat)> = Vec::new(); // because can't call _transfer within closure: panicked at 'already borrowed: BorrowMutError'
+    STABLE_MAP.with(|s| {
+        let map = s.borrow();
+        for (key, val) in bidding_state.bids.range(None, None, &map) {
+            let bidder = bidding_state.bids.key_decode::<Principal>(&key);
+            let cycles = bidding_state.bids.val_decode::<u64>(&val);
+            let amount = total_amount.clone() * cycles / total_cycles;
+            temp.push((bidder, amount.clone()));
+        }
+    });
 
-    for (bidder, cycles) in &bidding_state.bids {
-        let amount = total_amount.clone() * *cycles / total_cycles;
+    for (bidder, amount) in temp.iter() {
         _transfer(balances, auction_principal(), *bidder, amount.clone());
         ledger.auction(*bidder, amount.clone());
-        transferred_amount += amount;
+        transferred_amount += amount.clone();
     }
 
     let last_id = ledger.len() - 1;
@@ -164,7 +196,10 @@ fn reset_bidding_state(stats: &StatsData, bidding_state: &mut BiddingState) {
     bidding_state.fee_ratio = get_fee_ratio(stats.min_cycles, ic::balance());
     bidding_state.cycles_since_auction = 0;
     bidding_state.last_auction = ic::time();
-    bidding_state.bids = HashMap::new();
+    STABLE_MAP.with(|s| {
+        let mut map = s.borrow_mut();
+        bidding_state.bids.clear(&mut map);
+    });
 }
 
 fn get_fee_ratio(min_cycles: u64, current_cycles: u64) -> f64 {
@@ -192,9 +227,7 @@ pub fn auction_principal() -> Principal {
 
 pub fn accumulated_fees(balances: &Balances) -> Nat {
     balances
-        .0
         .get(&auction_principal())
-        .cloned()
         .unwrap_or_else(|| Nat::from(0))
 }
 
@@ -290,7 +323,6 @@ mod tests {
             .state
             .borrow_mut()
             .balances
-            .0
             .insert(auction_principal(), Nat::from(6_000));
 
         let result = canister.runAuction().unwrap();
@@ -299,7 +331,10 @@ mod tests {
         assert_eq!(result.last_transaction_id, Nat::from(2));
         assert_eq!(result.tokens_distributed, Nat::from(6_000));
 
-        assert_eq!(canister.state.borrow().balances.0[&bob()], 4_000);
+        assert_eq!(
+            canister.state.borrow().balances.get(&bob()),
+            Some(Nat::from(4_000))
+        );
 
         let retrieved_result = canister.auctionInfo(result.auction_id).unwrap();
         assert_eq!(retrieved_result, result);
