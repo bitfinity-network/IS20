@@ -1,38 +1,24 @@
-use std::cell::RefCell;
-use std::rc::Rc;
+use std::{cell::RefCell, rc::Rc};
 
-use ic_canister::generate_exports;
-use ic_canister::Canister;
-use ic_cdk::export::candid::Principal;
-
-use crate::core::ISTokenCanister;
-use crate::state::CanisterState;
-
-pub mod erc20_transactions;
-
-#[cfg(not(feature = "no_api"))]
-mod inspect;
-
-pub mod is20_auction;
-pub mod is20_notify;
-pub mod is20_transactions;
+use candid::Principal;
+use ic_canister::{Canister, PreUpdate};
+use token_api::{canister::TokenCanisterAPI, state::CanisterState};
 
 #[derive(Debug, Clone, Canister)]
 pub struct TokenCanister {
     #[id]
     principal: Principal,
-
     #[state]
     pub(crate) state: Rc<RefCell<CanisterState>>,
 }
 
-impl ISTokenCanister for TokenCanister {
+impl PreUpdate for TokenCanister {}
+
+impl TokenCanisterAPI for TokenCanister {
     fn state(&self) -> Rc<RefCell<CanisterState>> {
         self.state.clone()
     }
 }
-
-generate_exports!(TokenCanister);
 
 #[cfg(test)]
 mod test {

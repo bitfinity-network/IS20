@@ -1,0 +1,28 @@
+[package]
+edition = "2021"
+name = "token-impl"
+version = "0.1.6"
+
+[features]
+default = []
+no_api = []
+
+[dependencies]
+assert-panic = "1.0"
+candid = "0.7"
+ic-cdk = "0.5"
+ic-cdk-macros = "0.5"
+serde = "1.0"
+ic-canister = { git = "https://github.com/infinity-swap/canister-sdk", package = "ic-canister", branch = "awkure/pre-update-hook" }
+ic-helpers = { git = "https://github.com/infinity-swap/canister-sdk", package = "ic-helpers", branch = "awkure/pre-update-hook" }
+ic-storage = { git = "https://github.com/infinity-swap/canister-sdk", package = "ic-storage", branch = "awkure/pre-update-hook" }
+ic-certified-map = "0.3"
+token-api = { path = "../api" }
+
+[target.'cfg(not(target_family = "wasm"))'.dependencies]
+async-std = {version = "1.10.0", features = ["attributes"]}
+
+[dev-dependencies]
+test-case = "1.2.1"
+tokio = {version = "1", features = ["macros", "rt"]}
+proptest = "1.0.0"

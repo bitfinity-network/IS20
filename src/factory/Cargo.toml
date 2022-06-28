@@ -11,13 +11,17 @@ no_api = []
 candid = "0.7"
 ic-cdk = "0.5"
 ic-cdk-macros = "0.5"
-ic-canister = { git = "https://github.com/infinity-swap/canister-sdk", package = "ic-canister", tag = "v0.3.10" }
-ic-helpers = { git = "https://github.com/infinity-swap/canister-sdk", package = "ic-helpers", tag = "v0.3.10" }
-ic-storage = { git = "https://github.com/infinity-swap/canister-sdk", package = "ic-storage", tag = "v0.3.10" }
-ic-factory = { git = "https://github.com/infinity-swap/canister-sdk", package = "ic-factory", tag = "v0.3.10" }
+ic-canister = { git = "https://github.com/infinity-swap/canister-sdk", package = "ic-canister", branch = "awkure/pre-update-hook" }
+ic-helpers = { git = "https://github.com/infinity-swap/canister-sdk", package = "ic-helpers", branch = "awkure/pre-update-hook" }
+ic-storage = { git = "https://github.com/infinity-swap/canister-sdk", package = "ic-storage", branch = "awkure/pre-update-hook" }
+ic-factory = { git = "https://github.com/infinity-swap/canister-sdk", package = "ic-factory", branch = "awkure/pre-update-hook" }
+# ic-canister = { path = "../../../ic-helpers/ic-canister/ic-canister" }
+# ic-helpers = { path = "../../../ic-helpers/ic-helpers" }
+# ic-storage = { path = "../../../ic-helpers/ic-storage" }
+# ic-factory = { path = "../../../ic-helpers/ic-factory" }
 serde = "1.0"
 thiserror = "1.0"
-token = { path = "../token", features = ["no_api"] }
+token = { path = "../token/api", features = ["no_api"], package = "token-api" }
 
 [dev-dependencies]
 tokio = { version = "1", features = ["rt", "macros"] }

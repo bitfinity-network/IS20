@@ -8,7 +8,7 @@ use std::rc::Rc;
 use crate::state::StableState;
 use crate::{error::TokenFactoryError, state::State};
 use candid::Principal;
-use ic_canister::{init, post_upgrade, pre_upgrade, query, update, Canister};
+use ic_canister::{init, post_upgrade, pre_upgrade, query, update, Canister, PreUpdate};
 use ic_factory::{api::FactoryCanister, error::FactoryError, FactoryConfiguration, FactoryState};
 use token::types::Metadata;
 
@@ -199,6 +199,7 @@ impl TokenFactoryCanister {
     }
 }
 
+impl PreUpdate for TokenFactoryCanister {}
 impl FactoryCanister for TokenFactoryCanister {}
 
 #[cfg(test)]

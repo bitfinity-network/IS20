@@ -6,7 +6,7 @@ use crate::principal::{CheckedPrincipal, WithRecipient};
 use crate::state::CanisterState;
 use crate::types::{TxError, TxId, TxReceipt};
 
-use super::ISTokenCanister;
+use super::TokenCanisterAPI;
 
 /// Transfers `value` amount to the `to` principal, applying American style fee. This means, that
 /// the recipient will receive `value - fee`, and the sender account will be reduced exactly by `value`.
@@ -14,7 +14,7 @@ use super::ISTokenCanister;
 /// Note, that the `value` cannot be less than the `fee` amount. If the value given is too small,
 /// transaction will fail with `TxError::AmountTooSmall` error.
 pub fn transfer_include_fee(
-    canister: &impl ISTokenCanister,
+    canister: &impl TokenCanisterAPI,
     caller: CheckedPrincipal<WithRecipient>,
     amount: Tokens128,
 ) -> TxReceipt {
@@ -54,7 +54,7 @@ pub fn transfer_include_fee(
 }
 
 pub fn batch_transfer(
-    canister: &impl ISTokenCanister,
+    canister: &impl TokenCanisterAPI,
     transfers: Vec<(Principal, Tokens128)>,
 ) -> Result<Vec<TxId>, TxError> {
     let from = ic_canister::ic_kit::ic::caller();
@@ -98,7 +98,7 @@ pub fn batch_transfer(
 
 #[cfg(test)]
 mod tests {
-    use crate::canister::TokenCanister;
+    use crate::canister::TokenCanisterExports;
     use ic_canister::ic_kit::mock_principals::{alice, bob, john, xtc};
     use ic_canister::ic_kit::MockContext;
     use ic_canister::Canister;
@@ -107,10 +107,10 @@ mod tests {
 
     use super::*;
 
-    fn test_canister() -> TokenCanister {
+    fn test_canister() -> TokenCanisterExports {
         MockContext::new().with_caller(alice()).inject();
 
-        let canister = TokenCanister::init_instance();
+        let canister = TokenCanisterExports::init_instance();
         canister.init(Metadata {
             logo: "".to_string(),
             name: "".to_string(),
@@ -144,7 +144,8 @@ mod tests {
     #[test]
     fn batch_transfer_with_fee() {
         let canister = test_canister();
-        let mut state = canister.state.borrow_mut();
+        let state = canister.state();
+        let mut state = state.borrow_mut();
         state.stats.fee = Tokens128::from(50);
         state.stats.fee_to = john();
         drop(state);
@@ -189,7 +190,8 @@ mod tests {
     fn transfer_with_fee() {
         let canister = test_canister();
 
-        let mut state = canister.state.borrow_mut();
+        let state = canister.state();
+        let mut state = state.borrow_mut();
         state.stats.fee = Tokens128::from(100);
         state.stats.fee_to = john();
         drop(state);

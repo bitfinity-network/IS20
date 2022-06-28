@@ -1,8 +1,14 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use candid::Principal;
-use ic_canister::{init, query, update, AsyncReturn, Canister};
+use ic_canister::generate_exports;
+use ic_canister::Canister;
+use ic_cdk::export::candid::Principal;
+use ic_storage::IcStorage;
+
+use crate::state::CanisterState;
+
+use ic_canister::{init, query, update, AsyncReturn};
 use ic_helpers::tokens::Tokens128;
 
 use crate::canister::erc20_transactions::{
@@ -15,11 +21,19 @@ use crate::canister::is20_auction::{
 use crate::canister::is20_notify::{approve_and_notify, consume_notification, notify};
 use crate::canister::is20_transactions::{batch_transfer, transfer_include_fee};
 use crate::principal::{CheckedPrincipal, Owner};
-use crate::state::CanisterState;
 use crate::types::{
     AuctionInfo, Metadata, PaginatedResult, StatsData, Timestamp, TokenInfo, TxError, TxId,
     TxReceipt, TxRecord,
 };
+
+pub mod erc20_transactions;
+
+#[cfg(not(feature = "no_api"))]
+mod inspect;
+
+pub mod is20_auction;
+pub mod is20_notify;
+pub mod is20_transactions;
 
 pub(crate) const MAX_TRANSACTION_QUERY_LEN: usize = 1000;
 // 1 day in nanoseconds.
@@ -36,8 +50,10 @@ pub enum CanisterUpdate {
 }
 
 #[allow(non_snake_case)]
-pub trait ISTokenCanister: Canister + Sized {
-    fn state(&self) -> Rc<RefCell<CanisterState>>;
+pub trait TokenCanisterAPI: Canister + Sized {
+    fn state(&self) -> Rc<RefCell<CanisterState>> {
+        CanisterState::get()
+    }
 
     #[init(trait = true)]
     fn init(&self, metadata: Metadata) {
@@ -409,3 +425,5 @@ pub trait ISTokenCanister: Canister + Sized {
         ic_canister::generate_idl!()
     }
 }
+
+generate_exports!(TokenCanisterAPI, TokenCanisterExports);

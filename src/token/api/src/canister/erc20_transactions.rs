@@ -6,10 +6,10 @@ use crate::principal::{CheckedPrincipal, Owner, SenderRecipient, TestNet, WithRe
 use crate::state::{Balances, CanisterState};
 use crate::types::{TxError, TxReceipt};
 
-use super::ISTokenCanister;
+use super::TokenCanisterAPI;
 
 pub fn transfer(
-    canister: &impl ISTokenCanister,
+    canister: &impl TokenCanisterAPI,
     caller: CheckedPrincipal<WithRecipient>,
     amount: Tokens128,
     fee_limit: Option<Tokens128>,
@@ -47,7 +47,7 @@ pub fn transfer(
 }
 
 pub fn transfer_from(
-    canister: &impl ISTokenCanister,
+    canister: &impl TokenCanisterAPI,
     caller: CheckedPrincipal<SenderRecipient>,
     amount: Tokens128,
 ) -> TxReceipt {
@@ -103,7 +103,7 @@ pub fn transfer_from(
 }
 
 pub fn approve(
-    canister: &impl ISTokenCanister,
+    canister: &impl TokenCanisterAPI,
     caller: CheckedPrincipal<WithRecipient>,
     amount: Tokens128,
 ) -> TxReceipt {
@@ -290,7 +290,7 @@ mod tests {
     use std::collections::HashSet;
     use std::iter::FromIterator;
 
-    use crate::canister::TokenCanister;
+    use crate::canister::TokenCanisterExports;
     use ic_canister::ic_kit::mock_principals::{alice, bob, john, xtc};
     use ic_canister::ic_kit::MockContext;
     use ic_canister::Canister;
@@ -299,10 +299,10 @@ mod tests {
 
     use super::*;
 
-    fn test_context() -> (&'static MockContext, TokenCanister) {
+    fn test_context() -> (&'static MockContext, TokenCanisterExports) {
         let context = MockContext::new().with_caller(alice()).inject();
 
-        let canister = TokenCanister::init_instance();
+        let canister = TokenCanisterExports::init_instance();
         canister.init(Metadata {
             logo: "".to_string(),
             name: "".to_string(),
@@ -318,7 +318,7 @@ mod tests {
         (context, canister)
     }
 
-    fn test_canister() -> TokenCanister {
+    fn test_canister() -> TokenCanisterExports {
         let (_, canister) = test_context();
         canister
     }
@@ -337,8 +337,8 @@ mod tests {
     #[test]
     fn transfer_with_fee() {
         let canister = test_canister();
-        canister.state.borrow_mut().stats.fee = Tokens128::from(100);
-        canister.state.borrow_mut().stats.fee_to = john();
+        canister.state().borrow_mut().stats.fee = Tokens128::from(100);
+        canister.state().borrow_mut().stats.fee_to = john();
 
         assert!(canister.transfer(bob(), Tokens128::from(200), None).is_ok());
         assert_eq!(canister.balanceOf(bob()), Tokens128::from(200));
@@ -349,8 +349,8 @@ mod tests {
     #[test]
     fn transfer_fee_exceeded() {
         let canister = test_canister();
-        canister.state.borrow_mut().stats.fee = Tokens128::from(100);
-        canister.state.borrow_mut().stats.fee_to = john();
+        canister.state().borrow_mut().stats.fee = Tokens128::from(100);
+        canister.state().borrow_mut().stats.fee_to = john();
 
         assert!(canister
             .transfer(bob(), Tokens128::from(200), Some(Tokens128::from(100)))
@@ -364,9 +364,9 @@ mod tests {
     #[test]
     fn fees_with_auction_enabled() {
         let canister = test_canister();
-        canister.state.borrow_mut().stats.fee = Tokens128::from(50);
-        canister.state.borrow_mut().stats.fee_to = john();
-        canister.state.borrow_mut().bidding_state.fee_ratio = 0.5;
+        canister.state().borrow_mut().stats.fee = Tokens128::from(50);
+        canister.state().borrow_mut().stats.fee_to = john();
+        canister.state().borrow_mut().bidding_state.fee_ratio = 0.5;
 
         canister
             .transfer(bob(), Tokens128::from(100), None)
@@ -391,8 +391,8 @@ mod tests {
     #[test]
     fn transfer_with_fee_insufficient_balance() {
         let canister = test_canister();
-        canister.state.borrow_mut().stats.fee = Tokens128::from(100);
-        canister.state.borrow_mut().stats.fee_to = john();
+        canister.state().borrow_mut().stats.fee = Tokens128::from(100);
+        canister.state().borrow_mut().stats.fee_to = john();
 
         assert_eq!(
             canister.transfer(bob(), Tokens128::from(950), None),
@@ -417,7 +417,7 @@ mod tests {
     #[test]
     fn transfer_saved_into_history() {
         let (ctx, canister) = test_context();
-        canister.state.borrow_mut().stats.fee = Tokens128::from(10);
+        canister.state().borrow_mut().stats.fee = Tokens128::from(10);
 
         canister
             .transfer(bob(), Tokens128::from(1001), None)
@@ -454,7 +454,7 @@ mod tests {
             Err(TxError::Unauthorized)
         );
 
-        canister.state.borrow_mut().stats.is_test_token = true;
+        canister.state().borrow_mut().stats.is_test_token = true;
 
         assert!(canister.mint(alice(), Tokens128::from(2000)).is_ok());
         assert!(canister.mint(bob(), Tokens128::from(5000)).is_ok());
@@ -475,7 +475,7 @@ mod tests {
     #[test]
     fn mint_saved_into_history() {
         let (ctx, canister) = test_context();
-        canister.state.borrow_mut().stats.fee = Tokens128::from(10);
+        canister.state().borrow_mut().stats.fee = Tokens128::from(10);
 
         assert_eq!(canister.historySize(), 1);
 
@@ -561,7 +561,7 @@ mod tests {
     #[test]
     fn burn_saved_into_history() {
         let (ctx, canister) = test_context();
-        canister.state.borrow_mut().stats.fee = Tokens128::from(10);
+        canister.state().borrow_mut().stats.fee = Tokens128::from(10);
 
         canister.burn(None, Tokens128::from(1001)).unwrap_err();
         assert_eq!(canister.historySize(), 1);
@@ -644,7 +644,7 @@ mod tests {
     fn transfer_from_saved_into_history() {
         let (ctx, canister) = test_context();
         let context = MockContext::new().with_caller(alice()).inject();
-        canister.state.borrow_mut().stats.fee = Tokens128::from(10);
+        canister.state().borrow_mut().stats.fee = Tokens128::from(10);
 
         canister
             .transferFrom(bob(), john(), Tokens128::from(10))
@@ -732,8 +732,8 @@ mod tests {
     #[test]
     fn transfer_from_with_fee() {
         let canister = test_canister();
-        canister.state.borrow_mut().stats.fee = Tokens128::from(100);
-        canister.state.borrow_mut().stats.fee_to = bob();
+        canister.state().borrow_mut().stats.fee = Tokens128::from(100);
+        canister.state().borrow_mut().stats.fee_to = bob();
         let context = MockContext::new().with_caller(alice()).inject();
 
         assert!(canister.approve(bob(), Tokens128::from(1500)).is_ok());
@@ -751,7 +751,7 @@ mod tests {
     #[test]
     fn approve_saved_into_history() {
         let (ctx, canister) = test_context();
-        canister.state.borrow_mut().stats.fee = Tokens128::from(10);
+        canister.state().borrow_mut().stats.fee = Tokens128::from(10);
         assert_eq!(canister.historySize(), 1);
 
         const COUNT: u64 = 5;
@@ -835,7 +835,7 @@ mod tests {
 
 #[cfg(test)]
 mod proptests {
-    use crate::canister::TokenCanister;
+    use crate::canister::TokenCanisterExports;
     use ic_canister::ic_kit::MockContext;
     use ic_canister::Canister;
     use proptest::collection::vec;
@@ -972,7 +972,7 @@ mod proptests {
             principals in vec(make_principal(), 1..7),
             owner_idx in any::<Index>(),
             fee_to_idx in any::<Index>(),
-        )-> (TokenCanister, Vec<Principal>) {
+        )-> (TokenCanisterExports, Vec<Principal>) {
             // pick two random principals (they could very well be the same principal twice)
             let owner = principals[owner_idx.index(principals.len())];
             let fee_to = principals[fee_to_idx.index(principals.len())];
@@ -988,12 +988,12 @@ mod proptests {
                 feeTo: fee_to,
                 isTestToken: None,
             };
-            let canister = TokenCanister::init_instance();
+            let canister = TokenCanisterExports::init_instance();
             canister.init(meta);
             (canister, principals)
         }
     }
-    fn canister_and_actions() -> impl Strategy<Value = (TokenCanister, Vec<Action>)> {
+    fn canister_and_actions() -> impl Strategy<Value = (TokenCanisterExports, Vec<Action>)> {
         make_canister().prop_flat_map(|(canister, principals)| {
             let actions = vec(make_action(principals), 1..7);
             (Just(canister), actions)
@@ -1040,7 +1040,7 @@ mod proptests {
                         MockContext::new().with_caller(caller).inject();
                         let from_balance = canister.balanceOf(from);
                         let to_balance = canister.balanceOf(to);
-                        let (fee , _) = canister.state.borrow().stats.fee_info();
+                        let (fee , _) = canister.state().borrow().stats.fee_info();
                         let amount_with_fee = (fee + amount).unwrap();
                         let res = canister.transferFrom(from, to, amount);
                         let _ = canister.approve(from, amount);
@@ -1070,7 +1070,7 @@ mod proptests {
                         MockContext::new().with_caller(from).inject();
                         let from_balance = canister.balanceOf(from);
                         let to_balance = canister.balanceOf(to);
-                        let (fee , fee_to) = canister.state.borrow().stats.fee_info();
+                        let (fee , fee_to) = canister.state().borrow().stats.fee_info();
                         let amount_with_fee = (amount + fee).unwrap();
                         let res = canister.transfer(to, amount, fee_limit);
 
@@ -1112,7 +1112,7 @@ mod proptests {
                         MockContext::new().with_caller(from).inject();
                         let from_balance = canister.balanceOf(from);
                         let to_balance = canister.balanceOf(to);
-                        let (fee , fee_to) = canister.state.borrow().stats.fee_info();
+                        let (fee , fee_to) = canister.state().borrow().stats.fee_info();
                         let res = canister.transferIncludeFee(to, amount);
 
                         if to == from {

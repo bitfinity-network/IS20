@@ -7,10 +7,10 @@ use ic_helpers::tokens::Tokens128;
 use crate::principal::{CheckedPrincipal, WithRecipient};
 use crate::types::{TxError, TxId, TxReceipt};
 
-use super::ISTokenCanister;
+use super::TokenCanisterAPI;
 
 pub(crate) async fn approve_and_notify(
-    canister: &impl ISTokenCanister,
+    canister: &impl TokenCanisterAPI,
     caller: CheckedPrincipal<WithRecipient>,
     amount: Tokens128,
 ) -> TxReceipt {
@@ -23,7 +23,7 @@ pub(crate) async fn approve_and_notify(
 }
 
 pub(crate) async fn consume_notification(
-    canister: &impl ISTokenCanister,
+    canister: &impl TokenCanisterAPI,
     transaction_id: TxId,
 ) -> TxReceipt {
     let state = canister.state();
@@ -45,7 +45,7 @@ pub(crate) async fn consume_notification(
 
 /// This is a one-way call
 pub(crate) async fn notify(
-    canister: &impl ISTokenCanister,
+    canister: &impl TokenCanisterAPI,
     transaction_id: TxId,
     to: Principal,
 ) -> TxReceipt {
@@ -83,7 +83,7 @@ mod tests {
     use std::rc::Rc;
     use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 
-    use crate::canister::TokenCanister;
+    use crate::canister::TokenCanisterExports;
     use ic_canister::ic_kit::mock_principals::{alice, bob};
     use ic_canister::ic_kit::MockContext;
     use ic_canister::{register_failing_virtual_responder, register_virtual_responder, Canister};
@@ -92,10 +92,10 @@ mod tests {
 
     use super::*;
 
-    fn test_canister() -> TokenCanister {
+    fn test_canister() -> TokenCanisterExports {
         MockContext::new().with_caller(alice()).inject();
 
-        let canister = TokenCanister::init_instance();
+        let canister = TokenCanisterExports::init_instance();
         canister.init(Metadata {
             logo: "".to_string(),
             name: "".to_string(),
