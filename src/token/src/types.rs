@@ -163,8 +163,6 @@ impl Default for StatsData {
     }
 }
 
-// pub type Allowances = HashMap<Principal, HashMap<Principal, Nat>>;
-
 #[derive(Debug, CandidType, Deserialize)]
 pub struct Allowances(pub StableMap);
 
@@ -290,8 +288,6 @@ pub enum TxError {
 pub type TxReceipt = Result<Nat, TxError>;
 
 // Notification receiver not set if None
-// pub type PendingNotifications = HashMap<Nat, Option<Principal>>;
-
 #[derive(Debug, CandidType, Deserialize)]
 pub struct PendingNotifications(pub StableMap);
 

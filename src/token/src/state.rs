@@ -72,7 +72,7 @@ impl Versioned for CanisterState {
 }
 
 #[derive(Debug, CandidType, Deserialize)]
-pub struct Balances(pub StableMap); // HashMap<Principal, Nat>
+pub struct Balances(pub StableMap);
 
 impl Default for Balances {
     fn default() -> Self {
@@ -157,7 +157,7 @@ pub struct BiddingState {
     pub last_auction: Timestamp,
     pub auction_period: Timestamp,
     pub cycles_since_auction: u64,
-    pub bids: StableMap, // HashMap<Principal, u64>,
+    pub bids: StableMap,
 }
 
 impl Default for BiddingState {

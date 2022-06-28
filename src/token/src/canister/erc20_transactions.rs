@@ -3,7 +3,7 @@ use ic_cdk::export::Principal;
 
 use crate::canister::is20_auction::auction_principal;
 use crate::principal::{CheckedPrincipal, Owner, SenderRecipient, TestNet, WithRecipient};
-use crate::state::{Balances, CanisterState};
+use crate::state::{Balances, CanisterState, STATS_DATA_HEADER};
 use crate::types::{TxError, TxReceipt};
 
 use super::TokenCanister;
@@ -102,7 +102,7 @@ pub fn approve(
     let mut state = canister.state.borrow_mut();
 
     let CanisterState {
-        ref mut bidding_state,
+        ref bidding_state,
         ref mut balances,
         ref stats,
         ..
@@ -146,6 +146,7 @@ fn mint(canister: &TokenCanister, caller: Principal, to: Principal, amount: Nat)
     let mut state = canister.state.borrow_mut();
     state.stats.total_supply += amount.clone();
     let id = state.ledger.mint(caller, to, amount);
+    STATS_DATA_HEADER.with(|s| state.stats.save_header(&s.borrow()));
 
     Ok(id)
 }
@@ -181,7 +182,7 @@ fn burn(canister: &TokenCanister, caller: Principal, from: Principal, amount: Na
 
     let mut state = canister.state.borrow_mut();
     state.stats.total_supply -= amount.clone();
-
+    STATS_DATA_HEADER.with(|s| state.stats.save_header(&s.borrow()));
     let id = state.ledger.burn(caller, from, amount);
     Ok(id)
 }

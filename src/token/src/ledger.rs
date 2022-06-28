@@ -1,4 +1,4 @@
-use crate::state::STABLE_MAP;
+use crate::state::{LEDGER_HEADER, STABLE_MAP};
 use crate::types::{PaginatedResult, PendingNotifications, TxRecord, TxRecordStable};
 use candid::{CandidType, Deserialize, Nat, Principal};
 use num_traits::ToPrimitive;
@@ -66,15 +66,24 @@ impl Ledger {
         }
     }
 
-    // pub fn iter(&self) -> impl DoubleEndedIterator<Item = &TxRecord> {
-    //     self.history.iter()
+    // pub fn iter(&self) -> impl DoubleEndedIterator<Item = TxRecord> {
+    //     let mut buf = vec![];
+    //     STABLE_MAP.with(|s| {
+    //         let map = s.borrow();
+    //         for (k, _) in self.history.index.range(None, None, &map) {
+    //             let key = self.history.index.key_decode::<u64>(&k) as usize;
+    //             buf.push(key);
+    //         }
+    //     });
+
+    //     buf.iter().map(|k| &self.history.get(*k).unwrap())
     // }
 
     fn get_index(&self, id: &Nat) -> Option<usize> {
         if *id < self.vec_offset {
             None
         } else {
-            let index = id.clone() - self.vec_offset.clone();
+            let index = id.clone();
             index.0.to_usize()
         }
     }
@@ -176,7 +185,12 @@ impl Ledger {
     }
 
     fn push(&mut self, record: TxRecord) {
-        self.history.push(record.clone());
+        self.history.push(
+            record.clone(),
+            self.len().0.to_u64().unwrap_or_else(|| {
+                ic_canister::ic_kit::ic::trap(&format!("TxRecordStable push error"))
+            }),
+        );
         self.notifications.insert(record.index, None);
 
         if self.len() > MAX_HISTORY_LENGTH + HISTORY_REMOVAL_BATCH_SIZE {
@@ -204,8 +218,10 @@ impl Ledger {
             for key in keys.iter() {
                 self.history.remove(*key);
             }
-            // todo add the vec_offset to id when find the TxRecordStable.
-            self.vec_offset += HISTORY_REMOVAL_BATCH_SIZE;
+            self.vec_offset += HISTORY_REMOVAL_BATCH_SIZE as u64;
+            LEDGER_HEADER.with(|l| {
+                self.save_header(&l.borrow());
+            });
         }
     }
 }

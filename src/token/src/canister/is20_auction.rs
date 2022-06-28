@@ -3,7 +3,9 @@
 use crate::canister::erc20_transactions::_transfer;
 use crate::canister::TokenCanister;
 use crate::ledger::Ledger;
-use crate::state::{AuctionHistory, Balances, BiddingState, CanisterState, STABLE_MAP};
+use crate::state::{
+    AuctionHistory, Balances, BiddingState, CanisterState, BIDDING_STATE_HEADER, STABLE_MAP,
+};
 use crate::types::{AuctionInfo, StatsData, Timestamp};
 use candid::{CandidType, Deserialize, Nat, Principal};
 use ic_canister::ic_kit::ic;
@@ -77,6 +79,9 @@ pub(crate) fn bid_cycles(canister: &TokenCanister, bidder: Principal) -> Result<
             .unwrap_or_else(|e| {
                 ic_canister::ic_kit::ic::trap(&format!("failed to update bidder and value: {}", e))
             });
+        BIDDING_STATE_HEADER.with(|b| {
+            bidding_state.save_header(&b.borrow());
+        });
     });
 
     Ok(amount_accepted)
@@ -199,6 +204,9 @@ fn reset_bidding_state(stats: &StatsData, bidding_state: &mut BiddingState) {
     STABLE_MAP.with(|s| {
         let mut map = s.borrow_mut();
         bidding_state.bids.clear(&mut map);
+    });
+    BIDDING_STATE_HEADER.with(|b| {
+        bidding_state.save_header(&b.borrow());
     });
 }
 

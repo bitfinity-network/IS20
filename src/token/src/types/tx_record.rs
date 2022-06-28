@@ -192,9 +192,7 @@ impl TxRecordStable {
         })
     }
 
-    pub fn push(&self, item: TxRecord) {
-        let id = self.len() as u64;
-
+    pub fn push(&self, item: TxRecord, id: u64) {
         STABLE_MAP.with(|s| {
             let mut map = s.borrow_mut();
             self.caller
@@ -260,15 +258,4 @@ impl TxRecordStable {
             self.operation.remove::<u64, Operation>(&id, &mut map);
         });
     }
-
-    // pub fn iter<T: DoubleEndedIterator<Item = &TxRecord>>(&self, iter: &mut T) {
-    //     let mut buf = vec![];
-    //     STABLE_MAP.with(|s| {
-    //         let map = s.borrow();
-    //         for (k, _) in self.index.range(None, None, &map) {
-    //             buf.push(self.get(self.index.key_decode::<u64>(&k) as usize).unwrap());
-    //         }
-    //     });
-    //     iter = buf.iter();
-    // }
 }

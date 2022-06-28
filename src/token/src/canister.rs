@@ -1,11 +1,3 @@
-use std::cell::RefCell;
-use std::rc::Rc;
-
-use candid::Nat;
-use common::types::Metadata;
-use ic_canister::{init, query, update, Canister};
-use ic_cdk::export::candid::Principal;
-
 use crate::canister::erc20_transactions::{
     approve, burn_as_owner, burn_own_tokens, mint_as_owner, mint_test_token, transfer,
     transfer_from,
@@ -16,10 +8,16 @@ use crate::canister::is20_auction::{
 use crate::canister::is20_notify::{approve_and_notify, consume_notification, notify};
 use crate::canister::is20_transactions::{batch_transfer, transfer_include_fee};
 use crate::principal::{CheckedPrincipal, Owner};
-use crate::state::CanisterState;
+use crate::state::{CanisterState, BIDDING_STATE_HEADER, STATS_DATA_HEADER};
 use crate::types::{
     AuctionInfo, PaginatedResult, StatsData, Timestamp, TokenInfo, TxError, TxReceipt, TxRecord,
 };
+use candid::Nat;
+use common::types::Metadata;
+use ic_canister::{init, query, update, Canister};
+use ic_cdk::export::candid::Principal;
+use std::cell::RefCell;
+use std::rc::Rc;
 
 mod erc20_transactions;
 mod inspect;
@@ -67,8 +65,27 @@ impl TokenCanister {
         );
 
         self.state.borrow_mut().stats = metadata.into();
+        STATS_DATA_HEADER.with(|s| self.state.borrow().stats.save_header(&s.borrow()));
+
         self.state.borrow_mut().bidding_state.auction_period = DEFAULT_AUCTION_PERIOD;
+        BIDDING_STATE_HEADER.with(|b| {
+            self.state.borrow().bidding_state.save_header(&b.borrow());
+        });
     }
+
+    // #[post_upgrade]
+    // pub fn post_upgrade(&self) {
+    //     BIDDING_STATE_HEADER.with(|b| {
+    //         self.state
+    //             .borrow_mut()
+    //             .bidding_state
+    //             .load_header(&b.borrow());
+    //     });
+    //     LEDGER_HEADER.with(|l| {
+    //         self.state.borrow_mut().ledger.load_header(&l.borrow());
+    //     });
+    //     STATS_DATA_HEADER.with(|s| self.state.borrow_mut().stats.load_header(&s.borrow()));
+    // }
 
     #[query]
     pub fn getTokenInfo(&self) -> TokenInfo {
@@ -187,14 +204,35 @@ impl TokenCanister {
     fn update_stats(&self, _caller: CheckedPrincipal<Owner>, update: CanisterUpdate) {
         use CanisterUpdate::*;
         match update {
-            Name(name) => self.state.borrow_mut().stats.name = name,
-            Logo(logo) => self.state.borrow_mut().stats.logo = logo,
-            Fee(fee) => self.state.borrow_mut().stats.fee = fee,
-            FeeTo(fee_to) => self.state.borrow_mut().stats.fee_to = fee_to,
-            Owner(owner) => self.state.borrow_mut().stats.owner = owner,
-            MinCycles(min_cycles) => self.state.borrow_mut().stats.min_cycles = min_cycles,
+            Name(name) => {
+                self.state.borrow_mut().stats.name = name;
+                STATS_DATA_HEADER.with(|s| self.state.borrow().stats.save_header(&s.borrow()));
+            }
+            Logo(logo) => {
+                self.state.borrow_mut().stats.logo = logo;
+                STATS_DATA_HEADER.with(|s| self.state.borrow().stats.save_header(&s.borrow()));
+            }
+            Fee(fee) => {
+                self.state.borrow_mut().stats.fee = fee;
+                STATS_DATA_HEADER.with(|s| self.state.borrow().stats.save_header(&s.borrow()));
+            }
+            FeeTo(fee_to) => {
+                self.state.borrow_mut().stats.fee_to = fee_to;
+                STATS_DATA_HEADER.with(|s| self.state.borrow().stats.save_header(&s.borrow()));
+            }
+            Owner(owner) => {
+                self.state.borrow_mut().stats.owner = owner;
+                STATS_DATA_HEADER.with(|s| self.state.borrow().stats.save_header(&s.borrow()));
+            }
+            MinCycles(min_cycles) => {
+                self.state.borrow_mut().stats.min_cycles = min_cycles;
+                STATS_DATA_HEADER.with(|s| self.state.borrow().stats.save_header(&s.borrow()));
+            }
             AuctionPeriod(period_sec) => {
-                self.state.borrow_mut().bidding_state.auction_period = period_sec * 1_000_000
+                self.state.borrow_mut().bidding_state.auction_period = period_sec * 1_000_000;
+                BIDDING_STATE_HEADER.with(|b| {
+                    self.state.borrow().bidding_state.save_header(&b.borrow());
+                });
             }
         }
     }
