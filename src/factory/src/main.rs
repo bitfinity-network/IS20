@@ -10,6 +10,7 @@ fn main() {
     use crate::{api::TokenFactoryCanister, error::TokenFactoryError};
     use candid::Principal;
     use ic_factory::api::FactoryCanister;
+    use ic_factory::error::FactoryError;
     use token::types::Metadata;
 
     let canister_idl = ic_canister::generate_idl!();
