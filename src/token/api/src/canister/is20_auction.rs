@@ -215,20 +215,20 @@ pub fn accumulated_fees(balances: &Balances) -> Tokens128 {
 
 #[cfg(test)]
 mod tests {
-    use crate::canister::TokenCanisterExports;
     use ic_canister::ic_kit::mock_principals::{alice, bob};
     use ic_canister::ic_kit::MockContext;
     use ic_canister::Canister;
     use test_case::test_case;
 
+    use crate::mock::*;
     use crate::types::{Metadata, TxError};
 
     use super::*;
 
-    fn test_context() -> (&'static mut MockContext, TokenCanisterExports) {
+    fn test_context() -> (&'static mut MockContext, TokenCanisterMock) {
         let context = MockContext::new().with_caller(alice()).inject();
 
-        let canister = TokenCanisterExports::init_instance();
+        let canister = TokenCanisterMock::init_instance();
         canister.init(Metadata {
             logo: "".to_string(),
             name: "".to_string(),

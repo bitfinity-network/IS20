@@ -1,8 +1,12 @@
 use std::{cell::RefCell, rc::Rc};
 
 use candid::Principal;
-use ic_canister::{Canister, PreUpdate};
-use token_api::{canister::TokenCanisterAPI, state::CanisterState};
+use ic_canister::{init, Canister, PreUpdate};
+use token_api::{
+    canister::{TokenCanisterAPI, DEFAULT_AUCTION_PERIOD},
+    state::CanisterState,
+    types::Metadata,
+};
 
 #[derive(Debug, Clone, Canister)]
 pub struct TokenCanister {
@@ -10,6 +14,25 @@ pub struct TokenCanister {
     principal: Principal,
     #[state]
     pub(crate) state: Rc<RefCell<CanisterState>>,
+}
+
+impl TokenCanister {
+    #[init]
+    pub fn init(&self, metadata: Metadata) {
+        self.state
+            .borrow_mut()
+            .balances
+            .0
+            .insert(metadata.owner, metadata.totalSupply);
+
+        self.state
+            .borrow_mut()
+            .ledger
+            .mint(metadata.owner, metadata.owner, metadata.totalSupply);
+
+        self.state.borrow_mut().stats = metadata.into();
+        self.state.borrow_mut().bidding_state.auction_period = DEFAULT_AUCTION_PERIOD;
+    }
 }
 
 impl PreUpdate for TokenCanister {}

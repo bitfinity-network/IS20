@@ -8,7 +8,7 @@ use ic_storage::IcStorage;
 
 use crate::state::CanisterState;
 
-use ic_canister::{init, query, update, AsyncReturn};
+use ic_canister::{query, update, AsyncReturn};
 use ic_helpers::tokens::Tokens128;
 
 use crate::canister::erc20_transactions::{
@@ -37,7 +37,7 @@ pub mod is20_transactions;
 
 pub(crate) const MAX_TRANSACTION_QUERY_LEN: usize = 1000;
 // 1 day in nanoseconds.
-const DEFAULT_AUCTION_PERIOD: Timestamp = 24 * 60 * 60 * 1_000_000;
+pub const DEFAULT_AUCTION_PERIOD: Timestamp = 24 * 60 * 60 * 1_000_000;
 
 pub enum CanisterUpdate {
     Name(String),
@@ -53,23 +53,6 @@ pub enum CanisterUpdate {
 pub trait TokenCanisterAPI: Canister + Sized {
     fn state(&self) -> Rc<RefCell<CanisterState>> {
         CanisterState::get()
-    }
-
-    #[init(trait = true)]
-    fn init(&self, metadata: Metadata) {
-        self.state()
-            .borrow_mut()
-            .balances
-            .0
-            .insert(metadata.owner, metadata.totalSupply);
-
-        self.state()
-            .borrow_mut()
-            .ledger
-            .mint(metadata.owner, metadata.owner, metadata.totalSupply);
-
-        self.state().borrow_mut().stats = metadata.into();
-        self.state().borrow_mut().bidding_state.auction_period = DEFAULT_AUCTION_PERIOD;
     }
 
     #[query(trait = true)]

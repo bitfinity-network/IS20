@@ -290,19 +290,19 @@ mod tests {
     use std::collections::HashSet;
     use std::iter::FromIterator;
 
-    use crate::canister::TokenCanisterExports;
     use ic_canister::ic_kit::mock_principals::{alice, bob, john, xtc};
     use ic_canister::ic_kit::MockContext;
     use ic_canister::Canister;
 
+    use crate::mock::*;
     use crate::types::{Metadata, Operation, TransactionStatus};
 
     use super::*;
 
-    fn test_context() -> (&'static MockContext, TokenCanisterExports) {
+    fn test_context() -> (&'static MockContext, TokenCanisterMock) {
         let context = MockContext::new().with_caller(alice()).inject();
 
-        let canister = TokenCanisterExports::init_instance();
+        let canister = TokenCanisterMock::init_instance();
         canister.init(Metadata {
             logo: "".to_string(),
             name: "".to_string(),
@@ -318,7 +318,7 @@ mod tests {
         (context, canister)
     }
 
-    fn test_canister() -> TokenCanisterExports {
+    fn test_canister() -> TokenCanisterMock {
         let (_, canister) = test_context();
         canister
     }
@@ -835,7 +835,6 @@ mod tests {
 
 #[cfg(test)]
 mod proptests {
-    use crate::canister::TokenCanisterExports;
     use ic_canister::ic_kit::MockContext;
     use ic_canister::Canister;
     use proptest::collection::vec;
@@ -845,6 +844,7 @@ mod proptests {
     use crate::types::Metadata;
 
     use super::*;
+    use crate::mock::*;
 
     #[derive(Debug, Clone, PartialEq, Eq)]
     enum Action {
@@ -972,7 +972,7 @@ mod proptests {
             principals in vec(make_principal(), 1..7),
             owner_idx in any::<Index>(),
             fee_to_idx in any::<Index>(),
-        )-> (TokenCanisterExports, Vec<Principal>) {
+        )-> (TokenCanisterMock, Vec<Principal>) {
             // pick two random principals (they could very well be the same principal twice)
             let owner = principals[owner_idx.index(principals.len())];
             let fee_to = principals[fee_to_idx.index(principals.len())];
@@ -988,12 +988,12 @@ mod proptests {
                 feeTo: fee_to,
                 isTestToken: None,
             };
-            let canister = TokenCanisterExports::init_instance();
+            let canister = TokenCanisterMock::init_instance();
             canister.init(meta);
             (canister, principals)
         }
     }
-    fn canister_and_actions() -> impl Strategy<Value = (TokenCanisterExports, Vec<Action>)> {
+    fn canister_and_actions() -> impl Strategy<Value = (TokenCanisterMock, Vec<Action>)> {
         make_canister().prop_flat_map(|(canister, principals)| {
             let actions = vec(make_action(principals), 1..7);
             (Just(canister), actions)

@@ -2,6 +2,7 @@
 
 mod canister;
 mod ledger;
+mod mock;
 mod principal;
 mod state;
 mod types;

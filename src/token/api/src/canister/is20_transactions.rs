@@ -98,19 +98,23 @@ pub fn batch_transfer(
 
 #[cfg(test)]
 mod tests {
-    use crate::canister::TokenCanisterExports;
-    use ic_canister::ic_kit::mock_principals::{alice, bob, john, xtc};
-    use ic_canister::ic_kit::MockContext;
-    use ic_canister::Canister;
+    use ic_canister::{
+        ic_kit::{
+            mock_principals::{alice, bob, john, xtc},
+            MockContext,
+        },
+        Canister,
+    };
 
+    use crate::mock::*;
     use crate::types::Metadata;
 
     use super::*;
 
-    fn test_canister() -> TokenCanisterExports {
+    fn test_canister() -> TokenCanisterMock {
         MockContext::new().with_caller(alice()).inject();
 
-        let canister = TokenCanisterExports::init_instance();
+        let canister = TokenCanisterMock::init_instance();
         canister.init(Metadata {
             logo: "".to_string(),
             name: "".to_string(),
