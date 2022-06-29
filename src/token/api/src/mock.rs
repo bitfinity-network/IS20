@@ -33,12 +33,8 @@ impl TokenCanisterMock {
 }
 
 impl PreUpdate for TokenCanisterMock {
-    fn pre_update(&self, method_name: &str, _method_type: ic_canister::MethodType) {
-        if method_name != "runAuction" {
-            if let Err(auction_error) = self.runAuction() {
-                ic_cdk::println!("Auction error: {auction_error:#?}");
-            }
-        }
+    fn pre_update(&self, method_name: &str, method_type: ic_canister::MethodType) {
+        crate::canister::pre_update(self, method_name, method_type);
     }
 }
 
