@@ -42,13 +42,7 @@ impl Ledger {
             .iter()
             .rev()
             .filter(|tx| who.map_or(true, |c| c == tx.from || c == tx.to || Some(c) == tx.caller))
-            .filter(|tx| {
-                if let Some(id) = transaction_id {
-                    tx.index <= id
-                } else {
-                    true
-                }
-            })
+            .filter(|tx| transaction_id.map_or(true, |id| id >= tx.index))
             .take(count + 1)
             .cloned()
             .collect::<Vec<_>>();
