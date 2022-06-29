@@ -35,7 +35,15 @@ impl TokenCanister {
     }
 }
 
-impl PreUpdate for TokenCanister {}
+impl PreUpdate for TokenCanister {
+    fn pre_update(&self, method_name: &str, _method_type: ic_canister::MethodType) {
+        if method_name != "runAuction" {
+            if let Err(auction_error) = self.runAuction() {
+                ic_cdk::println!("Auction error: {auction_error:#?}");
+            }
+        }
+    }
+}
 
 impl TokenCanisterAPI for TokenCanister {
     fn state(&self) -> Rc<RefCell<CanisterState>> {
