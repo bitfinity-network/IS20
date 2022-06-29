@@ -175,14 +175,11 @@ impl TokenCanister {
         count: usize,
         transaction_id: Option<TxId>,
     ) -> PaginatedResult {
-        if count > MAX_TRANSACTION_QUERY_LEN {
-            ic_canister::ic_kit::ic::trap("Too many transactions requested");
-        }
-
-        self.state
-            .borrow()
-            .ledger
-            .get_transactions(who, count, transaction_id)
+        self.state.borrow().ledger.get_transactions(
+            who,
+            count.min(MAX_TRANSACTION_QUERY_LEN),
+            transaction_id,
+        )
     }
 
     // This function can only be called as the owner
@@ -412,8 +409,9 @@ impl TokenCanister {
 
 #[cfg(test)]
 mod test {
-    use super::*;
     use ic_canister::ic_kit::MockContext;
+
+    use super::*;
 
     #[test]
     fn test_upgrade_from_previous() {

@@ -1,6 +1,7 @@
-use crate::types::{PaginatedResult, PendingNotifications, TxId, TxRecord};
 use candid::{CandidType, Deserialize, Principal};
 use ic_helpers::tokens::Tokens128;
+
+use crate::types::{PaginatedResult, PendingNotifications, TxId, TxRecord};
 
 const MAX_HISTORY_LENGTH: usize = 1_000_000;
 const HISTORY_REMOVAL_BATCH_SIZE: usize = 10_000;
@@ -41,7 +42,13 @@ impl Ledger {
             .iter()
             .rev()
             .filter(|tx| who.map_or(true, |c| c == tx.from || c == tx.to || Some(c) == tx.caller))
-            .filter(|tx| transaction_id.map_or(true, |id| id >= tx.index))
+            .filter(|tx| {
+                if let Some(id) = transaction_id {
+                    tx.index < id
+                } else {
+                    true
+                }
+            })
             .take(count + 1)
             .cloned()
             .collect::<Vec<_>>();

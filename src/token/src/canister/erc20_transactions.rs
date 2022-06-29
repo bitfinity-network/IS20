@@ -284,15 +284,16 @@ pub(crate) fn charge_fee(
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use crate::types::{Metadata, Operation, TransactionStatus};
-    use ic_canister::ic_kit::mock_principals::{alice, bob, john, xtc};
-    use ic_canister::ic_kit::MockContext;
     use std::collections::HashSet;
     use std::iter::FromIterator;
 
-    use crate::canister::MAX_TRANSACTION_QUERY_LEN;
+    use ic_canister::ic_kit::mock_principals::{alice, bob, john, xtc};
+    use ic_canister::ic_kit::MockContext;
     use ic_canister::Canister;
+
+    use crate::types::{Metadata, Operation, TransactionStatus};
+
+    use super::*;
 
     fn test_context() -> (&'static MockContext, TokenCanister) {
         let context = MockContext::new().with_caller(alice()).inject();
@@ -697,7 +698,7 @@ mod tests {
             HashSet::from_iter(
                 vec![
                     (bob(), Tokens128::from(200)),
-                    (john(), Tokens128::from(1000))
+                    (john(), Tokens128::from(1000)),
                 ]
                 .iter()
             )
@@ -774,7 +775,7 @@ mod tests {
     fn get_transactions_test() {
         let canister = test_canister();
 
-        for _ in 1..5 {
+        for _ in 1..=5 {
             canister.transfer(bob(), Tokens128::from(10), None).unwrap();
         }
 
@@ -784,12 +785,11 @@ mod tests {
             .transfer(john(), Tokens128::from(10), None)
             .unwrap();
 
-        assert_eq!(canister.getTransactions(None, 10, None).result.len(), 8);
-        assert_eq!(canister.getTransactions(None, 10, Some(3)).result.len(), 4);
-
+        assert_eq!(canister.getTransactions(None, 10, None).result.len(), 9);
+        assert_eq!(canister.getTransactions(None, 10, Some(3)).result.len(), 3);
         assert_eq!(
-            canister.getTransactions(Some(bob()), 5, None).result.len(),
-            5
+            canister.getTransactions(Some(bob()), 10, None).result.len(),
+            6
         );
         assert_eq!(
             canister.getTransactions(Some(xtc()), 5, None).result.len(),
@@ -800,21 +800,14 @@ mod tests {
                 .getTransactions(Some(alice()), 10, Some(5))
                 .result
                 .len(),
-            6
+            5
         );
-        assert_eq!(canister.getTransactions(None, 5, None).next, Some(2));
+        assert_eq!(canister.getTransactions(None, 5, None).next, Some(3));
         assert_eq!(
             canister.getTransactions(Some(alice()), 3, Some(5)).next,
-            Some(2)
+            Some(1)
         );
         assert_eq!(canister.getTransactions(Some(bob()), 3, Some(2)).next, None);
-    }
-
-    #[test]
-    #[should_panic]
-    fn get_transactions_over_limit() {
-        let canister = test_canister();
-        canister.getTransactions(None, (MAX_TRANSACTION_QUERY_LEN + 1) as usize, None);
     }
 
     #[test]
@@ -837,13 +830,15 @@ mod tests {
 
 #[cfg(test)]
 mod proptests {
-    use super::*;
-    use crate::types::Metadata;
     use ic_canister::ic_kit::MockContext;
     use ic_canister::Canister;
     use proptest::collection::vec;
     use proptest::prelude::*;
     use proptest::sample::Index;
+
+    use crate::types::Metadata;
+
+    use super::*;
 
     #[derive(Debug, Clone, PartialEq, Eq)]
     enum Action {
