@@ -1,7 +1,7 @@
 [package]
 edition = "2021"
-name = "token-api"
-version = "0.1.6"
+name = "is20-token"
+version = "0.1.7"
 
 [features]
 default = []
@@ -14,9 +14,9 @@ ic-cdk = "0.5"
 ic-cdk-macros = "0.5"
 num-traits = "0.2"
 serde = "1.0"
-ic-canister = { git = "https://github.com/infinity-swap/canister-sdk", package = "ic-canister"}
-ic-helpers = { git = "https://github.com/infinity-swap/canister-sdk", package = "ic-helpers"}
-ic-storage = { git = "https://github.com/infinity-swap/canister-sdk", package = "ic-storage"}
+ic-canister = { git = "https://github.com/infinity-swap/canister-sdk", package = "ic-canister", tag = "v0.3.11" }
+ic-helpers = { git = "https://github.com/infinity-swap/canister-sdk", package = "ic-helpers", tag = "v0.3.11" }
+ic-storage = { git = "https://github.com/infinity-swap/canister-sdk", package = "ic-storage", tag = "v0.3.11" }
 ic-certified-map = "0.3"
 serde_cbor = "0.11"
 

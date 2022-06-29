@@ -21,7 +21,7 @@ ic-factory = { git = "https://github.com/infinity-swap/canister-sdk", package = 
 # ic-factory = { path = "../../../ic-helpers/ic-factory" }
 serde = "1.0"
 thiserror = "1.0"
-token = { path = "../token/api", features = ["no_api"], package = "token-api" }
+token = { path = "../token/api", features = ["no_api"], package = "is20-token" }
 
 [dev-dependencies]
 tokio = { version = "1", features = ["rt", "macros"] }
