@@ -44,7 +44,7 @@ impl Ledger {
             .filter(|tx| who.map_or(true, |c| c == tx.from || c == tx.to || Some(c) == tx.caller))
             .filter(|tx| {
                 if let Some(id) = transaction_id {
-                    tx.index < id
+                    tx.index <= id
                 } else {
                     true
                 }
