@@ -1,7 +1,9 @@
 use crate::ledger::Ledger;
-use crate::types::{Allowances, AuctionInfoStable, StableMap, StatsData, Timestamp};
-use candid::{CandidType, Deserialize, Nat, Principal};
-use common::types::Metadata;
+use crate::types::{
+    Allowances, AuctionInfoStable, Cycles, Metadata, StableMap, StatsData, Timestamp,
+};
+use candid::{CandidType, Deserialize, Principal};
+use ic_helpers::tokens::Tokens128;
 use ic_storage::stable::Versioned;
 use ic_storage::IcStorage;
 use stable_structures::{stable_storage::StableStorage, RestrictedMemory, StableBTreeMap};
@@ -9,10 +11,8 @@ use std::cell::RefCell;
 
 const BID_HEAD_MAGIC: &[u8; 3] = b"BHD";
 const BID_HEAD_LAYOUT_VERSION: u8 = 1;
-
 const BID_DATA_MAGIC: &[u8; 3] = b"BDA";
 const BID_DATA_LAYOUT_VERSION: u8 = 1;
-
 const BALANCES_MAGIC: &[u8; 3] = b"BAS";
 const BALANCES_LAYOUT_VERSION: u8 = 1;
 
@@ -40,18 +40,18 @@ impl CanisterState {
             name: self.stats.name.clone(),
             symbol: self.stats.symbol.clone(),
             decimals: self.stats.decimals,
-            totalSupply: self.stats.total_supply.clone(),
+            totalSupply: self.stats.total_supply,
             owner: self.stats.owner,
-            fee: self.stats.fee.clone(),
+            fee: self.stats.fee,
             feeTo: self.stats.fee_to,
             isTestToken: Some(self.stats.is_test_token),
         }
     }
 
-    pub fn allowance(&self, owner: Principal, spender: Principal) -> Nat {
+    pub fn allowance(&self, owner: Principal, spender: Principal) -> Tokens128 {
         match self.allowances.get(&owner, &spender) {
             Some(v) => v,
-            None => Nat::from(0),
+            None => Tokens128::from(0u128),
         }
     }
 
@@ -59,7 +59,7 @@ impl CanisterState {
         self.allowances.len()
     }
 
-    pub fn user_approvals(&self, who: Principal) -> Vec<(Principal, Nat)> {
+    pub fn user_approvals(&self, who: Principal) -> Vec<(Principal, Tokens128)> {
         self.allowances.user_approvals(who)
     }
 }
@@ -81,16 +81,16 @@ impl Default for Balances {
 }
 
 impl Balances {
-    pub fn balance_of(&self, who: &Principal) -> Nat {
+    pub fn balance_of(&self, who: &Principal) -> Tokens128 {
         STABLE_MAP.with(|s| {
             let map = s.borrow();
             self.0
-                .get::<Principal, Nat>(who, &map)
-                .unwrap_or_else(|| Nat::from(0))
+                .get::<Principal, Tokens128>(who, &map)
+                .unwrap_or_else(|| Tokens128::from(0u128))
         })
     }
 
-    pub fn get_holders(&self, start: usize, limit: usize) -> Vec<(Principal, Nat)> {
+    pub fn get_holders(&self, start: usize, limit: usize) -> Vec<(Principal, Tokens128)> {
         let mut balance = STABLE_MAP.with(|s| {
             let map = s.borrow();
             self.0
@@ -98,7 +98,7 @@ impl Balances {
                 .map(|(k, v)| {
                     (
                         self.0.key_decode::<Principal>(&k),
-                        self.0.val_decode::<Nat>(&v),
+                        self.0.val_decode::<Tokens128>(&v),
                     )
                 })
                 .collect::<Vec<_>>()
@@ -111,11 +111,11 @@ impl Balances {
         balance[start..end].to_vec()
     }
 
-    pub fn insert(&self, user: Principal, amount: Nat) {
+    pub fn insert(&self, user: Principal, amount: Tokens128) {
         STABLE_MAP.with(|s| {
             let mut map = s.borrow_mut();
             self.0
-                .insert::<Principal, Nat>(&user, &amount, &mut map)
+                .insert::<Principal, Tokens128>(&user, &amount, &mut map)
                 .unwrap_or_else(|e| {
                     ic_canister::ic_kit::ic::trap(&format!("failed to serialize value: {}", e))
                 });
@@ -125,21 +125,25 @@ impl Balances {
     pub fn len(&self) -> usize {
         STABLE_MAP.with(|s| {
             let map = s.borrow();
-            self.0.len(&map)
+            self.0.size(&map)
         })
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
     }
 
     pub fn remove(&self, user: &Principal) {
         STABLE_MAP.with(|s| {
             let mut map = s.borrow_mut();
-            self.0.remove::<Principal, Nat>(user, &mut map);
+            self.0.remove::<Principal, Tokens128>(user, &mut map);
         });
     }
 
-    pub fn get(&self, user: &Principal) -> Option<Nat> {
+    pub fn get(&self, user: &Principal) -> Option<Tokens128> {
         STABLE_MAP.with(|s| {
             let map = s.borrow();
-            self.0.get::<Principal, Nat>(user, &map)
+            self.0.get::<Principal, Tokens128>(user, &map)
         })
     }
 
@@ -156,7 +160,7 @@ pub struct BiddingState {
     pub fee_ratio: f64,
     pub last_auction: Timestamp,
     pub auction_period: Timestamp,
-    pub cycles_since_auction: u64,
+    pub cycles_since_auction: Cycles,
     pub bids: StableMap,
 }
 

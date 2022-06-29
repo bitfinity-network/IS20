@@ -1,5 +1,6 @@
 use candid::Principal;
 use ic_cdk::export::candid::CandidType;
+use ic_factory::FactoryState;
 use ic_storage::{stable::Versioned, IcStorage};
 use serde::Deserialize;
 use std::collections::HashMap;
@@ -11,10 +12,16 @@ pub struct State {
     pub tokens: HashMap<String, Principal>,
 }
 
-impl Versioned for State {
+#[derive(CandidType, Deserialize, Default)]
+pub(crate) struct StableState {
+    pub token_factory_state: State,
+    pub base_factory_state: FactoryState,
+}
+
+impl Versioned for StableState {
     type Previous = ();
 
-    fn upgrade((): ()) -> Self {
+    fn upgrade(_: Self::Previous) -> Self {
         Self::default()
     }
 }

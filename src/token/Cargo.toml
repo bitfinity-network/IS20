@@ -1,7 +1,7 @@
 [package]
 edition = "2021"
 name = "token"
-version = "0.1.3"
+version = "0.1.6"
 
 [features]
 default = []
@@ -10,14 +10,13 @@ no_api = []
 [dependencies]
 assert-panic = "1.0"
 candid = "0.7"
-common = {path = "../common"}
 ic-cdk = "0.5"
 ic-cdk-macros = "0.5"
 num-traits = "0.2"
 serde = "1.0"
-ic-canister = { git = "https://github.com/infinity-swap/canister-sdk", package = "ic-canister", tag = "v0.3.8" }
-ic-helpers = { git = "https://github.com/infinity-swap/canister-sdk", package = "ic-helpers", tag = "v0.3.8" }
-ic-storage = { git = "https://github.com/infinity-swap/canister-sdk", package = "ic-storage", tag = "v0.3.8" }
+ic-canister = { git = "https://github.com/infinity-swap/canister-sdk", package = "ic-canister", tag = "v0.3.10" }
+ic-helpers = { git = "https://github.com/infinity-swap/canister-sdk", package = "ic-helpers", tag = "v0.3.10" }
+ic-storage = { git = "https://github.com/infinity-swap/canister-sdk", package = "ic-storage", tag = "v0.3.10" }
 stable-structures = { git = "https://github.com/aewc/ic" }
 ic-certified-map = "0.3"
 serde_cbor = "0.11"

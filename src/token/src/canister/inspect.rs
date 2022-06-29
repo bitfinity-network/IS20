@@ -1,6 +1,8 @@
 use crate::state::{CanisterState, STABLE_MAP};
+use crate::types::TxId;
 use candid::{Nat, Principal};
 use ic_cdk_macros::inspect_message;
+use ic_helpers::tokens::Tokens128;
 use ic_storage::IcStorage;
 
 static PUBLIC_METHODS: &[&str] = &[
@@ -98,7 +100,8 @@ fn inspect_message() {
         "transferFrom" => {
             // Check if the caller has allowance for this transfer.
             let allowances = &state.allowances;
-            let (from, _, value) = ic_cdk::api::call::arg_data::<(Principal, Principal, Nat)>();
+            let (from, _, value) =
+                ic_cdk::api::call::arg_data::<(Principal, Principal, Tokens128)>();
             if let Some(allowance) = allowances.get(&caller, &from) {
                 if value <= allowance {
                     ic_cdk::api::call::accept_message();
@@ -115,7 +118,7 @@ fn inspect_message() {
             // This method can only be called if the notification id is in the pending notifications
             // list.
             let notifications = &state.ledger.notifications;
-            let (tx_id,) = ic_cdk::api::call::arg_data::<(Nat,)>();
+            let (tx_id,) = ic_cdk::api::call::arg_data::<(TxId,)>();
 
             if notifications.contains_key(&tx_id) {
                 ic_cdk::api::call::accept_message();
@@ -127,7 +130,7 @@ fn inspect_message() {
             // This method can only be called if the notification id is in the pending notifications
             // list and the caller is notified canister.
             let notifications = &state.ledger.notifications;
-            let (tx_id,) = ic_cdk::api::call::arg_data::<(Nat,)>();
+            let (tx_id,) = ic_cdk::api::call::arg_data::<(TxId,)>();
 
             match notifications.get(&tx_id) {
                 Some(Some(x)) if x != ic_canister::ic_kit::ic::caller() => {

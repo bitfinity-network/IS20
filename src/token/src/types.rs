@@ -1,6 +1,6 @@
 use crate::state::STABLE_MAP;
-use candid::{CandidType, Deserialize, Nat, Principal};
-use common::types::Metadata;
+use candid::{CandidType, Deserialize, Principal};
+use ic_helpers::tokens::Tokens128;
 use stable_structures::{
     btreemap::{iter::Iter, InsertError},
     stable_storage::StableStorage,
@@ -34,15 +34,29 @@ const FIRST_TX_LAYOUT_VERSION: u8 = 1;
 const LAST_TX_MAGIC: &[u8; 3] = b"LTX";
 const LAST_TX_LAYOUT_VERSION: u8 = 1;
 
+#[allow(non_snake_case)]
+#[derive(Deserialize, CandidType, Clone, Debug)]
+pub struct Metadata {
+    pub logo: String,
+    pub name: String,
+    pub symbol: String,
+    pub decimals: u8,
+    pub totalSupply: Tokens128,
+    pub owner: Principal,
+    pub fee: Tokens128,
+    pub feeTo: Principal,
+    pub isTestToken: Option<bool>,
+}
+
 #[derive(Deserialize, CandidType, Clone, Debug)]
 pub struct StatsData {
     pub logo: String,
     pub name: String,
     pub symbol: String,
     pub decimals: u8,
-    pub total_supply: Nat,
+    pub total_supply: Tokens128,
     pub owner: Principal,
-    pub fee: Nat,
+    pub fee: Tokens128,
     pub fee_to: Principal,
     pub deploy_time: u64,
     pub min_cycles: u64,
@@ -56,9 +70,9 @@ struct StatsDataHeader {
     name: String,
     symbol: String,
     decimals: u8,
-    total_supply: Nat,
+    total_supply: Tokens128,
     owner: Principal,
-    fee: Nat,
+    fee: Tokens128,
     fee_to: Principal,
     deploy_time: u64,
     min_cycles: u64,
@@ -66,8 +80,8 @@ struct StatsDataHeader {
 }
 
 impl StatsData {
-    pub fn fee_info(&self) -> (Nat, Principal) {
-        (self.fee.clone(), self.fee_to)
+    pub fn fee_info(&self) -> (Tokens128, Principal) {
+        (self.fee, self.fee_to)
     }
 
     pub fn save_header(&self, memory: &RestrictedMemory<StableStorage>) {
@@ -101,9 +115,9 @@ impl From<&StatsData> for StatsDataHeader {
             name: value.name.clone(),
             symbol: value.symbol.clone(),
             decimals: value.decimals,
-            total_supply: value.total_supply.clone(),
+            total_supply: value.total_supply,
             owner: value.owner,
-            fee: value.fee.clone(),
+            fee: value.fee,
             fee_to: value.fee_to,
             deploy_time: value.deploy_time,
             min_cycles: value.min_cycles,
@@ -139,7 +153,7 @@ impl From<Metadata> for StatsData {
 pub struct TokenInfo {
     pub metadata: Metadata,
     pub feeTo: Principal,
-    pub historySize: Nat,
+    pub historySize: u64,
     pub deployTime: Timestamp,
     pub holderNumber: usize,
     pub cycles: u64,
@@ -152,9 +166,9 @@ impl Default for StatsData {
             name: "".to_string(),
             symbol: "".to_string(),
             decimals: 0u8,
-            total_supply: Nat::from(0),
+            total_supply: Tokens128::from(0u128),
             owner: Principal::anonymous(),
-            fee: Nat::from(0),
+            fee: Tokens128::from(0u128),
             fee_to: Principal::anonymous(),
             deploy_time: 0,
             min_cycles: 0,
@@ -205,11 +219,11 @@ impl Allowances {
         )
     }
 
-    pub fn get(&self, owner: &Principal, spender: &Principal) -> Option<Nat> {
+    pub fn get(&self, owner: &Principal, spender: &Principal) -> Option<Tokens128> {
         let key = self.encode_key(owner, spender);
         STABLE_MAP.with(|s| {
             let map = s.borrow();
-            map.get(&key).map(|v| self.0.val_decode::<Nat>(&v))
+            map.get(&key).map(|v| self.0.val_decode::<Tokens128>(&v))
         })
     }
 
@@ -217,12 +231,12 @@ impl Allowances {
         &self,
         owner: &Principal,
         spender: &Principal,
-        value: Nat,
-    ) -> Result<Option<Nat>, InsertError> {
+        value: Tokens128,
+    ) -> Result<Option<Tokens128>, InsertError> {
         STABLE_MAP.with(|s| {
             let mut map = s.borrow_mut();
             let key = self.encode_key(owner, spender);
-            let val = self.0.val_encode::<Nat>(&value);
+            let val = self.0.val_encode::<Tokens128>(&value);
             let result = map.insert(key, val)?;
             match result {
                 Some(v) => Ok(Some(self.0.val_decode(&v))),
@@ -231,7 +245,7 @@ impl Allowances {
         })
     }
 
-    pub fn remove(&self, owner: &Principal, spender: &Principal) -> Option<Nat> {
+    pub fn remove(&self, owner: &Principal, spender: &Principal) -> Option<Tokens128> {
         STABLE_MAP.with(|s| {
             let mut map = s.borrow_mut();
             let key = self.encode_key(owner, spender);
@@ -242,16 +256,20 @@ impl Allowances {
     pub fn len(&self) -> usize {
         STABLE_MAP.with(|s| {
             let map = s.borrow();
-            self.0.len(&map)
+            self.0.size(&map)
         })
     }
 
-    pub fn user_approvals(&self, who: Principal) -> Vec<(Principal, Nat)> {
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+
+    pub fn user_approvals(&self, who: Principal) -> Vec<(Principal, Tokens128)> {
         let mut buf: Vec<u8> = vec![];
         let owner = who.as_slice();
         buf.push(owner.len() as u8);
         buf.extend(owner);
-        let mut result: Vec<(Principal, Nat)> = vec![];
+        let mut result: Vec<(Principal, Tokens128)> = vec![];
         STABLE_MAP.with(|s| {
             let map = s.borrow();
             for (k, v) in self.0.range(Some(buf), None, &map) {
@@ -273,19 +291,20 @@ pub enum TxError {
     AmountTooSmall,
     FeeExceededLimit,
     ApproveSucceededButNotifyFailed { tx_error: Box<TxError> },
-    NotificationFailed { transaction_id: Nat },
+    NotificationFailed { transaction_id: u64 },
     AlreadyActioned,
     NotificationDoesNotExist,
     TransactionDoesNotExist,
-    BadFee { expected_fee: u64 },
-    InsufficientFunds { balance: u64 },
+    BadFee { expected_fee: Tokens128 },
+    InsufficientFunds { balance: Tokens128 },
     TxTooOld { allowed_window_nanos: u64 },
     TxCreatedInFuture,
     TxDuplicate { duplicate_of: u64 },
     SelfTransfer,
+    AmountOverflow,
 }
 
-pub type TxReceipt = Result<Nat, TxError>;
+pub type TxReceipt = Result<u64, TxError>;
 
 // Notification receiver not set if None
 #[derive(Debug, CandidType, Deserialize)]
@@ -301,35 +320,35 @@ impl Default for PendingNotifications {
 }
 
 impl PendingNotifications {
-    pub fn insert(&self, index: Nat, amount: Option<Principal>) {
+    pub fn insert(&self, index: u64, amount: Option<Principal>) {
         STABLE_MAP.with(|s| {
             let mut map = s.borrow_mut();
             self.0
-                .insert::<Nat, Option<Principal>>(&index, &amount, &mut map)
+                .insert::<u64, Option<Principal>>(&index, &amount, &mut map)
                 .unwrap_or_else(|e| {
                     ic_canister::ic_kit::ic::trap(&format!("failed to serialize value: {}", e))
                 });
         });
     }
 
-    pub fn remove(&self, index: &Nat) -> Option<Option<Principal>> {
+    pub fn remove(&self, index: &u64) -> Option<Option<Principal>> {
         STABLE_MAP.with(|s| {
             let mut map = s.borrow_mut();
-            self.0.remove::<Nat, Option<Principal>>(index, &mut map)
+            self.0.remove::<u64, Option<Principal>>(index, &mut map)
         })
     }
 
-    pub fn get(&self, index: &Nat) -> Option<Option<Principal>> {
+    pub fn get(&self, index: &u64) -> Option<Option<Principal>> {
         STABLE_MAP.with(|s| {
             let map = s.borrow();
-            self.0.get::<Nat, Option<Principal>>(index, &map)
+            self.0.get::<u64, Option<Principal>>(index, &map)
         })
     }
 
-    pub fn contains_key(&self, index: &Nat) -> bool {
+    pub fn contains_key(&self, index: &u64) -> bool {
         STABLE_MAP.with(|s| {
             let map = s.borrow();
-            self.0.contains_key::<Nat>(index, &map)
+            self.0.contains_key::<u64>(index, &map)
         })
     }
 }
@@ -354,11 +373,11 @@ pub enum Operation {
 pub struct AuctionInfo {
     pub auction_id: usize,
     pub auction_time: Timestamp,
-    pub tokens_distributed: Nat,
-    pub cycles_collected: u64,
+    pub tokens_distributed: Tokens128,
+    pub cycles_collected: Cycles,
     pub fee_ratio: f64,
-    pub first_transaction_id: Nat,
-    pub last_transaction_id: Nat,
+    pub first_transaction_id: TxId,
+    pub last_transaction_id: TxId,
 }
 
 #[derive(Debug, CandidType, Deserialize)]
@@ -393,11 +412,11 @@ impl AuctionInfoStable {
             let id = id as u64;
             let auction_id = self.auction_id.get::<u64, usize>(&id, &map);
             let auction_time = self.auction_time.get::<u64, Timestamp>(&id, &map);
-            let tokens_distributed = self.tokens_distributed.get::<u64, Nat>(&id, &map);
-            let cycles_collected = self.cycles_collected.get::<u64, u64>(&id, &map);
+            let tokens_distributed = self.tokens_distributed.get::<u64, Tokens128>(&id, &map);
+            let cycles_collected = self.cycles_collected.get::<u64, Cycles>(&id, &map);
             let fee_ratio = self.fee_ratio.get::<u64, f64>(&id, &map);
-            let first_transaction_id = self.first_transaction_id.get::<u64, Nat>(&id, &map);
-            let last_transaction_id = self.last_transaction_id.get::<u64, Nat>(&id, &map);
+            let first_transaction_id = self.first_transaction_id.get::<u64, TxId>(&id, &map);
+            let last_transaction_id = self.last_transaction_id.get::<u64, TxId>(&id, &map);
 
             auction_id.map(|auction_id| AuctionInfo {
                 auction_id,
@@ -414,8 +433,12 @@ impl AuctionInfoStable {
     pub fn len(&self) -> usize {
         STABLE_MAP.with(|s| {
             let map = s.borrow();
-            self.auction_id.len(&map)
+            self.auction_id.size(&map)
         })
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
     }
 
     pub fn push(&self, item: AuctionInfo) {
@@ -434,12 +457,12 @@ impl AuctionInfoStable {
                     ic_canister::ic_kit::ic::trap(&format!("AuctionInfoStable insert error: {}", e))
                 });
             self.tokens_distributed
-                .insert::<u64, Nat>(&id, &item.tokens_distributed, &mut map)
+                .insert::<u64, Tokens128>(&id, &item.tokens_distributed, &mut map)
                 .unwrap_or_else(|e| {
                     ic_canister::ic_kit::ic::trap(&format!("AuctionInfoStable insert error: {}", e))
                 });
             self.cycles_collected
-                .insert::<u64, u64>(&id, &item.cycles_collected, &mut map)
+                .insert::<u64, Cycles>(&id, &item.cycles_collected, &mut map)
                 .unwrap_or_else(|e| {
                     ic_canister::ic_kit::ic::trap(&format!("AuctionInfoStable insert error: {}", e))
                 });
@@ -449,12 +472,12 @@ impl AuctionInfoStable {
                     ic_canister::ic_kit::ic::trap(&format!("AuctionInfoStable insert error: {}", e))
                 });
             self.first_transaction_id
-                .insert::<u64, Nat>(&id, &item.first_transaction_id, &mut map)
+                .insert::<u64, TxId>(&id, &item.first_transaction_id, &mut map)
                 .unwrap_or_else(|e| {
                     ic_canister::ic_kit::ic::trap(&format!("AuctionInfoStable insert error: {}", e))
                 });
             self.last_transaction_id
-                .insert::<u64, Nat>(&id, &item.last_transaction_id, &mut map)
+                .insert::<u64, TxId>(&id, &item.last_transaction_id, &mut map)
                 .unwrap_or_else(|e| {
                     ic_canister::ic_kit::ic::trap(&format!("AuctionInfoStable insert error: {}", e))
                 });
@@ -469,7 +492,7 @@ pub struct PaginatedResult {
     pub result: Vec<TxRecord>,
 
     /// This is  the next `id` of the transaction. The `next` is used as offset for the next query if it exits.
-    pub next: Option<u128>,
+    pub next: Option<TxId>,
 }
 
 // I want set the K,V type in struct by using PhantomData<T>, but it can't derive CandidType
@@ -577,16 +600,16 @@ impl StableMap {
         }
     }
 
-    pub fn total_len(map: &StableBTreeMap<RestrictedMemory<StableStorage>>) -> u64 {
+    pub fn total_size(map: &StableBTreeMap<RestrictedMemory<StableStorage>>) -> u64 {
         map.len()
     }
 
-    pub fn len(&self, map: &StableBTreeMap<RestrictedMemory<StableStorage>>) -> usize {
+    pub fn size(&self, map: &StableBTreeMap<RestrictedMemory<StableStorage>>) -> usize {
         map.range(self.magic.to_vec(), None).count()
     }
 
     pub fn is_empty(&self, map: &StableBTreeMap<RestrictedMemory<StableStorage>>) -> bool {
-        Self::total_len(map) == 0 || self.len(map) == 0
+        Self::total_size(map) == 0 || self.size(map) == 0
     }
 
     pub fn total_iter(
@@ -606,3 +629,5 @@ impl StableMap {
         map.range(magic, offset)
     }
 }
+pub type TxId = u64;
+pub type Cycles = u64;

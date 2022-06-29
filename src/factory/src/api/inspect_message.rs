@@ -2,7 +2,6 @@ use crate::state::State;
 use ic_cdk_macros::inspect_message;
 use ic_storage::IcStorage;
 
-#[cfg(not(feature = "no_api"))]
 #[inspect_message]
 fn inspect_message() {
     let state = State::get();

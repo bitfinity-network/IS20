@@ -5,32 +5,56 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
+use crate::state::StableState;
 use crate::{error::TokenFactoryError, state::State};
 use candid::Principal;
-use common::types::Metadata;
-use ic_canister::{init, query, update, Canister};
+use ic_canister::{init, post_upgrade, pre_upgrade, query, update, Canister};
 use ic_factory::{api::FactoryCanister, error::FactoryError, FactoryConfiguration, FactoryState};
-use ic_helpers::get_canister_bytecode_for;
+use token::types::Metadata;
 
-const FACTORY_WASM_PATH: &str = "../../../target/wasm32-unknown-unknown/release/factory.wasm";
 const DEFAULT_LEDGER_PRINCIPAL: &str = "ryjl3-tyaaa-aaaaa-aaaba-cai";
 const DEFAULT_ICP_FEE: u64 = 10u64.pow(8); // 1 ICP
 
+#[cfg(not(feature = "no_api"))]
 mod inspect_message;
+
 #[derive(Clone, Canister)]
+#[canister_no_upgrade_methods]
 pub struct TokenFactoryCanister {
     #[id]
     principal: Principal,
 
     #[state]
     state: Rc<RefCell<State>>,
-
-    #[state(stable_store = false)]
-    factory: Rc<RefCell<FactoryState>>,
 }
 
 #[allow(dead_code)]
 impl TokenFactoryCanister {
+    #[pre_upgrade]
+    fn pre_upgrade(&self) {
+        let token_factory_state = self.state.replace(State::default());
+        let base_factory_state = self.factory_state().replace(FactoryState::default());
+
+        ic_storage::stable::write(&StableState {
+            token_factory_state,
+            base_factory_state,
+        })
+        .expect("failed to serialize state to the stable storage");
+    }
+
+    #[post_upgrade]
+    fn post_upgrade(&self) {
+        let stable_state = ic_storage::stable::read::<StableState>()
+            .expect("failed to read stable state from the stable storage");
+        let StableState {
+            token_factory_state,
+            base_factory_state,
+        } = stable_state;
+
+        self.state.replace(token_factory_state);
+        self.factory_state().replace(base_factory_state);
+    }
+
     #[init]
     pub fn init(&self, controller: Principal, ledger_principal: Option<Principal>) {
         let ledger = ledger_principal
@@ -43,14 +67,14 @@ impl TokenFactoryCanister {
 
         factory_state.configuration = factory_configuration;
 
-        self.factory.replace(factory_state);
+        self.factory_state().replace(factory_state);
     }
 
     /// Returns the token, or None if it does not exist.
     #[query]
     pub async fn get_token(&self, name: String) -> Option<Principal> {
         let principal = Principal::from_text(name).unwrap();
-        self.factory.borrow().factory.get(&principal)
+        self.factory_state().borrow().factory.get(&principal)
     }
 
     #[update]
@@ -109,7 +133,10 @@ impl TokenFactoryCanister {
         }
 
         let caller = owner.unwrap_or_else(ic_canister::ic_kit::ic::caller);
-        let actor = self.factory.borrow().consume_provided_cycles_or_icp(caller);
+        let actor = self
+            .factory_state()
+            .borrow()
+            .consume_provided_cycles_or_icp(caller);
         let cycles = actor.await?;
 
         let create_token = {
@@ -119,7 +146,7 @@ impl TokenFactoryCanister {
                 .as_ref()
                 .expect("token_wasm is not set in token state");
 
-            self.factory
+            self.factory_state()
                 .borrow()
                 .factory
                 .create_with_cycles(wasm, (info,), cycles)
@@ -130,7 +157,7 @@ impl TokenFactoryCanister {
             .map_err(|e| TokenFactoryError::CanisterCreateFailed(e.1))?;
         let principal = canister.identity();
 
-        self.factory
+        self.factory_state()
             .borrow_mut()
             .factory
             .register(principal, canister);
@@ -146,32 +173,33 @@ impl TokenFactoryCanister {
     #[update]
     pub async fn forget_token(&self, name: String) -> Result<(), TokenFactoryError> {
         //    Check controller access
-        self.factory.borrow_mut().check_controller_access()?;
+        self.factory_state()
+            .borrow_mut()
+            .check_controller_access()?;
 
         let token = self
             .get_token(name.clone())
             .await
             .ok_or(TokenFactoryError::FactoryError(FactoryError::NotFound))?;
 
-        let drop_token_fut = self.factory.borrow_mut().factory.drop(token);
+        let drop_token_fut = self.factory_state().borrow_mut().factory.drop(token);
         drop_token_fut.await?;
         let _ = self.state.borrow_mut().tokens.remove(&name);
         let name = Principal::from_text(name).unwrap();
-        self.factory.borrow_mut().factory.forget(&name)?;
+        self.factory_state().borrow_mut().factory.forget(&name)?;
 
         Ok(())
     }
-}
 
-impl FactoryCanister for TokenFactoryCanister {
-    fn get_canister_bytecode() -> Vec<u8> {
-        get_canister_bytecode_for(FACTORY_WASM_PATH)
-    }
-
-    fn state(&self) -> Rc<RefCell<FactoryState>> {
-        self.factory.clone()
+    #[update]
+    pub async fn upgrade(&mut self) -> Result<Vec<Principal>, FactoryError> {
+        let wasm = self.state.borrow().token_wasm.clone();
+        let result = FactoryCanister::upgrade(self, wasm).await;
+        result
     }
 }
+
+impl FactoryCanister for TokenFactoryCanister {}
 
 #[cfg(test)]
 mod tests {
