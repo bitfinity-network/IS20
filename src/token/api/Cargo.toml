@@ -6,6 +6,8 @@ version = "0.1.7"
 [features]
 default = []
 no_api = []
+no_mint_burn_api = []
+no_transfer_api = []
 
 [dependencies]
 assert-panic = "1.0"
