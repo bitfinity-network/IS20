@@ -8,12 +8,12 @@ use std::collections::HashMap;
 
 #[derive(Debug, Default, CandidType, Deserialize, IcStorage)]
 pub struct CanisterState {
-    pub(crate) bidding_state: BiddingState,
-    pub(crate) balances: Balances,
-    pub(crate) auction_history: AuctionHistory,
-    pub(crate) stats: StatsData,
-    pub(crate) allowances: Allowances,
-    pub(crate) ledger: Ledger,
+    pub bidding_state: BiddingState,
+    pub balances: Balances,
+    pub auction_history: AuctionHistory,
+    pub stats: StatsData,
+    pub allowances: Allowances,
+    pub ledger: Ledger,
 }
 
 impl CanisterState {

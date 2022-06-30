@@ -1,10 +1,12 @@
+use candid::Principal;
+use ic_helpers::tokens::Tokens128;
+
 use crate::canister::erc20_transactions::{charge_fee, transfer_balance};
-use crate::canister::TokenCanister;
 use crate::principal::{CheckedPrincipal, WithRecipient};
 use crate::state::CanisterState;
 use crate::types::{TxError, TxId, TxReceipt};
-use candid::Principal;
-use ic_helpers::tokens::Tokens128;
+
+use super::TokenCanisterAPI;
 
 /// Transfers `value` amount to the `to` principal, applying American style fee. This means, that
 /// the recipient will receive `value - fee`, and the sender account will be reduced exactly by `value`.
@@ -12,17 +14,19 @@ use ic_helpers::tokens::Tokens128;
 /// Note, that the `value` cannot be less than the `fee` amount. If the value given is too small,
 /// transaction will fail with `TxError::AmountTooSmall` error.
 pub fn transfer_include_fee(
-    canister: &TokenCanister,
+    canister: &impl TokenCanisterAPI,
     caller: CheckedPrincipal<WithRecipient>,
     amount: Tokens128,
 ) -> TxReceipt {
+    let state = canister.state();
+    let mut state = state.borrow_mut();
     let CanisterState {
         ref mut balances,
         ref mut ledger,
         ref bidding_state,
         ref stats,
         ..
-    } = *canister.state.borrow_mut();
+    } = *state;
 
     let (fee, fee_to) = stats.fee_info();
     let fee_ratio = bidding_state.fee_ratio;
@@ -50,11 +54,12 @@ pub fn transfer_include_fee(
 }
 
 pub fn batch_transfer(
-    canister: &TokenCanister,
+    canister: &impl TokenCanisterAPI,
     transfers: Vec<(Principal, Tokens128)>,
 ) -> Result<Vec<TxId>, TxError> {
     let from = ic_canister::ic_kit::ic::caller();
-    let mut state = canister.state.borrow_mut();
+    let state = canister.state();
+    let mut state = state.borrow_mut();
 
     let mut total_value = Tokens128::from(0u128);
     for target in transfers.iter() {
@@ -93,16 +98,23 @@ pub fn batch_transfer(
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use crate::types::Metadata;
-    use ic_canister::ic_kit::mock_principals::{alice, bob, john, xtc};
-    use ic_canister::ic_kit::MockContext;
-    use ic_canister::Canister;
+    use ic_canister::{
+        ic_kit::{
+            mock_principals::{alice, bob, john, xtc},
+            MockContext,
+        },
+        Canister,
+    };
 
-    fn test_canister() -> TokenCanister {
+    use crate::mock::*;
+    use crate::types::Metadata;
+
+    use super::*;
+
+    fn test_canister() -> TokenCanisterMock {
         MockContext::new().with_caller(alice()).inject();
 
-        let canister = TokenCanister::init_instance();
+        let canister = TokenCanisterMock::init_instance();
         canister.init(Metadata {
             logo: "".to_string(),
             name: "".to_string(),
@@ -136,7 +148,8 @@ mod tests {
     #[test]
     fn batch_transfer_with_fee() {
         let canister = test_canister();
-        let mut state = canister.state.borrow_mut();
+        let state = canister.state();
+        let mut state = state.borrow_mut();
         state.stats.fee = Tokens128::from(50);
         state.stats.fee_to = john();
         drop(state);
@@ -181,7 +194,8 @@ mod tests {
     fn transfer_with_fee() {
         let canister = test_canister();
 
-        let mut state = canister.state.borrow_mut();
+        let state = canister.state();
+        let mut state = state.borrow_mut();
         state.stats.fee = Tokens128::from(100);
         state.stats.fee_to = john();
         drop(state);

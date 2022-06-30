@@ -1,23 +1,23 @@
 [package]
 edition = "2021"
-name = "token-factory"
-version = "0.1.6"
+name = "is20-token-canister"
+version = "0.1.7"
 
 [features]
 default = []
 no_api = []
 
 [dependencies]
+assert-panic = "1.0"
 candid = "0.7"
 ic-cdk = "0.5"
 ic-cdk-macros = "0.5"
+serde = "1.0"
 ic-canister = { git = "https://github.com/infinity-swap/canister-sdk", package = "ic-canister", tag = "v0.3.11" }
 ic-helpers = { git = "https://github.com/infinity-swap/canister-sdk", package = "ic-helpers", tag = "v0.3.11" }
 ic-storage = { git = "https://github.com/infinity-swap/canister-sdk", package = "ic-storage", tag = "v0.3.11" }
-ic-factory = { git = "https://github.com/infinity-swap/canister-sdk", package = "ic-factory", tag = "v0.3.11" }
-serde = "1.0"
-thiserror = "1.0"
-token = { path = "../token/api", features = ["no_api"], package = "is20-token" }
+ic-certified-map = "0.3"
+token-api = { path = "../api", package = "is20-token" }
 
-[dev-dependencies]
-tokio = { version = "1", features = ["rt", "macros"] }
+[target.'cfg(not(target_family = "wasm"))'.dependencies]
+async-std = {version = "1.10.0", features = ["attributes"]}
