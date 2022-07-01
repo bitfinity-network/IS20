@@ -744,7 +744,6 @@ mod tests {
         let context = MockContext::new().with_caller(alice()).inject();
 
         assert!(canister.approve(bob(), Tokens128::from(1500)).is_ok());
-        println!("balance: {}", ic_canister::ic_kit::ic::balance());
         assert_eq!(canister.balanceOf(bob()), Tokens128::from(100));
         context.update_caller(bob());
 
