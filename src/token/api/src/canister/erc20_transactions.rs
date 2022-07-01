@@ -787,7 +787,7 @@ mod tests {
     fn get_transactions_test() {
         let canister = test_canister();
 
-        for _ in 1..5 {
+        for _ in 1..=5 {
             canister.transfer(bob(), Tokens128::from(10), None).unwrap();
         }
 
@@ -797,12 +797,11 @@ mod tests {
             .transfer(john(), Tokens128::from(10), None)
             .unwrap();
 
-        assert_eq!(canister.getTransactions(None, 10, None).result.len(), 8);
+        assert_eq!(canister.getTransactions(None, 10, None).result.len(), 9);
         assert_eq!(canister.getTransactions(None, 10, Some(3)).result.len(), 4);
-
         assert_eq!(
-            canister.getTransactions(Some(bob()), 5, None).result.len(),
-            5
+            canister.getTransactions(Some(bob()), 10, None).result.len(),
+            6
         );
         assert_eq!(
             canister.getTransactions(Some(xtc()), 5, None).result.len(),
@@ -815,12 +814,30 @@ mod tests {
                 .len(),
             6
         );
-        assert_eq!(canister.getTransactions(None, 5, None).next, Some(2));
+        assert_eq!(canister.getTransactions(None, 5, None).next, Some(3));
         assert_eq!(
             canister.getTransactions(Some(alice()), 3, Some(5)).next,
             Some(2)
         );
         assert_eq!(canister.getTransactions(Some(bob()), 3, Some(2)).next, None);
+
+        for _ in 1..=10 {
+            canister.transfer(bob(), Tokens128::from(10), None).unwrap();
+        }
+
+        let txn = canister.getTransactions(None, 5, None);
+        assert_eq!(txn.result[0].index, 18);
+        assert_eq!(txn.result[1].index, 17);
+        assert_eq!(txn.result[2].index, 16);
+        assert_eq!(txn.result[3].index, 15);
+        assert_eq!(txn.result[4].index, 14);
+        let txn2 = canister.getTransactions(None, 5, txn.next);
+        assert_eq!(txn2.result[0].index, 13);
+        assert_eq!(txn2.result[1].index, 12);
+        assert_eq!(txn2.result[2].index, 11);
+        assert_eq!(txn2.result[3].index, 10);
+        assert_eq!(txn2.result[4].index, 9);
+        assert_eq!(canister.getTransactions(None, 5, txn.next).next, Some(8));
     }
 
     #[test]
