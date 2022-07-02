@@ -3,13 +3,10 @@ use std::rc::Rc;
 
 use ic_canister::generate_exports;
 use ic_canister::Canister;
-use ic_cdk::export::candid::Principal;
-use ic_storage::IcStorage;
-
-use crate::state::CanisterState;
-
 use ic_canister::{query, update, AsyncReturn};
+use ic_cdk::export::candid::Principal;
 use ic_helpers::tokens::Tokens128;
+use ic_storage::IcStorage;
 
 use crate::canister::erc20_transactions::{
     approve, burn_as_owner, burn_own_tokens, mint_as_owner, mint_test_token, transfer,
@@ -19,11 +16,12 @@ use crate::canister::is20_auction::{
     auction_info, bid_cycles, bidding_info, run_auction, AuctionError, BiddingInfo,
 };
 use crate::canister::is20_notify::{approve_and_notify, consume_notification, notify};
-use crate::canister::is20_transactions::{batch_transfer, transfer_include_fee};
+use crate::canister::is20_transactions::transfer_include_fee;
 use crate::principal::{CheckedPrincipal, Owner};
+use crate::state::CanisterState;
 use crate::types::{
-    AuctionInfo, Metadata, PaginatedResult, StatsData, Timestamp, TokenInfo, TxError, TxId,
-    TxReceipt, TxRecord,
+    AuctionInfo, Metadata, PaginatedResult, StatsData, Subaccount, Timestamp, TokenHolder,
+    TokenInfo, TokenReceiver, TxError, TxId, TxReceipt, TxRecord,
 };
 
 pub mod erc20_transactions;
@@ -113,7 +111,7 @@ pub trait TokenCanisterAPI: Canister + Sized {
     }
 
     #[query(trait = true)]
-    fn getHolders(&self, start: usize, limit: usize) -> Vec<(Principal, Tokens128)> {
+    fn getHolders(&self, start: usize, limit: usize) -> Vec<(TokenHolder, Tokens128)> {
         self.state().borrow().balances.get_holders(start, limit)
     }
 
@@ -123,17 +121,31 @@ pub trait TokenCanisterAPI: Canister + Sized {
     }
 
     #[query(trait = true)]
-    fn getUserApprovals(&self, who: Principal) -> Vec<(Principal, Tokens128)> {
+    fn getUserApprovals(
+        &self,
+        who: Principal,
+        who_subaccount: Option<Subaccount>,
+    ) -> Vec<(TokenHolder, Tokens128)> {
+        let who = TokenHolder::new(who, who_subaccount);
         self.state().borrow().user_approvals(who)
     }
 
     #[query(trait = true)]
-    fn balanceOf(&self, holder: Principal) -> Tokens128 {
+    fn balanceOf(&self, holder: Principal, holder_subaccount: Option<Subaccount>) -> Tokens128 {
+        let holder = TokenHolder::new(holder, holder_subaccount);
         self.state().borrow().balances.balance_of(&holder)
     }
 
     #[query(trait = true)]
-    fn allowance(&self, owner: Principal, spender: Principal) -> Tokens128 {
+    fn allowance(
+        &self,
+        owner: Principal,
+        owner_subaccount: Option<Subaccount>,
+        spender: Principal,
+        spender_subaccount: Option<Subaccount>,
+    ) -> Tokens128 {
+        let owner = TokenHolder::new(owner, owner_subaccount);
+        let spender = TokenHolder::new(spender, spender_subaccount);
         self.state().borrow().allowance(owner, spender)
     }
 
@@ -193,9 +205,17 @@ pub trait TokenCanisterAPI: Canister + Sized {
     }
 
     #[update(trait = true)]
-    fn approve(&self, spender: Principal, amount: Tokens128) -> TxReceipt {
+    fn approve(
+        &self,
+        spender: Principal,
+        spender_subaccount: Option<Subaccount>,
+        amount: Tokens128,
+        owner_subaccount: Option<Subaccount>,
+    ) -> TxReceipt {
         let caller = CheckedPrincipal::with_recipient(spender)?;
-        approve(self, caller, amount)
+        let spender = TokenHolder::new(caller.recipient(), spender_subaccount);
+        let owner = TokenHolder::new(caller.inner(), owner_subaccount);
+        approve(self, owner, spender, amount, caller.inner())
     }
 
     /********************** TRANSFERS ***********************/
@@ -203,17 +223,31 @@ pub trait TokenCanisterAPI: Canister + Sized {
     fn transfer(
         &self,
         to: Principal,
+        to_subaccount: Option<Subaccount>,
         amount: Tokens128,
+        from_subaccount: Option<Subaccount>,
         fee_limit: Option<Tokens128>,
     ) -> TxReceipt {
         let caller = CheckedPrincipal::with_recipient(to)?;
-        transfer(self, caller, amount, fee_limit)
+        let from = TokenHolder::new(caller.inner(), from_subaccount);
+        let to = TokenReceiver::new(caller.recipient(), to_subaccount);
+        transfer(self, from, to, amount, fee_limit, caller.inner())
     }
 
     #[update(trait = true)]
-    fn transferFrom(&self, from: Principal, to: Principal, amount: Tokens128) -> TxReceipt {
+    fn transferFrom(
+        &self,
+        from: Principal,
+        from_subaccount: Option<Subaccount>,
+        to: Principal,
+        to_subaccount: Option<Subaccount>,
+        amount: Tokens128,
+    ) -> TxReceipt {
         let caller = CheckedPrincipal::from_to(from, to)?;
-        transfer_from(self, caller, amount)
+        let from = TokenHolder::new(caller.from(), from_subaccount);
+        let to = TokenReceiver::new(caller.to(), to_subaccount);
+
+        transfer_from(self, from, to, amount, caller.inner())
     }
 
     /// Transfers `value` amount to the `to` principal, applying American style fee. This means, that
@@ -222,23 +256,31 @@ pub trait TokenCanisterAPI: Canister + Sized {
     /// Note, that the `value` cannot be less than the `fee` amount. If the value given is too small,
     /// transaction will fail with `TxError::AmountTooSmall` error.
     #[update(trait = true)]
-    fn transferIncludeFee(&self, to: Principal, amount: Tokens128) -> TxReceipt {
+    fn transferIncludeFee(
+        &self,
+        to: Principal,
+        to_subaccount: Option<Subaccount>,
+        from_subaccount: Option<Subaccount>,
+        amount: Tokens128,
+    ) -> TxReceipt {
         let caller = CheckedPrincipal::with_recipient(to)?;
-        transfer_include_fee(self, caller, amount)
+        let from = TokenHolder::new(caller.inner(), from_subaccount);
+        let to = TokenReceiver::new(caller.recipient(), to_subaccount);
+        transfer_include_fee(self, from, to, amount, caller.inner())
     }
 
-    /// Takes a list of transfers, each of which is a pair of `to` and `value` fields, it returns a `TxReceipt` which contains
-    /// a vec of transaction index or an error message. The list of transfers is processed in the order they are given. if the `fee`
-    /// is set, the `fee` amount is applied to each transfer.
-    /// The balance of the caller is reduced by sum of `value + fee` amount for each transfer. If the total sum of `value + fee` for all transfers,
-    /// is less than the `balance` of the caller, the transaction will fail with `TxError::InsufficientBalance` error.
-    #[update(trait = true)]
-    fn batchTransfer(&self, transfers: Vec<(Principal, Tokens128)>) -> Result<Vec<TxId>, TxError> {
-        for (to, _) in transfers.clone() {
-            let _ = CheckedPrincipal::with_recipient(to)?;
-        }
-        batch_transfer(self, transfers)
-    }
+    // /// Takes a list of transfers, each of which is a pair of `to` and `value` fields, it returns a `TxReceipt` which contains
+    // /// a vec of transaction index or an error message. The list of transfers is processed in the order they are given. if the `fee`
+    // /// is set, the `fee` amount is applied to each transfer.
+    // /// The balance of the caller is reduced by sum of `value + fee` amount for each transfer. If the total sum of `value + fee` for all transfers,
+    // /// is less than the `balance` of the caller, the transaction will fail with `TxError::InsufficientBalance` error.
+    // #[update(trait = true)]
+    // fn batchTransfer(&self, transfers: Vec<(Principal, Tokens128)>) -> Result<Vec<TxId>, TxError> {
+    //     for (to, _) in transfers.clone() {
+    //         let _ = CheckedPrincipal::with_recipient(to)?;
+    //     }
+    //     batch_transfer(self, transfers)
+    // }
 
     #[update(trait = true)]
     fn mint(&self, to: Principal, amount: Tokens128) -> TxReceipt {
@@ -384,20 +426,34 @@ pub trait TokenCanisterAPI: Canister + Sized {
     fn getTransactions(
         &self,
         who: Option<Principal>,
+        who_subaccount: Option<Subaccount>,
         count: usize,
         transaction_id: Option<TxId>,
     ) -> PaginatedResult {
         // We don't trap if the transaction count is greater than the MAX_TRANSACTION_QUERY_LEN, we take the MAX_TRANSACTION_QUERY_LEN instead.
-        self.state().borrow().ledger.get_transactions(
-            who,
-            count.min(MAX_TRANSACTION_QUERY_LEN),
-            transaction_id,
-        )
+        // self.state().borrow().ledger.get_transactions(
+        //     TokenHolder::new(who, who_subaccount),
+        //     count.min(MAX_TRANSACTION_QUERY_LEN),
+        //     transaction_id,
+        // )
+        match who {
+            Some(p) => self.state().borrow_mut().ledger.get_transactions(
+                Some(TokenHolder::new(p, who_subaccount)),
+                count.min(MAX_TRANSACTION_QUERY_LEN),
+                transaction_id,
+            ),
+            None => self.state().borrow_mut().ledger.get_transactions(
+                None,
+                count.min(MAX_TRANSACTION_QUERY_LEN),
+                transaction_id,
+            ),
+        }
     }
 
     /// Returns the total number of transactions related to the user `who`.
     #[query(trait = true)]
-    fn getUserTransactionCount(&self, who: Principal) -> usize {
+    fn getUserTransactionCount(&self, who: Principal, who_subaccount: Option<Subaccount>) -> usize {
+        let who = TokenHolder::new(who, who_subaccount);
         self.state().borrow().ledger.get_len_user_history(who)
     }
 

@@ -3,7 +3,11 @@ use std::{cell::RefCell, rc::Rc};
 use candid::Principal;
 use ic_canister::{Canister, PreUpdate};
 
-use crate::{canister::TokenCanisterAPI, state::CanisterState, types::Metadata};
+use crate::{
+    canister::TokenCanisterAPI,
+    state::CanisterState,
+    types::{Metadata, TokenHolder},
+};
 
 #[derive(Debug, Clone, Canister)]
 pub struct TokenCanisterMock {
@@ -19,7 +23,7 @@ impl TokenCanisterMock {
             .borrow_mut()
             .balances
             .0
-            .insert(metadata.owner, metadata.totalSupply);
+            .insert(TokenHolder::from(metadata.owner), metadata.totalSupply);
 
         self.state
             .borrow_mut()

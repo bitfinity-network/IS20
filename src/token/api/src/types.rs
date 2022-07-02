@@ -1,9 +1,13 @@
-use candid::{CandidType, Deserialize, Principal};
-use ic_helpers::tokens::Tokens128;
 use std::collections::HashMap;
 
-mod tx_record;
+use candid::{CandidType, Deserialize, Principal};
+use ic_helpers::tokens::Tokens128;
+
+pub use account_identifier::*;
 pub use tx_record::*;
+
+mod account_identifier;
+mod tx_record;
 
 pub type Timestamp = u64;
 
@@ -93,7 +97,7 @@ impl Default for StatsData {
     }
 }
 
-pub type Allowances = HashMap<Principal, HashMap<Principal, Tokens128>>;
+pub type Allowances = HashMap<TokenHolder, HashMap<TokenHolder, Tokens128>>;
 
 // TODO: a wrapper over `ic_helpers::TxError`, this is a most likely
 // place to make tests fail in amm.
@@ -163,3 +167,5 @@ pub struct PaginatedResult {
 
 pub type TxId = u64;
 pub type Cycles = u64;
+pub type TokenHolder = AccountIdentifier;
+pub type TokenReceiver = AccountIdentifier;

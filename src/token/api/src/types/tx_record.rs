@@ -1,14 +1,23 @@
-use crate::types::{Operation, TransactionStatus, TxId};
 use candid::{CandidType, Deserialize, Principal};
 use ic_canister::ic_kit::ic;
 use ic_helpers::tokens::Tokens128;
+
+use crate::types::{Operation, TokenHolder, TokenReceiver, TransactionStatus, TxId};
+
+// from can be either a TokenHolder or a TokenReceiver or a Principal.
+#[derive(Deserialize, CandidType, Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+pub enum FromToOption {
+    TokenHolder(TokenHolder),
+    TokenReceiver(TokenReceiver),
+    Principal(Principal),
+}
 
 #[derive(Deserialize, CandidType, Debug, Clone)]
 pub struct TxRecord {
     pub caller: Option<Principal>,
     pub index: TxId,
-    pub from: Principal,
-    pub to: Principal,
+    pub from: FromToOption,
+    pub to: FromToOption,
     pub amount: Tokens128,
     pub fee: Tokens128,
     pub timestamp: u64,
@@ -19,16 +28,17 @@ pub struct TxRecord {
 impl TxRecord {
     pub fn transfer(
         index: TxId,
-        from: Principal,
-        to: Principal,
+        from: TokenHolder,
+        to: TokenReceiver,
         amount: Tokens128,
         fee: Tokens128,
+        caller: Principal,
     ) -> Self {
         Self {
-            caller: Some(from),
+            caller: Some(caller),
             index,
-            from,
-            to,
+            from: FromToOption::TokenHolder(from),
+            to: FromToOption::TokenReceiver(to),
             amount,
             fee,
             timestamp: ic::time(),
@@ -40,16 +50,16 @@ impl TxRecord {
     pub fn transfer_from(
         index: TxId,
         caller: Principal,
-        from: Principal,
-        to: Principal,
+        from: TokenHolder,
+        to: TokenReceiver,
         amount: Tokens128,
         fee: Tokens128,
     ) -> Self {
         Self {
             caller: Some(caller),
             index,
-            from,
-            to,
+            from: FromToOption::TokenHolder(from),
+            to: FromToOption::TokenReceiver(to),
             amount,
             fee,
             timestamp: ic::time(),
@@ -60,16 +70,17 @@ impl TxRecord {
 
     pub fn approve(
         index: TxId,
-        from: Principal,
-        to: Principal,
+        from: TokenHolder,
+        to: TokenReceiver,
         amount: Tokens128,
         fee: Tokens128,
+        caller: Principal,
     ) -> Self {
         Self {
-            caller: Some(from),
+            caller: Some(caller),
             index,
-            from,
-            to,
+            from: FromToOption::TokenHolder(from),
+            to: FromToOption::TokenReceiver(to),
             amount,
             fee,
             timestamp: ic::time(),
@@ -82,8 +93,8 @@ impl TxRecord {
         Self {
             caller: Some(from),
             index,
-            from,
-            to,
+            from: FromToOption::Principal(from),
+            to: FromToOption::Principal(to),
             amount,
             fee: Tokens128::from(0u128),
             timestamp: ic::time(),
@@ -96,8 +107,8 @@ impl TxRecord {
         Self {
             caller: Some(caller),
             index,
-            from,
-            to: from,
+            from: FromToOption::Principal(from),
+            to: FromToOption::Principal(from),
             amount,
             fee: Tokens128::from(0u128),
             timestamp: ic::time(),
@@ -108,10 +119,10 @@ impl TxRecord {
 
     pub fn auction(index: TxId, to: Principal, amount: Tokens128) -> Self {
         Self {
-            caller: Some(to),
+            caller: Some(ic_cdk::caller()),
             index,
-            from: to,
-            to,
+            from: FromToOption::Principal(to),
+            to: FromToOption::Principal(to),
             amount,
             fee: Tokens128::from(0u128),
             timestamp: ic::time(),

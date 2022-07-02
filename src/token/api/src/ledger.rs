@@ -1,7 +1,9 @@
 use candid::{CandidType, Deserialize, Principal};
 use ic_helpers::tokens::Tokens128;
 
-use crate::types::{PaginatedResult, PendingNotifications, TxId, TxRecord};
+use crate::types::{
+    FromToOption, PaginatedResult, PendingNotifications, TokenHolder, TokenReceiver, TxId, TxRecord,
+};
 
 const MAX_HISTORY_LENGTH: usize = 1_000_000;
 const HISTORY_REMOVAL_BATCH_SIZE: usize = 10_000;
@@ -32,7 +34,7 @@ impl Ledger {
 
     pub fn get_transactions(
         &self,
-        who: Option<Principal>,
+        who: Option<TokenHolder>,
         count: usize,
         transaction_id: Option<TxId>,
     ) -> PaginatedResult {
@@ -41,7 +43,11 @@ impl Ledger {
             .history
             .iter()
             .rev()
-            .filter(|tx| who.map_or(true, |c| c == tx.from || c == tx.to || Some(c) == tx.caller))
+            .filter(|tx| {
+                who.map_or(true, |c| {
+                    FromToOption::TokenHolder(c) == tx.from || FromToOption::TokenHolder(c) == tx.to
+                })
+            })
             .filter(|tx| transaction_id.map_or(true, |id| id >= tx.index))
             .take(count + 1)
             .cloned()
@@ -71,43 +77,47 @@ impl Ledger {
         }
     }
 
-    pub fn get_len_user_history(&self, user: Principal) -> usize {
+    pub fn get_len_user_history(&self, user: TokenHolder) -> usize {
         self.history
             .iter()
-            .filter(|tx| tx.to == user || tx.from == user || tx.caller == Some(user))
+            .filter(|tx| {
+                tx.to == FromToOption::TokenHolder(user)
+                    || tx.from == FromToOption::TokenHolder(user)
+            })
             .count()
     }
 
     pub fn transfer(
         &mut self,
-        from: Principal,
-        to: Principal,
+        from: TokenHolder,
+        to: TokenReceiver,
         amount: Tokens128,
         fee: Tokens128,
+        caller: Principal,
     ) -> TxId {
         let id = self.next_id();
-        self.push(TxRecord::transfer(id, from, to, amount, fee));
+        self.push(TxRecord::transfer(id, from, to, amount, fee, caller));
 
         id
     }
 
-    pub fn batch_transfer(
-        &mut self,
-        from: Principal,
-        transfers: Vec<(Principal, Tokens128)>,
-        fee: Tokens128,
-    ) -> Vec<TxId> {
-        transfers
-            .into_iter()
-            .map(|(to, amount)| self.transfer(from, to, amount, fee))
-            .collect()
-    }
+    // pub fn batch_transfer(
+    //     &mut self,
+    //     from: Principal,
+    //     transfers: Vec<(Principal, Tokens128)>,
+    //     fee: Tokens128,
+    // ) -> Vec<TxId> {
+    //     transfers
+    //         .into_iter()
+    //         .map(|(to, amount)| self.transfer(from, to, amount, fee))
+    //         .collect()
+    // }
 
     pub fn transfer_from(
         &mut self,
         caller: Principal,
-        from: Principal,
-        to: Principal,
+        from: TokenHolder,
+        to: TokenReceiver,
         amount: Tokens128,
         fee: Tokens128,
     ) -> TxId {
@@ -119,13 +129,14 @@ impl Ledger {
 
     pub fn approve(
         &mut self,
-        from: Principal,
-        to: Principal,
+        from: TokenHolder,
+        to: TokenReceiver,
         amount: Tokens128,
         fee: Tokens128,
+        caller: Principal,
     ) -> TxId {
         let id = self.next_id();
-        self.push(TxRecord::approve(id, from, to, amount, fee));
+        self.push(TxRecord::approve(id, from, to, amount, fee, caller));
 
         id
     }
