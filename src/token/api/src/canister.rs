@@ -26,9 +26,10 @@ use crate::types::{
     TxReceipt, TxRecord,
 };
 
+pub use inspect::AcceptReason;
+
 pub mod erc20_transactions;
 
-#[cfg(not(feature = "no_api"))]
 mod inspect;
 
 pub mod is20_auction;
@@ -53,6 +54,16 @@ pub enum CanisterUpdate {
 pub trait TokenCanisterAPI: Canister + Sized {
     fn state(&self) -> Rc<RefCell<CanisterState>> {
         CanisterState::get()
+    }
+
+    /// The `inspect_message()` call is not exported by default. Add your custom #[inspect_message]
+    /// function and use this method there to export the `inspect_message()` call.
+    fn inspect_message(
+        state: &CanisterState,
+        method: &str,
+        caller: Principal,
+    ) -> Result<AcceptReason, &'static str> {
+        inspect::inspect_message(state, method, caller)
     }
 
     #[query(trait = true)]
