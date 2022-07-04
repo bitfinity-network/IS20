@@ -1,9 +1,10 @@
+use ic_cdk::export::Principal;
+use ic_helpers::tokens::Tokens128;
+
 use crate::canister::is20_auction::auction_principal;
 use crate::principal::{CheckedPrincipal, Owner, TestNet};
 use crate::state::{Balances, CanisterState};
 use crate::types::{TokenHolder, TokenReceiver, TxError, TxReceipt};
-use ic_cdk::export::Principal;
-use ic_helpers::tokens::Tokens128;
 
 use super::TokenCanisterAPI;
 
@@ -13,7 +14,6 @@ pub fn transfer(
     to: TokenReceiver,
     amount: Tokens128,
     fee_limit: Option<Tokens128>,
-    caller: Principal,
 ) -> TxReceipt {
     let state = canister.state();
     let mut state = state.borrow_mut();
@@ -43,6 +43,8 @@ pub fn transfer(
 
     transfer_balance(balances, from, to, amount).expect("never fails due to checks above");
 
+    let caller = ic_canister::ic_kit::ic::caller();
+
     let id = state.ledger.transfer(from, to, amount, fee, caller);
     Ok(id)
 }
@@ -52,8 +54,8 @@ pub fn transfer_from(
     from: TokenHolder,
     to: TokenReceiver,
     amount: Tokens128,
-    caller: Principal,
 ) -> TxReceipt {
+    let caller = ic_canister::ic_kit::ic::caller();
     let caller_aid = TokenHolder::new(caller, None);
     let state = canister.state();
     let mut state = state.borrow_mut();
@@ -100,7 +102,7 @@ pub fn transfer_from(
         }
     }
 
-    let id = state.ledger.transfer_from(caller, from, to, amount, fee);
+    let id = state.ledger.transfer_from(from, to, amount, fee, caller);
     Ok(id)
 }
 
@@ -109,8 +111,8 @@ pub fn approve(
     owner: TokenHolder,
     spender: TokenHolder,
     amount: Tokens128,
-    caller: Principal,
 ) -> TxReceipt {
+    let caller = ic_canister::ic_kit::ic::caller();
     let state = canister.state();
     let mut state = state.borrow_mut();
     let CanisterState {
@@ -367,7 +369,7 @@ mod tests {
                 None,
                 Tokens128::from(200),
                 None,
-                Some(Tokens128::from(100))
+                Some(Tokens128::from(100)),
             )
             .is_ok());
         assert_eq!(
@@ -376,7 +378,7 @@ mod tests {
                 None,
                 Tokens128::from(200),
                 None,
-                Some(Tokens128::from(50))
+                Some(Tokens128::from(50)),
             ),
             Err(TxError::FeeExceededLimit)
         );
@@ -951,9 +953,10 @@ mod proptests {
     use proptest::prelude::*;
     use proptest::sample::Index;
 
-    use super::*;
     use crate::mock::*;
     use crate::types::Metadata;
+
+    use super::*;
 
     #[derive(Debug, Clone, PartialEq, Eq)]
     enum Action {

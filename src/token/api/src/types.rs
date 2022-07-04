@@ -167,5 +167,22 @@ pub struct PaginatedResult {
 
 pub type TxId = u64;
 pub type Cycles = u64;
+
+/// `TokenHolder` is the holder of a token. This is used to identify the holder of a token in the form of `AccountIdentifier`.
 pub type TokenHolder = AccountIdentifier;
+
+/// `TokenReceiver` is the recipient of a token. This is used to identify the recipient of a token in the form of `AccountIdentifier`.
 pub type TokenReceiver = AccountIdentifier;
+
+// Batch transfer arguments.
+#[derive(Debug, Clone, CandidType, Deserialize)]
+pub struct BatchTransferArgs {
+    pub reciever: BatchAccount,
+    pub amount: Tokens128,
+}
+
+#[derive(Debug, Clone, CandidType, Deserialize)]
+pub struct BatchAccount {
+    pub to: Principal,
+    pub to_subaccount: Option<Subaccount>,
+}

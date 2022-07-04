@@ -2,7 +2,8 @@ use candid::{CandidType, Deserialize, Principal};
 use ic_helpers::tokens::Tokens128;
 
 use crate::types::{
-    PaginatedResult, PendingNotifications, RecordOption, TokenHolder, TokenReceiver, TxId, TxRecord,
+    BatchTransferArgs, PaginatedResult, PendingNotifications, RecordOption, TokenHolder,
+    TokenReceiver, TxId, TxRecord,
 };
 
 const MAX_HISTORY_LENGTH: usize = 1_000_000;
@@ -105,25 +106,34 @@ impl Ledger {
         id
     }
 
-    // pub fn batch_transfer(
-    //     &mut self,
-    //     from: Principal,
-    //     transfers: Vec<(Principal, Tokens128)>,
-    //     fee: Tokens128,
-    // ) -> Vec<TxId> {
-    //     transfers
-    //         .into_iter()
-    //         .map(|(to, amount)| self.transfer(from, to, amount, fee))
-    //         .collect()
-    // }
+    pub fn batch_transfer(
+        &mut self,
+        from: TokenHolder,
+        transfers: Vec<BatchTransferArgs>,
+        fee: Tokens128,
+        caller: Principal,
+    ) -> Vec<TxId> {
+        transfers
+            .into_iter()
+            .map(|x| {
+                self.transfer(
+                    from,
+                    TokenReceiver::new(x.reciever.to, x.reciever.to_subaccount),
+                    x.amount,
+                    fee,
+                    caller,
+                )
+            })
+            .collect()
+    }
 
     pub fn transfer_from(
         &mut self,
-        caller: Principal,
         from: TokenHolder,
         to: TokenReceiver,
         amount: Tokens128,
         fee: Tokens128,
+        caller: Principal,
     ) -> TxId {
         let id = self.next_id();
         self.push(TxRecord::transfer_from(id, caller, from, to, amount, fee));

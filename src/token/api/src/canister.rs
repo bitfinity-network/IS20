@@ -16,9 +16,10 @@ use crate::canister::is20_auction::{
     auction_info, bid_cycles, bidding_info, run_auction, AuctionError, BiddingInfo,
 };
 use crate::canister::is20_notify::{approve_and_notify, consume_notification, notify};
-use crate::canister::is20_transactions::transfer_include_fee;
+use crate::canister::is20_transactions::{batch_transfer, transfer_include_fee};
 use crate::principal::{CheckedPrincipal, Owner};
 use crate::state::CanisterState;
+use crate::types::BatchTransferArgs;
 use crate::types::{
     AuctionInfo, Metadata, PaginatedResult, StatsData, Subaccount, Timestamp, TokenHolder,
     TokenInfo, TokenReceiver, TxError, TxId, TxReceipt, TxRecord,
@@ -215,7 +216,7 @@ pub trait TokenCanisterAPI: Canister + Sized {
         let caller = CheckedPrincipal::with_recipient(spender)?;
         let spender = TokenHolder::new(caller.recipient(), spender_subaccount);
         let owner = TokenHolder::new(caller.inner(), owner_subaccount);
-        approve(self, owner, spender, amount, caller.inner())
+        approve(self, owner, spender, amount)
     }
 
     /********************** TRANSFERS ***********************/
@@ -231,7 +232,7 @@ pub trait TokenCanisterAPI: Canister + Sized {
         let caller = CheckedPrincipal::with_recipient(to)?;
         let from = TokenHolder::new(caller.inner(), from_subaccount);
         let to = TokenReceiver::new(caller.recipient(), to_subaccount);
-        transfer(self, from, to, amount, fee_limit, caller.inner())
+        transfer(self, from, to, amount, fee_limit)
     }
 
     #[update(trait = true)]
@@ -247,7 +248,7 @@ pub trait TokenCanisterAPI: Canister + Sized {
         let from = TokenHolder::new(caller.from(), from_subaccount);
         let to = TokenReceiver::new(caller.to(), to_subaccount);
 
-        transfer_from(self, from, to, amount, caller.inner())
+        transfer_from(self, from, to, amount)
     }
 
     /// Transfers `value` amount to the `to` principal, applying American style fee. This means, that
@@ -266,7 +267,7 @@ pub trait TokenCanisterAPI: Canister + Sized {
         let caller = CheckedPrincipal::with_recipient(to)?;
         let from = TokenHolder::new(caller.inner(), from_subaccount);
         let to = TokenReceiver::new(caller.recipient(), to_subaccount);
-        transfer_include_fee(self, from, to, amount, caller.inner())
+        transfer_include_fee(self, from, to, amount)
     }
 
     /// Takes a list of transfers, each of which is a pair of `to` and `value` fields, it returns a `TxReceipt` which contains
@@ -274,13 +275,18 @@ pub trait TokenCanisterAPI: Canister + Sized {
     /// is set, the `fee` amount is applied to each transfer.
     /// The balance of the caller is reduced by sum of `value + fee` amount for each transfer. If the total sum of `value + fee` for all transfers,
     /// is less than the `balance` of the caller, the transaction will fail with `TxError::InsufficientBalance` error.
-    // #[update(trait = true)]
-    // fn batchTransfer(&self, transfers: Vec<(Principal, Tokens128)>) -> Result<Vec<TxId>, TxError> {
-    //     for (to, _) in transfers.clone() {
-    //         let _ = CheckedPrincipal::with_recipient(to)?;
-    //     }
-    //     batch_transfer(self, transfers)
-    // }
+    #[update(trait = true)]
+    fn batchTransfer(
+        &self,
+        from_subaccount: Option<Subaccount>,
+        transfers: Vec<BatchTransferArgs>,
+    ) -> Result<Vec<TxId>, TxError> {
+        for x in transfers.clone() {
+            CheckedPrincipal::with_recipient(x.reciever.to)?;
+        }
+
+        batch_transfer(self, from_subaccount, transfers)
+    }
 
     #[update(trait = true)]
     fn mint(&self, to: Principal, amount: Tokens128) -> TxReceipt {
