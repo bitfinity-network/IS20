@@ -210,7 +210,7 @@ pub trait TokenCanisterAPI: Canister + Sized {
     }
 
     /********************** TRANSFERS ***********************/
-    #[cfg_attr(not(feature = "no_transfer_api"), update(trait = true))]
+    #[cfg_attr(feature = "transfer", update(trait = true))]
     fn transfer(
         &self,
         to: Principal,
@@ -221,7 +221,7 @@ pub trait TokenCanisterAPI: Canister + Sized {
         transfer(self, caller, amount, fee_limit)
     }
 
-    #[cfg_attr(not(feature = "no_transfer_api"), update(trait = true))]
+    #[cfg_attr(feature = "transfer", update(trait = true))]
     fn transferFrom(&self, from: Principal, to: Principal, amount: Tokens128) -> TxReceipt {
         let caller = CheckedPrincipal::from_to(from, to)?;
         transfer_from(self, caller, amount)
@@ -232,7 +232,7 @@ pub trait TokenCanisterAPI: Canister + Sized {
     ///
     /// Note, that the `value` cannot be less than the `fee` amount. If the value given is too small,
     /// transaction will fail with `TxError::AmountTooSmall` error.
-    #[cfg_attr(not(feature = "no_transfer_api"), update(trait = true))]
+    #[cfg_attr(feature = "transfer", update(trait = true))]
     fn transferIncludeFee(&self, to: Principal, amount: Tokens128) -> TxReceipt {
         let caller = CheckedPrincipal::with_recipient(to)?;
         transfer_include_fee(self, caller, amount)
@@ -243,7 +243,7 @@ pub trait TokenCanisterAPI: Canister + Sized {
     /// is set, the `fee` amount is applied to each transfer.
     /// The balance of the caller is reduced by sum of `value + fee` amount for each transfer. If the total sum of `value + fee` for all transfers,
     /// is less than the `balance` of the caller, the transaction will fail with `TxError::InsufficientBalance` error.
-    #[cfg_attr(not(feature = "no_transfer_api"), update(trait = true))]
+    #[cfg_attr(feature = "transfer", update(trait = true))]
     fn batchTransfer(&self, transfers: Vec<(Principal, Tokens128)>) -> Result<Vec<TxId>, TxError> {
         for (to, _) in transfers.clone() {
             let _ = CheckedPrincipal::with_recipient(to)?;
@@ -251,7 +251,7 @@ pub trait TokenCanisterAPI: Canister + Sized {
         batch_transfer(self, transfers)
     }
 
-    #[cfg_attr(not(feature = "no_mint_burn_api"), update(trait = true))]
+    #[cfg_attr(feature = "mint_burn", update(trait = true))]
     fn mint(&self, to: Principal, amount: Tokens128) -> TxReceipt {
         if self.isTestToken() {
             let test_user = CheckedPrincipal::test_user(&self.state().borrow().stats)?;
@@ -266,7 +266,7 @@ pub trait TokenCanisterAPI: Canister + Sized {
     /// If `from` is None, then caller's tokens will be burned.
     /// If `from` is Some(_) but method called not by owner, `TxError::Unauthorized` will be returned.
     /// If owner calls this method and `from` is Some(who), then who's tokens will be burned.
-    #[cfg_attr(not(feature = "no_mint_burn_api"), update(trait = true))]
+    #[cfg_attr(feature = "mint_burn", update(trait = true))]
     fn burn(&self, from: Option<Principal>, amount: Tokens128) -> TxReceipt {
         match from {
             None => burn_own_tokens(&mut *self.state().borrow_mut(), amount),

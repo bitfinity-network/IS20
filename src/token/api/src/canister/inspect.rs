@@ -66,7 +66,7 @@ pub fn inspect_message(
     method: &str,
     caller: Principal,
 ) -> Result<AcceptReason, &'static str> {
-    match &method[..] {
+    match method {
         // These are query methods, so no checks are needed.
         "mint" if state.stats.is_test_token => Ok(AcceptReason::Valid),
         m if PUBLIC_METHODS.contains(&m) => Ok(AcceptReason::Valid),

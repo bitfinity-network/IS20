@@ -4,10 +4,10 @@ name = "is20-token"
 version = "0.1.7"
 
 [features]
-default = []
+default = ["mint_burn", "transfer"]
 no_api = []
-no_mint_burn_api = []
-no_transfer_api = []
+mint_burn = []
+transfer = []
 
 [dependencies]
 assert-panic = "1.0"
