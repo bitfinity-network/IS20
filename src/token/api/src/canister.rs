@@ -431,19 +431,16 @@ pub trait TokenCanisterAPI: Canister + Sized {
         transaction_id: Option<TxId>,
     ) -> PaginatedResult {
         // We don't trap if the transaction count is greater than the MAX_TRANSACTION_QUERY_LEN, we take the MAX_TRANSACTION_QUERY_LEN instead.
-        // self.state().borrow().ledger.get_transactions(
-        //     TokenHolder::new(who, who_subaccount),
-        //     count.min(MAX_TRANSACTION_QUERY_LEN),
-        //     transaction_id,
-        // )
         match who {
             Some(p) => self.state().borrow_mut().ledger.get_transactions(
                 Some(TokenHolder::new(p, who_subaccount)),
+                who,
                 count.min(MAX_TRANSACTION_QUERY_LEN),
                 transaction_id,
             ),
             None => self.state().borrow_mut().ledger.get_transactions(
                 None,
+                who,
                 count.min(MAX_TRANSACTION_QUERY_LEN),
                 transaction_id,
             ),
@@ -453,8 +450,11 @@ pub trait TokenCanisterAPI: Canister + Sized {
     /// Returns the total number of transactions related to the user `who`.
     #[query(trait = true)]
     fn getUserTransactionCount(&self, who: Principal, who_subaccount: Option<Subaccount>) -> usize {
-        let who = TokenHolder::new(who, who_subaccount);
-        self.state().borrow().ledger.get_len_user_history(who)
+        let who_aid = TokenHolder::new(who, who_subaccount);
+        self.state()
+            .borrow()
+            .ledger
+            .get_len_user_history(who_aid, who)
     }
 
     // Important: This function *must* be defined to be the

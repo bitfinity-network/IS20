@@ -1,4 +1,5 @@
 use candid::{CandidType, Deserialize, Principal};
+use ic_cdk::api::call;
 use ic_helpers::tokens::Tokens128;
 
 use crate::types::{
@@ -35,6 +36,7 @@ impl Ledger {
     pub fn get_transactions(
         &self,
         who: Option<TokenHolder>,
+        caller: Option<Principal>,
         count: usize,
         transaction_id: Option<TxId>,
     ) -> PaginatedResult {
@@ -45,7 +47,9 @@ impl Ledger {
             .rev()
             .filter(|tx| {
                 who.map_or(true, |c| {
-                    FromToOption::TokenHolder(c) == tx.from || FromToOption::TokenHolder(c) == tx.to
+                    FromToOption::TokenHolder(c) == tx.from
+                        || FromToOption::TokenReceiver(c) == tx.to
+                        || tx.caller == caller
                 })
             })
             .filter(|tx| transaction_id.map_or(true, |id| id >= tx.index))
@@ -77,12 +81,13 @@ impl Ledger {
         }
     }
 
-    pub fn get_len_user_history(&self, user: TokenHolder) -> usize {
+    pub fn get_len_user_history(&self, user: TokenHolder, caller: Principal) -> usize {
         self.history
             .iter()
             .filter(|tx| {
-                tx.to == FromToOption::TokenHolder(user)
+                tx.to == FromToOption::TokenReceiver(user)
                     || tx.from == FromToOption::TokenHolder(user)
+                    || tx.caller == Some(caller)
             })
             .count()
     }

@@ -218,181 +218,179 @@ pub fn accumulated_fees(balances: &Balances) -> Tokens128 {
         .unwrap_or_else(|| Tokens128::from(0u128))
 }
 
-// #[cfg(test)]
-// mod tests {
-//     use ic_canister::Canister;
-//     use ic_canister::ic_kit::mock_principals::{alice, bob};
-//     use ic_canister::ic_kit::MockContext;
-//     use test_case::test_case;
-//
-//     use crate::mock::*;
-//     use crate::types::{Metadata, TokenHolder, TokenReceiver, TxError};
-//
-//     use super::*;
-//
-//     fn test_context() -> (&'static mut MockContext, TokenCanisterMock) {
-//         let context = MockContext::new().with_caller(alice()).inject();
-//
-//         let canister = TokenCanisterMock::init_instance();
-//         canister.init(Metadata {
-//             logo: "".to_string(),
-//             name: "".to_string(),
-//             symbol: "".to_string(),
-//             decimals: 8,
-//             totalSupply: Tokens128::from(1000),
-//             owner: alice(),
-//             fee: Tokens128::from(0),
-//             feeTo: alice(),
-//             isTestToken: None,
-//         });
-//
-//         (context, canister)
-//     }
-//
-//     #[test_case(0, 0, 0.0)]
-//     #[test_case(0, 1000, 0.0)]
-//     #[test_case(1000, 0, 1.0)]
-//     #[test_case(1000, 1000, 1.0)]
-//     #[test_case(1000, 10_000, 0.5)]
-//     #[test_case(1000, 1_000_000, 0.125)]
-//     fn fee_ratio_tests(min_cycles: u64, current_cycles: u64, ratio: f64) {
-//         assert_eq!(get_fee_ratio(min_cycles, current_cycles), ratio);
-//     }
-//
-//     #[test]
-//     fn bidding_cycles() {
-//         let (context, canister) = test_context();
-//         context.update_caller(bob());
-//         context.update_msg_cycles(2_000_000);
-//
-//         canister.bidCycles(bob()).unwrap();
-//         let info = canister.biddingInfo();
-//         assert_eq!(info.total_cycles, 2_000_000);
-//         assert_eq!(info.caller_cycles, 2_000_000);
-//
-//         context.update_caller(alice());
-//         let info = canister.biddingInfo();
-//         assert_eq!(info.total_cycles, 2_000_000);
-//         assert_eq!(info.caller_cycles, 0);
-//     }
-//
-//     #[test]
-//     fn bidding_cycles_under_limit() {
-//         let (context, canister) = test_context();
-//         context.update_msg_cycles(MIN_BIDDING_AMOUNT - 1);
-//         assert_eq!(
-//             canister.bidCycles(alice()),
-//             Err(AuctionError::BiddingTooSmall)
-//         );
-//     }
-//
-//     #[test]
-//     fn bidding_multiple_times() {
-//         let (context, canister) = test_context();
-//         context.update_msg_cycles(2_000_000);
-//         canister.bidCycles(alice()).unwrap();
-//
-//         context.update_msg_cycles(2_000_000);
-//         canister.bidCycles(alice()).unwrap();
-//
-//         assert_eq!(canister.biddingInfo().caller_cycles, 4_000_000);
-//     }
-//
-//     #[test]
-//     fn auction_test() {
-//         let (context, canister) = test_context();
-//         context.update_msg_cycles(2_000_000);
-//         canister.bidCycles(alice()).unwrap();
-//
-//         context.update_msg_cycles(4_000_000);
-//         canister.bidCycles(bob()).unwrap();
-//
-//         canister
-//             .state()
-//             .borrow_mut()
-//             .balances
-//             .0
-//             .insert(TokenHolder::from(auction_principal()), Tokens128::from(6_000));
-//
-//         let result = canister.runAuction().unwrap();
-//         assert_eq!(result.cycles_collected, 6_000_000);
-//         assert_eq!(result.first_transaction_id, 1);
-//         assert_eq!(result.last_transaction_id, 2);
-//         assert_eq!(result.tokens_distributed, Tokens128::from(6_000));
-//
-//         assert_eq!(
-//             canister.state().borrow().balances.0[&TokenHolder::from(bob())],
-//             Tokens128::from(4_000)
-//         );
-//
-//         let retrieved_result = canister.auctionInfo(result.auction_id).unwrap();
-//         assert_eq!(retrieved_result, result);
-//     }
-//
-//     #[test]
-//     fn auction_without_bids() {
-//         let (_, canister) = test_context();
-//         assert_eq!(canister.runAuction(), Err(AuctionError::NoBids));
-//     }
-//
-//     #[test]
-//     fn auction_not_in_time() {
-//         let (context, canister) = test_context();
-//         context.update_msg_cycles(2_000_000);
-//         canister.bidCycles(alice()).unwrap();
-//
-//         {
-//             let state = canister.state();
-//             let state = &mut state.borrow_mut().bidding_state;
-//             state.last_auction = ic::time() - 100_000;
-//             state.auction_period = 1_000_000_000;
-//         }
-//
-//         assert_eq!(
-//             canister.runAuction(),
-//             Err(AuctionError::TooEarlyToBeginAuction)
-//         );
-//     }
-//
-//     #[test]
-//     fn fee_ratio_update() {
-//         let (context, canister) = test_context();
-//         context.update_balance(1_000_000_000);
-//
-//         canister.state().borrow_mut().stats.min_cycles = 1_000_000;
-//         canister.runAuction().unwrap_err();
-//
-//         assert_eq!(canister.state().borrow().bidding_state.fee_ratio, 0.125);
-//     }
-//
-//     #[test]
-//     fn setting_min_cycles() {
-//         let (_, canister) = test_context();
-//         canister.setMinCycles(100500).unwrap();
-//         assert_eq!(canister.getMinCycles(), 100500);
-//     }
-//
-//     #[test]
-//     fn setting_min_cycles_not_authorized() {
-//         let (context, canister) = test_context();
-//         context.update_caller(bob());
-//         assert_eq!(canister.setMinCycles(100500), Err(TxError::Unauthorized));
-//     }
-//
-//     #[test]
-//     fn setting_auction_period() {
-//         let (_, canister) = test_context();
-//         canister.setAuctionPeriod(100500).unwrap();
-//         assert_eq!(canister.biddingInfo().auction_period, 100500 * 1000000);
-//     }
-//
-//     #[test]
-//     fn setting_auction_period_not_authorized() {
-//         let (context, canister) = test_context();
-//         context.update_caller(bob());
-//         assert_eq!(
-//             canister.setAuctionPeriod(100500),
-//             Err(TxError::Unauthorized)
-//         );
-//     }
-// }
+#[cfg(test)]
+mod tests {
+    use ic_canister::ic_kit::mock_principals::{alice, bob};
+    use ic_canister::ic_kit::MockContext;
+    use ic_canister::Canister;
+    use test_case::test_case;
+
+    use crate::mock::*;
+    use crate::types::{Metadata, TokenHolder, TokenReceiver, TxError};
+
+    use super::*;
+
+    fn test_context() -> (&'static mut MockContext, TokenCanisterMock) {
+        let context = MockContext::new().with_caller(alice()).inject();
+
+        let canister = TokenCanisterMock::init_instance();
+        canister.init(Metadata {
+            logo: "".to_string(),
+            name: "".to_string(),
+            symbol: "".to_string(),
+            decimals: 8,
+            totalSupply: Tokens128::from(1000),
+            owner: alice(),
+            fee: Tokens128::from(0),
+            feeTo: alice(),
+            isTestToken: None,
+        });
+
+        (context, canister)
+    }
+
+    #[test_case(0, 0, 0.0)]
+    #[test_case(0, 1000, 0.0)]
+    #[test_case(1000, 0, 1.0)]
+    #[test_case(1000, 1000, 1.0)]
+    #[test_case(1000, 10_000, 0.5)]
+    #[test_case(1000, 1_000_000, 0.125)]
+    fn fee_ratio_tests(min_cycles: u64, current_cycles: u64, ratio: f64) {
+        assert_eq!(get_fee_ratio(min_cycles, current_cycles), ratio);
+    }
+
+    #[test]
+    fn bidding_cycles() {
+        let (context, canister) = test_context();
+        context.update_caller(bob());
+        context.update_msg_cycles(2_000_000);
+
+        canister.bidCycles(bob()).unwrap();
+        let info = canister.biddingInfo();
+        assert_eq!(info.total_cycles, 2_000_000);
+        assert_eq!(info.caller_cycles, 2_000_000);
+
+        context.update_caller(alice());
+        let info = canister.biddingInfo();
+        assert_eq!(info.total_cycles, 2_000_000);
+        assert_eq!(info.caller_cycles, 0);
+    }
+
+    #[test]
+    fn bidding_cycles_under_limit() {
+        let (context, canister) = test_context();
+        context.update_msg_cycles(MIN_BIDDING_AMOUNT - 1);
+        assert_eq!(
+            canister.bidCycles(alice()),
+            Err(AuctionError::BiddingTooSmall)
+        );
+    }
+
+    #[test]
+    fn bidding_multiple_times() {
+        let (context, canister) = test_context();
+        context.update_msg_cycles(2_000_000);
+        canister.bidCycles(alice()).unwrap();
+
+        context.update_msg_cycles(2_000_000);
+        canister.bidCycles(alice()).unwrap();
+
+        assert_eq!(canister.biddingInfo().caller_cycles, 4_000_000);
+    }
+
+    #[test]
+    fn auction_test() {
+        let (context, canister) = test_context();
+        context.update_msg_cycles(2_000_000);
+        canister.bidCycles(alice()).unwrap();
+
+        context.update_msg_cycles(4_000_000);
+        canister.bidCycles(bob()).unwrap();
+
+        canister.state().borrow_mut().balances.0.insert(
+            TokenHolder::from(auction_principal()),
+            Tokens128::from(6_000),
+        );
+
+        let result = canister.runAuction().unwrap();
+        assert_eq!(result.cycles_collected, 6_000_000);
+        assert_eq!(result.first_transaction_id, 1);
+        assert_eq!(result.last_transaction_id, 2);
+        assert_eq!(result.tokens_distributed, Tokens128::from(6_000));
+
+        assert_eq!(
+            canister.state().borrow().balances.0[&TokenHolder::from(bob())],
+            Tokens128::from(4_000)
+        );
+
+        let retrieved_result = canister.auctionInfo(result.auction_id).unwrap();
+        assert_eq!(retrieved_result, result);
+    }
+
+    #[test]
+    fn auction_without_bids() {
+        let (_, canister) = test_context();
+        assert_eq!(canister.runAuction(), Err(AuctionError::NoBids));
+    }
+
+    #[test]
+    fn auction_not_in_time() {
+        let (context, canister) = test_context();
+        context.update_msg_cycles(2_000_000);
+        canister.bidCycles(alice()).unwrap();
+
+        {
+            let state = canister.state();
+            let state = &mut state.borrow_mut().bidding_state;
+            state.last_auction = ic::time() - 100_000;
+            state.auction_period = 1_000_000_000;
+        }
+
+        assert_eq!(
+            canister.runAuction(),
+            Err(AuctionError::TooEarlyToBeginAuction)
+        );
+    }
+
+    #[test]
+    fn fee_ratio_update() {
+        let (context, canister) = test_context();
+        context.update_balance(1_000_000_000);
+
+        canister.state().borrow_mut().stats.min_cycles = 1_000_000;
+        canister.runAuction().unwrap_err();
+
+        assert_eq!(canister.state().borrow().bidding_state.fee_ratio, 0.125);
+    }
+
+    #[test]
+    fn setting_min_cycles() {
+        let (_, canister) = test_context();
+        canister.setMinCycles(100500).unwrap();
+        assert_eq!(canister.getMinCycles(), 100500);
+    }
+
+    #[test]
+    fn setting_min_cycles_not_authorized() {
+        let (context, canister) = test_context();
+        context.update_caller(bob());
+        assert_eq!(canister.setMinCycles(100500), Err(TxError::Unauthorized));
+    }
+
+    #[test]
+    fn setting_auction_period() {
+        let (_, canister) = test_context();
+        canister.setAuctionPeriod(100500).unwrap();
+        assert_eq!(canister.biddingInfo().auction_period, 100500 * 1000000);
+    }
+
+    #[test]
+    fn setting_auction_period_not_authorized() {
+        let (context, canister) = test_context();
+        context.update_caller(bob());
+        assert_eq!(
+            canister.setAuctionPeriod(100500),
+            Err(TxError::Unauthorized)
+        );
+    }
+}

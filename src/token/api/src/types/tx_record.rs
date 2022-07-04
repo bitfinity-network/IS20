@@ -119,7 +119,7 @@ impl TxRecord {
 
     pub fn auction(index: TxId, to: Principal, amount: Tokens128) -> Self {
         Self {
-            caller: Some(ic_cdk::caller()),
+            caller: Some(to),
             index,
             from: FromToOption::Principal(to),
             to: FromToOption::Principal(to),

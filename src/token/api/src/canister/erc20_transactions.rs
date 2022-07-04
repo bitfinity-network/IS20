@@ -467,8 +467,11 @@ mod tests {
             assert_eq!(tx.operation, Operation::Transfer);
             assert_eq!(tx.status, TransactionStatus::Succeeded);
             assert_eq!(tx.index, i + 1);
-            // assert_eq!(tx.from, alice());
-            // assert_eq!(tx.to, bob());
+            assert_eq!(
+                tx.from,
+                FromToOption::TokenHolder(TokenHolder::from(alice()))
+            );
+            assert_eq!(tx.to, FromToOption::TokenReceiver(TokenHolder::from(bob())));
             assert!(ts < tx.timestamp);
             ts = tx.timestamp;
         }
@@ -501,33 +504,34 @@ mod tests {
         assert_eq!(canister.getMetadata().totalSupply, Tokens128::from(8000));
     }
 
-    // #[test]
-    // fn mint_saved_into_history() {
-    //     let (ctx, canister) = test_context();
-    //     canister.state().borrow_mut().stats.fee = Tokens128::from(10);
+    #[test]
+    fn mint_saved_into_history() {
+        let (ctx, canister) = test_context();
+        canister.state().borrow_mut().stats.fee = Tokens128::from(10);
 
-    //     assert_eq!(canister.historySize(), 1);
+        assert_eq!(canister.historySize(), 1);
 
-    //     const COUNT: u64 = 5;
-    //     let mut ts = ic_canister::ic_kit::ic::time();
-    //     for i in 0..COUNT {
-    //         ctx.add_time(10);
-    //         let id = canister
-    //             .mint(bob(), Tokens128::from(100 + i as u128))
-    //             .unwrap();
-    //         assert_eq!(canister.historySize(), 2 + i);
-    //         let tx = canister.getTransaction(id);
-    //         assert_eq!(tx.amount, Tokens128::from(100 + i as u128));
-    //         assert_eq!(tx.fee, Tokens128::from(0));
-    //         assert_eq!(tx.operation, Operation::Mint);
-    //         assert_eq!(tx.status, TransactionStatus::Succeeded);
-    //         assert_eq!(tx.index, i + 1);
-    //         assert_eq!(tx.from, alice());
-    //         assert_eq!(tx.to, bob());
-    //         assert!(ts < tx.timestamp);
-    //         ts = tx.timestamp;
-    //     }
-    // }
+        const COUNT: u64 = 5;
+        let mut ts = ic_canister::ic_kit::ic::time();
+        for i in 0..COUNT {
+            ctx.add_time(10);
+            let id = canister
+                .mint(bob(), Tokens128::from(100 + i as u128))
+                .unwrap();
+            assert_eq!(canister.historySize(), 2 + i);
+            let tx = canister.getTransaction(id);
+            assert_eq!(tx.amount, Tokens128::from(100 + i as u128));
+            assert_eq!(tx.fee, Tokens128::from(0));
+            assert_eq!(tx.operation, Operation::Mint);
+            assert_eq!(tx.status, TransactionStatus::Succeeded);
+            assert_eq!(tx.index, i + 1);
+            assert_eq!(tx.from, FromToOption::Principal(alice()));
+            assert_eq!(tx.to, FromToOption::Principal(bob()));
+
+            assert!(ts < tx.timestamp);
+            ts = tx.timestamp;
+        }
+    }
 
     #[test]
     fn burn_by_owner() {
@@ -587,34 +591,34 @@ mod tests {
         assert_eq!(canister.getMetadata().totalSupply, Tokens128::from(1000));
     }
 
-    // #[test]
-    // fn burn_saved_into_history() {
-    //     let (ctx, canister) = test_context();
-    //     canister.state().borrow_mut().stats.fee = Tokens128::from(10);
+    #[test]
+    fn burn_saved_into_history() {
+        let (ctx, canister) = test_context();
+        canister.state().borrow_mut().stats.fee = Tokens128::from(10);
 
-    //     canister.burn(None, Tokens128::from(1001)).unwrap_err();
-    //     assert_eq!(canister.historySize(), 1);
+        canister.burn(None, Tokens128::from(1001)).unwrap_err();
+        assert_eq!(canister.historySize(), 1);
 
-    //     const COUNT: u64 = 5;
-    //     let mut ts = ic_canister::ic_kit::ic::time();
-    //     for i in 0..COUNT {
-    //         ctx.add_time(10);
-    //         let id = canister
-    //             .burn(None, Tokens128::from(100 + i as u128))
-    //             .unwrap();
-    //         assert_eq!(canister.historySize(), 2 + i);
-    //         let tx = canister.getTransaction(id);
-    //         assert_eq!(tx.amount, Tokens128::from(100 + i as u128));
-    //         assert_eq!(tx.fee, Tokens128::from(0));
-    //         assert_eq!(tx.operation, Operation::Burn);
-    //         assert_eq!(tx.status, TransactionStatus::Succeeded);
-    //         assert_eq!(tx.index, i + 1);
-    //         assert_eq!(tx.from, alice());
-    //         assert_eq!(tx.to, alice());
-    //         assert!(ts < tx.timestamp);
-    //         ts = tx.timestamp;
-    //     }
-    // }
+        const COUNT: u64 = 5;
+        let mut ts = ic_canister::ic_kit::ic::time();
+        for i in 0..COUNT {
+            ctx.add_time(10);
+            let id = canister
+                .burn(None, Tokens128::from(100 + i as u128))
+                .unwrap();
+            assert_eq!(canister.historySize(), 2 + i);
+            let tx = canister.getTransaction(id);
+            assert_eq!(tx.amount, Tokens128::from(100 + i as u128));
+            assert_eq!(tx.fee, Tokens128::from(0));
+            assert_eq!(tx.operation, Operation::Burn);
+            assert_eq!(tx.status, TransactionStatus::Succeeded);
+            assert_eq!(tx.index, i + 1);
+            assert_eq!(tx.to, FromToOption::Principal(alice()));
+            assert_eq!(tx.from, FromToOption::Principal(alice()));
+            assert!(ts < tx.timestamp);
+            ts = tx.timestamp;
+        }
+    }
 
     #[test]
     fn transfer_from_with_approve() {
@@ -673,41 +677,56 @@ mod tests {
         assert_eq!(canister.balanceOf(john(), None), Tokens128::from(0));
     }
 
-    // #[test]
-    // fn transfer_from_saved_into_history() {
-    //     let (ctx, canister) = test_context();
-    //     let context = MockContext::new().with_caller(alice()).inject();
-    //     canister.state().borrow_mut().stats.fee = Tokens128::from(10);
+    #[test]
+    fn transfer_from_saved_into_history() {
+        let (ctx, canister) = test_context();
+        let context = MockContext::new().with_caller(alice()).inject();
+        canister.state().borrow_mut().stats.fee = Tokens128::from(10);
 
-    //     canister
-    //         .transferFrom(bob(), john(), Tokens128::from(10))
-    //         .unwrap_err();
-    //     assert_eq!(canister.historySize(), 1);
+        canister
+            .transferFrom(bob(), None, john(), None, Tokens128::from(10))
+            .unwrap_err();
+        assert_eq!(canister.historySize(), 1);
 
-    //     canister.approve(bob(), Tokens128::from(1000)).unwrap();
-    //     context.update_caller(bob());
+        canister
+            .approve(bob(), None, Tokens128::from(1000), None)
+            .unwrap();
+        context.update_caller(bob());
 
-    //     const COUNT: u64 = 5;
-    //     let mut ts = ic_canister::ic_kit::ic::time();
-    //     for i in 0..COUNT {
-    //         ctx.add_time(10);
-    //         let id = canister
-    //             .transferFrom(alice(), john(), Tokens128::from(100 + i as u128))
-    //             .unwrap();
-    //         assert_eq!(canister.historySize(), 3 + i);
-    //         let tx = canister.getTransaction(id);
-    //         assert_eq!(tx.caller, Some(bob()));
-    //         assert_eq!(tx.amount, Tokens128::from(100 + i as u128));
-    //         assert_eq!(tx.fee, Tokens128::from(10));
-    //         assert_eq!(tx.operation, Operation::TransferFrom);
-    //         assert_eq!(tx.status, TransactionStatus::Succeeded);
-    //         assert_eq!(tx.index, i + 2);
-    //         assert_eq!(tx.from, alice());
-    //         assert_eq!(tx.to, john());
-    //         assert!(ts < tx.timestamp);
-    //         ts = tx.timestamp;
-    //     }
-    // }
+        const COUNT: u64 = 5;
+        let mut ts = ic_canister::ic_kit::ic::time();
+        for i in 0..COUNT {
+            ctx.add_time(10);
+            let id = canister
+                .transferFrom(
+                    alice(),
+                    None,
+                    john(),
+                    None,
+                    Tokens128::from(100 + i as u128),
+                )
+                .unwrap();
+            assert_eq!(canister.historySize(), 3 + i);
+            let tx = canister.getTransaction(id);
+            assert_eq!(tx.caller, Some(bob()));
+            assert_eq!(tx.amount, Tokens128::from(100 + i as u128));
+            assert_eq!(tx.fee, Tokens128::from(10));
+            assert_eq!(tx.operation, Operation::TransferFrom);
+            assert_eq!(tx.status, TransactionStatus::Succeeded);
+            assert_eq!(tx.index, i + 2);
+
+            assert_eq!(
+                tx.from,
+                FromToOption::TokenHolder(TokenHolder::from(alice()))
+            );
+            assert_eq!(
+                tx.to,
+                FromToOption::TokenReceiver(TokenHolder::from(john()))
+            );
+            assert!(ts < tx.timestamp);
+            ts = tx.timestamp;
+        }
+    }
 
     #[test]
     fn multiple_approves() {
@@ -790,423 +809,461 @@ mod tests {
         assert_eq!(canister.balanceOf(john(), None), Tokens128::from(300));
     }
 
-    // #[test]
-    // fn approve_saved_into_history() {
-    //     let (ctx, canister) = test_context();
-    //     canister.state().borrow_mut().stats.fee = Tokens128::from(10);
-    //     assert_eq!(canister.historySize(), 1);
+    #[test]
+    fn approve_saved_into_history() {
+        let (ctx, canister) = test_context();
+        canister.state().borrow_mut().stats.fee = Tokens128::from(10);
+        assert_eq!(canister.historySize(), 1);
 
-    //     const COUNT: u64 = 5;
-    //     let mut ts = ic_canister::ic_kit::ic::time();
-    //     for i in 0..COUNT {
-    //         ctx.add_time(10);
-    //         let id = canister
-    //             .approve(bob(), Tokens128::from(100 + i as u128))
-    //             .unwrap();
-    //         assert_eq!(canister.historySize(), 2 + i);
-    //         let tx = canister.getTransaction(id);
-    //         assert_eq!(tx.amount, Tokens128::from(100 + i as u128));
-    //         assert_eq!(tx.fee, Tokens128::from(10));
-    //         assert_eq!(tx.operation, Operation::Approve);
-    //         assert_eq!(tx.status, TransactionStatus::Succeeded);
-    //         assert_eq!(tx.index, i + 1);
-    //         assert_eq!(tx.from, alice());
-    //         assert_eq!(tx.to, bob());
-    //         assert!(ts < tx.timestamp);
-    //         ts = tx.timestamp;
-    //     }
-    // }
+        const COUNT: u64 = 5;
+        let mut ts = ic_canister::ic_kit::ic::time();
+        for i in 0..COUNT {
+            ctx.add_time(10);
+            let id = canister
+                .approve(bob(), None, Tokens128::from(100 + i as u128), None)
+                .unwrap();
+            assert_eq!(canister.historySize(), 2 + i);
+            let tx = canister.getTransaction(id);
+            assert_eq!(tx.amount, Tokens128::from(100 + i as u128));
+            assert_eq!(tx.fee, Tokens128::from(10));
+            assert_eq!(tx.operation, Operation::Approve);
+            assert_eq!(tx.status, TransactionStatus::Succeeded);
+            assert_eq!(tx.index, i + 1);
 
-    // #[test]
-    // fn get_transactions_test() {
-    //     let canister = test_canister();
+            assert_eq!(
+                tx.from,
+                FromToOption::TokenHolder(TokenHolder::from(alice()))
+            );
+            assert_eq!(tx.to, FromToOption::TokenReceiver(TokenHolder::from(bob())));
+            assert!(ts < tx.timestamp);
+            ts = tx.timestamp;
+        }
+    }
 
-    //     for _ in 1..=5 {
-    //         canister.transfer(bob(), Tokens128::from(10), None).unwrap();
-    //     }
+    #[test]
+    fn get_transactions_test() {
+        let canister = test_canister();
 
-    //     canister.transfer(bob(), Tokens128::from(10), None).unwrap();
-    //     canister.transfer(xtc(), Tokens128::from(10), None).unwrap();
-    //     canister
-    //         .transfer(john(), Tokens128::from(10), None)
-    //         .unwrap();
+        for _ in 1..=5 {
+            canister
+                .transfer(bob(), None, Tokens128::from(10), None, None)
+                .unwrap();
+        }
 
-    //     assert_eq!(canister.getTransactions(None, 10, None).result.len(), 9);
-    //     assert_eq!(canister.getTransactions(None, 10, Some(3)).result.len(), 4);
-    //     assert_eq!(
-    //         canister.getTransactions(Some(bob()), 10, None).result.len(),
-    //         6
-    //     );
-    //     assert_eq!(
-    //         canister.getTransactions(Some(xtc()), 5, None).result.len(),
-    //         1
-    //     );
-    //     assert_eq!(
-    //         canister
-    //             .getTransactions(Some(alice()), 10, Some(5))
-    //             .result
-    //             .len(),
-    //         6
-    //     );
-    //     assert_eq!(canister.getTransactions(None, 5, None).next, Some(3));
-    //     assert_eq!(
-    //         canister.getTransactions(Some(alice()), 3, Some(5)).next,
-    //         Some(2)
-    //     );
-    //     assert_eq!(canister.getTransactions(Some(bob()), 3, Some(2)).next, None);
+        canister
+            .transfer(bob(), None, Tokens128::from(10), None, None)
+            .unwrap();
+        canister
+            .transfer(xtc(), None, Tokens128::from(10), None, None)
+            .unwrap();
+        canister
+            .transfer(john(), None, Tokens128::from(10), None, None)
+            .unwrap();
 
-    //     for _ in 1..=10 {
-    //         canister.transfer(bob(), Tokens128::from(10), None).unwrap();
-    //     }
+        assert_eq!(
+            canister.getTransactions(None, None, 10, None).result.len(),
+            9
+        );
+        assert_eq!(
+            canister
+                .getTransactions(None, None, 10, Some(3))
+                .result
+                .len(),
+            4
+        );
+        assert_eq!(
+            canister
+                .getTransactions(Some(bob()), None, 10, None)
+                .result
+                .len(),
+            6
+        );
+        assert_eq!(
+            canister
+                .getTransactions(Some(xtc()), None, 5, None)
+                .result
+                .len(),
+            1
+        );
+        assert_eq!(
+            canister
+                .getTransactions(Some(alice()), None, 10, Some(5))
+                .result
+                .len(),
+            6
+        );
+        assert_eq!(canister.getTransactions(None, None, 5, None).next, Some(3));
+        assert_eq!(
+            canister
+                .getTransactions(Some(alice()), None, 3, Some(5))
+                .next,
+            Some(2)
+        );
+        assert_eq!(
+            canister.getTransactions(Some(bob()), None, 3, Some(2)).next,
+            None
+        );
 
-    //     let txn = canister.getTransactions(None, 5, None);
-    //     assert_eq!(txn.result[0].index, 18);
-    //     assert_eq!(txn.result[1].index, 17);
-    //     assert_eq!(txn.result[2].index, 16);
-    //     assert_eq!(txn.result[3].index, 15);
-    //     assert_eq!(txn.result[4].index, 14);
-    //     let txn2 = canister.getTransactions(None, 5, txn.next);
-    //     assert_eq!(txn2.result[0].index, 13);
-    //     assert_eq!(txn2.result[1].index, 12);
-    //     assert_eq!(txn2.result[2].index, 11);
-    //     assert_eq!(txn2.result[3].index, 10);
-    //     assert_eq!(txn2.result[4].index, 9);
-    //     assert_eq!(canister.getTransactions(None, 5, txn.next).next, Some(8));
-    // }
+        for _ in 1..=10 {
+            canister
+                .transfer(bob(), None, Tokens128::from(10), None, None)
+                .unwrap();
+        }
 
-    // #[test]
-    // #[should_panic]
-    // fn get_transaction_not_existing() {
-    //     let canister = test_canister();
-    //     canister.getTransaction(2);
-    // }
+        let txn = canister.getTransactions(None, None, 5, None);
+        assert_eq!(txn.result[0].index, 18);
+        assert_eq!(txn.result[1].index, 17);
+        assert_eq!(txn.result[2].index, 16);
+        assert_eq!(txn.result[3].index, 15);
+        assert_eq!(txn.result[4].index, 14);
+        let txn2 = canister.getTransactions(None, None, 5, txn.next);
+        assert_eq!(txn2.result[0].index, 13);
+        assert_eq!(txn2.result[1].index, 12);
+        assert_eq!(txn2.result[2].index, 11);
+        assert_eq!(txn2.result[3].index, 10);
+        assert_eq!(txn2.result[4].index, 9);
+        assert_eq!(
+            canister.getTransactions(None, None, 5, txn.next).next,
+            Some(8)
+        );
+    }
 
-    // #[test]
-    // fn get_transaction_count() {
-    //     let canister = test_canister();
-    //     const COUNT: usize = 10;
-    //     for _ in 1..COUNT {
-    //         canister.transfer(bob(), Tokens128::from(10), None).unwrap();
-    //     }
-    //     assert_eq!(canister.getUserTransactionCount(alice()), COUNT);
+    #[test]
+    #[should_panic]
+    fn get_transaction_not_existing() {
+        let canister = test_canister();
+        canister.getTransaction(2);
+    }
+
+    #[test]
+    fn get_transaction_count() {
+        let canister = test_canister();
+        const COUNT: usize = 10;
+        for _ in 1..COUNT {
+            canister
+                .transfer(bob(), None, Tokens128::from(10), None, None)
+                .unwrap();
+        }
+        assert_eq!(canister.getUserTransactionCount(alice(), None), COUNT);
+    }
 }
-// }
 
-// #[cfg(test)]
-// mod proptests {
-//     use ic_canister::ic_kit::MockContext;
-//     use ic_canister::Canister;
-//     use proptest::collection::vec;
-//     use proptest::prelude::*;
-//     use proptest::sample::Index;
+#[cfg(test)]
+mod proptests {
+    use ic_canister::ic_kit::MockContext;
+    use ic_canister::Canister;
+    use proptest::collection::vec;
+    use proptest::prelude::*;
+    use proptest::sample::Index;
 
-//     use crate::mock::*;
-//     use crate::types::Metadata;
+    use crate::mock::*;
+    use crate::types::Metadata;
+    use crate::types::TokenHolder;
 
-//     use super::*;
+    use super::*;
 
-//     #[derive(Debug, Clone, PartialEq, Eq)]
-//     enum Action {
-//         Mint {
-//             minter: Principal,
-//             recipient: Principal,
-//             amount: Tokens128,
-//         },
-//         Burn(Tokens128, Principal),
-//         TransferWithFee {
-//             from: Principal,
-//             to: Principal,
-//             amount: Tokens128,
-//         },
-//         TransferWithoutFee {
-//             from: Principal,
-//             to: Principal,
-//             amount: Tokens128,
-//             fee_limit: Option<Tokens128>,
-//         },
-//         TransferFrom {
-//             caller: Principal,
-//             from: Principal,
-//             to: Principal,
-//             amount: Tokens128,
-//         },
-//     }
+    #[derive(Debug, Clone, PartialEq, Eq)]
+    enum Action {
+        Mint {
+            minter: Principal,
+            recipient: Principal,
+            amount: Tokens128,
+        },
+        Burn(Tokens128, Principal),
+        TransferWithFee {
+            from: Principal,
+            to: Principal,
+            amount: Tokens128,
+        },
+        TransferWithoutFee {
+            from: Principal,
+            to: Principal,
+            amount: Tokens128,
+            fee_limit: Option<Tokens128>,
+        },
+        TransferFrom {
+            caller: Principal,
+            from: Principal,
+            to: Principal,
+            amount: Tokens128,
+        },
+    }
 
-//     prop_compose! {
-//         fn select_principal(p: Vec<Principal>) (index in any::<Index>()) -> Principal {
-//             let i = index.index(p.len());
-//             p[i]
-//         }
+    prop_compose! {
+        fn select_principal(p: Vec<Principal>) (index in any::<Index>()) -> Principal {
+            let i = index.index(p.len());
+            p[i]
+        }
 
-//     }
+    }
 
-//     fn make_action(principals: Vec<Principal>) -> impl Strategy<Value = Action> {
-//         prop_oneof![
-//             // Mint
-//             (
-//                 make_tokens128(),
-//                 select_principal(principals.clone()),
-//                 select_principal(principals.clone()),
-//             )
-//                 .prop_map(|(amount, minter, recipient)| Action::Mint {
-//                     minter,
-//                     recipient,
-//                     amount
-//                 }),
-//             // Burn
-//             (make_tokens128(), select_principal(principals.clone()))
-//                 .prop_map(|(amount, principal)| Action::Burn(amount, principal)),
-//             // With fee
-//             (
-//                 select_principal(principals.clone()),
-//                 select_principal(principals.clone()),
-//                 make_tokens128()
-//             )
-//                 .prop_map(|(from, to, amount)| Action::TransferWithFee {
-//                     from,
-//                     to,
-//                     amount
-//                 }),
-//             // Without fee
-//             (
-//                 select_principal(principals.clone()),
-//                 select_principal(principals.clone()),
-//                 make_tokens128(),
-//                 make_option(),
-//             )
-//                 .prop_map(|(from, to, amount, fee_limit)| {
-//                     Action::TransferWithoutFee {
-//                         from,
-//                         to,
-//                         amount,
-//                         fee_limit,
-//                     }
-//                 }),
-//             // Transfer from
-//             (
-//                 select_principal(principals.clone()),
-//                 select_principal(principals.clone()),
-//                 select_principal(principals),
-//                 make_tokens128()
-//             )
-//                 .prop_map(|(principal, from, to, amount)| {
-//                     Action::TransferFrom {
-//                         caller: principal,
-//                         from,
-//                         to,
-//                         amount,
-//                     }
-//                 })
-//         ]
-//     }
+    fn make_action(principals: Vec<Principal>) -> impl Strategy<Value = Action> {
+        prop_oneof![
+            // Mint
+            (
+                make_tokens128(),
+                select_principal(principals.clone()),
+                select_principal(principals.clone()),
+            )
+                .prop_map(|(amount, minter, recipient)| Action::Mint {
+                    minter,
+                    recipient,
+                    amount
+                }),
+            // Burn
+            (make_tokens128(), select_principal(principals.clone()))
+                .prop_map(|(amount, principal)| Action::Burn(amount, principal)),
+            // With fee
+            (
+                select_principal(principals.clone()),
+                select_principal(principals.clone()),
+                make_tokens128()
+            )
+                .prop_map(|(from, to, amount)| Action::TransferWithFee {
+                    from,
+                    to,
+                    amount
+                }),
+            // Without fee
+            (
+                select_principal(principals.clone()),
+                select_principal(principals.clone()),
+                make_tokens128(),
+                make_option(),
+            )
+                .prop_map(|(from, to, amount, fee_limit)| {
+                    Action::TransferWithoutFee {
+                        from,
+                        to,
+                        amount,
+                        fee_limit,
+                    }
+                }),
+            // Transfer from
+            (
+                select_principal(principals.clone()),
+                select_principal(principals.clone()),
+                select_principal(principals),
+                make_tokens128()
+            )
+                .prop_map(|(principal, from, to, amount)| {
+                    Action::TransferFrom {
+                        caller: principal,
+                        from,
+                        to,
+                        amount,
+                    }
+                })
+        ]
+    }
 
-//     fn make_option() -> impl Strategy<Value = Option<Tokens128>> {
-//         prop_oneof![Just(None), (make_tokens128()).prop_map(Some)]
-//     }
+    fn make_option() -> impl Strategy<Value = Option<Tokens128>> {
+        prop_oneof![Just(None), (make_tokens128()).prop_map(Some)]
+    }
 
-//     fn make_principal() -> BoxedStrategy<Principal> {
-//         (any::<[u8; 29]>().prop_map(|mut bytes| {
-//             // Make sure the last byte is more than four as the last byte carries special
-//             // meaning
-//             bytes[28] = bytes[28].saturating_add(5);
-//             bytes
-//         }))
-//         .prop_map(|bytes| Principal::from_slice(&bytes))
-//         .boxed()
-//     }
+    fn make_principal() -> BoxedStrategy<Principal> {
+        (any::<[u8; 29]>().prop_map(|mut bytes| {
+            // Make sure the last byte is more than four as the last byte carries special
+            // meaning
+            bytes[28] = bytes[28].saturating_add(5);
+            bytes
+        }))
+        .prop_map(|bytes| Principal::from_slice(&bytes))
+        .boxed()
+    }
 
-//     prop_compose! {
-//         fn make_tokens128() (num in "[0-9]{1,10}") -> Tokens128 {
-//             Tokens128::from(u128::from_str_radix(&num, 10).unwrap())
-//         }
-//     }
-//     prop_compose! {
-//         fn make_canister() (
-//             logo in any::<String>(),
-//             name in any::<String>(),
-//             symbol in any::<String>(),
-//             decimals in any::<u8>(),
-//             total_supply in make_tokens128(),
-//             fee in make_tokens128(),
-//             principals in vec(make_principal(), 1..7),
-//             owner_idx in any::<Index>(),
-//             fee_to_idx in any::<Index>(),
-//         )-> (TokenCanisterMock, Vec<Principal>) {
-//             // pick two random principals (they could very well be the same principal twice)
-//             let owner = principals[owner_idx.index(principals.len())];
-//             let fee_to = principals[fee_to_idx.index(principals.len())];
-//             MockContext::new().with_caller(owner).inject();
-//             let meta = Metadata {
-//                 logo,
-//                 name,
-//                 symbol,
-//                 decimals,
-//                 totalSupply: total_supply,
-//                 owner,
-//                 fee,
-//                 feeTo: fee_to,
-//                 isTestToken: None,
-//             };
-//             let canister = TokenCanisterMock::init_instance();
-//             canister.init(meta);
-//             (canister, principals)
-//         }
-//     }
-//     fn canister_and_actions() -> impl Strategy<Value = (TokenCanisterMock, Vec<Action>)> {
-//         make_canister().prop_flat_map(|(canister, principals)| {
-//             let actions = vec(make_action(principals), 1..7);
-//             (Just(canister), actions)
-//         })
-//     }
-//     proptest! {
-//         #[test]
-//         fn generic_proptest((canister, actions) in canister_and_actions()) {
-//             let mut total_minted = Tokens128::ZERO;
-//             let mut total_burned = Tokens128::ZERO;
-//             let starting_supply = canister.totalSupply();
-//             for action in actions {
-//                 use Action::*;
-//                 match action {
-//                     Mint { minter, recipient, amount } => {
-//                         MockContext::new().with_caller(minter).inject();
-//                         let original = canister.totalSupply();
-//                         let res = canister.mint(recipient, amount);
-//                         let expected = if minter == canister.owner() {
-//                             total_minted = (total_minted + amount).unwrap();
-//                             assert!(matches!(res, Ok(_)));
-//                             (original + amount).unwrap()
-//                         } else {
-//                             assert_eq!(res, Err(TxError::Unauthorized));
-//                             original
-//                         };
-//                         assert_eq!(expected, canister.totalSupply());
-//                     },
-//                     Burn(amount, burner) => {
-//                         MockContext::new().with_caller(burner).inject();
-//                         let original = canister.totalSupply();
-//                         let balance = canister.balanceOf(burner);
-//                         let res = canister.burn(Some(burner), amount);
-//                         if balance < amount {
-//                             prop_assert_eq!(res, Err(TxError::InsufficientBalance));
-//                             prop_assert_eq!(original, canister.totalSupply());
-//                         } else {
-//                             prop_assert!(matches!(res, Ok(_)), "Burn error: {:?}. Balance: {}, amount: {}", res, balance, amount);
-//                             prop_assert_eq!((original - amount).unwrap(), canister.totalSupply());
-//                             total_burned = (total_burned + amount).unwrap();
-//                         }
-//                     },
-//                     TransferFrom { caller, from, to, amount } => {
-//                         MockContext::new().with_caller(caller).inject();
-//                         let from_balance = canister.balanceOf(from);
-//                         let to_balance = canister.balanceOf(to);
-//                         let (fee , _) = canister.state().borrow().stats.fee_info();
-//                         let amount_with_fee = (fee + amount).unwrap();
-//                         let res = canister.transferFrom(from, to, amount);
-//                         let _ = canister.approve(from, amount);
-//                         let from_allowance = canister.allowance(from, caller);
-//                         if from == to {
-//                             prop_assert_eq!(res, Err(TxError::SelfTransfer));
-//                             return Ok(());
-//                         }
+    prop_compose! {
+        fn make_tokens128() (num in "[0-9]{1,10}") -> Tokens128 {
+            Tokens128::from(u128::from_str_radix(&num, 10).unwrap())
+        }
+    }
+    prop_compose! {
+        fn make_canister() (
+            logo in any::<String>(),
+            name in any::<String>(),
+            symbol in any::<String>(),
+            decimals in any::<u8>(),
+            total_supply in make_tokens128(),
+            fee in make_tokens128(),
+            principals in vec(make_principal(), 1..7),
+            owner_idx in any::<Index>(),
+            fee_to_idx in any::<Index>(),
+        )-> (TokenCanisterMock, Vec<Principal>) {
+            // pick two random principals (they could very well be the same principal twice)
+            let owner = principals[owner_idx.index(principals.len())];
+            let fee_to = principals[fee_to_idx.index(principals.len())];
+            MockContext::new().with_caller(owner).inject();
+            let meta = Metadata {
+                logo,
+                name,
+                symbol,
+                decimals,
+                totalSupply: total_supply,
+                owner,
+                fee,
+                feeTo: fee_to,
+                isTestToken: None,
+            };
+            let canister = TokenCanisterMock::init_instance();
+            canister.init(meta);
+            (canister, principals)
+        }
+    }
+    fn canister_and_actions() -> impl Strategy<Value = (TokenCanisterMock, Vec<Action>)> {
+        make_canister().prop_flat_map(|(canister, principals)| {
+            let actions = vec(make_action(principals), 1..7);
+            (Just(canister), actions)
+        })
+    }
+    proptest! {
+        #[test]
+        fn generic_proptest((canister, actions) in canister_and_actions()) {
+            let mut total_minted = Tokens128::ZERO;
+            let mut total_burned = Tokens128::ZERO;
+            let starting_supply = canister.totalSupply();
+            for action in actions {
+                use Action::*;
+                match action {
+                    Mint { minter, recipient, amount } => {
+                        MockContext::new().with_caller(minter).inject();
+                        let original = canister.totalSupply();
+                        let res = canister.mint(recipient, amount);
+                        let expected = if minter == canister.owner() {
+                            total_minted = (total_minted + amount).unwrap();
+                            assert!(matches!(res, Ok(_)));
+                            (original + amount).unwrap()
+                        } else {
+                            assert_eq!(res, Err(TxError::Unauthorized));
+                            original
+                        };
+                        assert_eq!(expected, canister.totalSupply());
+                    },
+                    Burn(amount, burner) => {
+                        MockContext::new().with_caller(burner).inject();
+                        let original = canister.totalSupply();
+                        let balance = canister.balanceOf(burner,None);
+                        let res = canister.burn(Some(burner), amount);
+                        if balance < amount {
+                            prop_assert_eq!(res, Err(TxError::InsufficientBalance));
+                            prop_assert_eq!(original, canister.totalSupply());
+                        } else {
+                            prop_assert!(matches!(res, Ok(_)), "Burn error: {:?}. Balance: {}, amount: {}", res, balance, amount);
+                            prop_assert_eq!((original - amount).unwrap(), canister.totalSupply());
+                            total_burned = (total_burned + amount).unwrap();
+                        }
+                    },
+                    TransferFrom { caller, from, to, amount } => {
+                        MockContext::new().with_caller(caller).inject();
+                        let from_balance = canister.balanceOf(from,None);
+                        let to_balance = canister.balanceOf(to,None);
+                        let (fee , _) = canister.state().borrow().stats.fee_info();
+                        let amount_with_fee = (fee + amount).unwrap();
+                        let res = canister.transferFrom(from, None,to,None, amount);
+                        let _ = canister.approve(from, None,amount,None);
+                        let from_allowance = canister.allowance(from,None, caller,None);
+                        if from == to {
+                            prop_assert_eq!(res, Err(TxError::SelfTransfer));
+                            return Ok(());
+                        }
 
-//                         if from_allowance < amount_with_fee {
-//                             prop_assert_eq!(res, Err(TxError::InsufficientAllowance));
-//                             return Ok(());
-//                         }
+                        if from_allowance < amount_with_fee {
+                            prop_assert_eq!(res, Err(TxError::InsufficientAllowance));
+                            return Ok(());
+                        }
 
-//                         if from_balance < amount_with_fee {
-//                             prop_assert_eq!(res, Err(TxError::InsufficientBalance));
-//                             prop_assert_eq!(from_balance, canister.balanceOf(from));
+                        if from_balance < amount_with_fee {
+                            prop_assert_eq!(res, Err(TxError::InsufficientBalance));
+                            prop_assert_eq!(from_balance, canister.balanceOf(from,None));
 
-//                             return Ok(());
-//                         }
+                            return Ok(());
+                        }
 
-//                         prop_assert!(matches!(res, Ok(_)));
-//                         prop_assert_eq!((from_balance - amount_with_fee).unwrap(), canister.balanceOf(from));
-//                         prop_assert_eq!((to_balance + amount).unwrap(), canister.balanceOf(to));
-//                     },
-//                     TransferWithoutFee{from,to,amount,fee_limit} => {
-//                         MockContext::new().with_caller(from).inject();
-//                         let from_balance = canister.balanceOf(from);
-//                         let to_balance = canister.balanceOf(to);
-//                         let (fee , fee_to) = canister.state().borrow().stats.fee_info();
-//                         let amount_with_fee = (amount + fee).unwrap();
-//                         let res = canister.transfer(to, amount, fee_limit);
+                        prop_assert!(matches!(res, Ok(_)));
+                        prop_assert_eq!((from_balance - amount_with_fee).unwrap(), canister.balanceOf(from,None));
+                        prop_assert_eq!((to_balance + amount).unwrap(), canister.balanceOf(to,None));
+                    },
+                    TransferWithoutFee{from,to,amount,fee_limit} => {
+                        MockContext::new().with_caller(from).inject();
+                        let from_balance = canister.balanceOf(from, None);
+                        let to_balance = canister.balanceOf(to, None);
+                        let (fee , fee_to) = canister.state().borrow().stats.fee_info();
+                        let amount_with_fee = (amount + fee).unwrap();
+                        let res = canister.transfer(to, None,amount,None, fee_limit);
 
-//                         if to == from {
-//                             prop_assert_eq!(res, Err(TxError::SelfTransfer));
-//                             return Ok(())
-//                         }
+                        if to == from {
+                            prop_assert_eq!(res, Err(TxError::SelfTransfer));
+                            return Ok(())
+                        }
 
-//                         if let Some(fee_limit) = fee_limit {
-//                             if fee_limit < fee {
-//                                 prop_assert_eq!(res, Err(TxError::FeeExceededLimit));
-//                                 return Ok(())
-//                             }
-//                         }
+                        if let Some(fee_limit) = fee_limit {
+                            if fee_limit < fee {
+                                prop_assert_eq!(res, Err(TxError::FeeExceededLimit));
+                                return Ok(())
+                            }
+                        }
 
-//                         if from_balance < amount_with_fee {
-//                             prop_assert_eq!(res, Err(TxError::InsufficientBalance));
-//                             return Ok(())
-//                         }
+                        if from_balance < amount_with_fee {
+                            prop_assert_eq!(res, Err(TxError::InsufficientBalance));
+                            return Ok(())
+                        }
 
-//                         if fee_to == from  {
-//                             prop_assert!(matches!(res, Ok(_)));
-//                             prop_assert_eq!((from_balance - amount).unwrap(), canister.balanceOf(from));
-//                             return Ok(());
-//                         }
+                        if fee_to == from  {
+                            prop_assert!(matches!(res, Ok(_)));
+                            prop_assert_eq!((from_balance - amount).unwrap(), canister.balanceOf(from, None));
+                            return Ok(());
+                        }
 
-//                         if fee_to == to  {
-//                             prop_assert!(matches!(res, Ok(_)));
-//                             prop_assert_eq!(((to_balance + amount).unwrap() + fee).unwrap(), canister.balanceOf(to));
-//                             return Ok(());
-//                         }
+                        if fee_to == to  {
+                            prop_assert!(matches!(res, Ok(_)));
+                            prop_assert_eq!(((to_balance + amount).unwrap() + fee).unwrap(), canister.balanceOf(to,None));
+                            return Ok(());
+                        }
 
-//                         prop_assert!(matches!(res, Ok(_)));
-//                         prop_assert_eq!((from_balance - amount_with_fee).unwrap(), canister.balanceOf(from));
-//                         prop_assert_eq!((to_balance + amount).unwrap(), canister.balanceOf(to));
+                        prop_assert!(matches!(res, Ok(_)));
+                        prop_assert_eq!((from_balance - amount_with_fee).unwrap(), canister.balanceOf(from, None));
+                        prop_assert_eq!((to_balance + amount).unwrap(), canister.balanceOf(to, None));
 
-//                     }
-//                     TransferWithFee { from, to, amount } => {
-//                         MockContext::new().with_caller(from).inject();
-//                         let from_balance = canister.balanceOf(from);
-//                         let to_balance = canister.balanceOf(to);
-//                         let (fee , fee_to) = canister.state().borrow().stats.fee_info();
-//                         let res = canister.transferIncludeFee(to, amount);
+                    }
+                    TransferWithFee { from, to, amount } => {
+                        MockContext::new().with_caller(from).inject();
+                        let from_balance = canister.balanceOf(from,None);
+                        let to_balance = canister.balanceOf(to,None);
+                        let (fee , fee_to) = canister.state().borrow().stats.fee_info();
+                        let res = canister.transferIncludeFee(to, None,None,amount);
 
-//                         if to == from {
-//                             prop_assert_eq!(res, Err(TxError::SelfTransfer));
-//                             return Ok(())
-//                         }
+                        if to == from {
+                            prop_assert_eq!(res, Err(TxError::SelfTransfer));
+                            return Ok(())
+                        }
 
-//                         if amount <= fee  {
-//                             prop_assert_eq!(res, Err(TxError::AmountTooSmall));
-//                             return Ok(());
-//                         }
-//                         if from_balance < amount {
-//                             prop_assert_eq!(res, Err(TxError::InsufficientBalance));
-//                             return Ok(());
-//                         }
+                        if amount <= fee  {
+                            prop_assert_eq!(res, Err(TxError::AmountTooSmall));
+                            return Ok(());
+                        }
+                        if from_balance < amount {
+                            prop_assert_eq!(res, Err(TxError::InsufficientBalance));
+                            return Ok(());
+                        }
 
-//                         // Sometimes the fee can be sent `to` or `from`
-//                         if fee_to == from  {
-//                             prop_assert_eq!(((from_balance - amount).unwrap() + fee).unwrap(), canister.balanceOf(from));
-//                             return Ok(());
-//                         }
+                        // Sometimes the fee can be sent `to` or `from`
+                        if fee_to == from  {
+                            prop_assert_eq!(((from_balance - amount).unwrap() + fee).unwrap(), canister.balanceOf(from,None));
+                            return Ok(());
+                        }
 
-//                         if fee_to == to  {
-//                             prop_assert_eq!((to_balance + amount).unwrap(), canister.balanceOf(to));
-//                             return Ok(());
-//                         }
+                        if fee_to == to  {
+                            prop_assert_eq!((to_balance + amount).unwrap(), canister.balanceOf(to,None));
+                            return Ok(());
+                        }
 
-//                         prop_assert!(matches!(res, Ok(_)));
-//                         prop_assert_eq!(((to_balance + amount).unwrap() - fee).unwrap(), canister.balanceOf(to));
-//                         prop_assert_eq!((from_balance - amount).unwrap(), canister.balanceOf(from));
+                        prop_assert!(matches!(res, Ok(_)));
+                        prop_assert_eq!(((to_balance + amount).unwrap() - fee).unwrap(), canister.balanceOf(to,None));
+                        prop_assert_eq!((from_balance - amount).unwrap(), canister.balanceOf(from,None));
 
-//                     }
-//                 }
-//             }
-//             prop_assert_eq!(((total_minted + starting_supply).unwrap() - total_burned).unwrap(), canister.totalSupply());
-//         }
-//     }
-// }
+                    }
+                }
+            }
+            prop_assert_eq!(((total_minted + starting_supply).unwrap() - total_burned).unwrap(), canister.totalSupply());
+        }
+    }
+}
