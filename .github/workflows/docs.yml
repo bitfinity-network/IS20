@@ -1,0 +1,19 @@
+name: "Publish cargo docs"
+
+on:
+  workflow_dispatch:
+    # Just run it
+  push:
+    branches:    
+      - 'main'  
+
+jobs:
+  cargo-docs:
+    uses: infinity-swap/ci-wf/.github/workflows/publish-cargo-docs.yml@main
+    with:
+      gcs_bucket: 'infinity-rust-docs'
+
+    secrets:
+      gh_token: ${{ secrets.GH_PKG_TOKEN }}
+      gcp_token: ${{ secrets.GCP_JSON_DOCS_TOKEN }}
+  
