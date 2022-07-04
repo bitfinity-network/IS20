@@ -5,7 +5,7 @@ use ic_canister::virtual_canister_notify;
 use ic_helpers::tokens::Tokens128;
 
 use crate::principal::{CheckedPrincipal, WithRecipient};
-use crate::types::{FromToOption, TokenHolder, TxError, TxId, TxReceipt};
+use crate::types::{RecordOption, TokenHolder, TxError, TxId, TxReceipt};
 
 use super::TokenCanisterAPI;
 
@@ -56,7 +56,7 @@ pub(crate) async fn notify(
         .get(transaction_id)
         .ok_or(TxError::TransactionDoesNotExist)?;
 
-    if FromToOption::TokenHolder(TokenHolder::from(ic_canister::ic_kit::ic::caller())) != tx.from {
+    if RecordOption::TokenHolder(TokenHolder::from(ic_canister::ic_kit::ic::caller())) != tx.from {
         return Err(TxError::Unauthorized);
     }
 
@@ -88,7 +88,7 @@ mod tests {
     use ic_canister::{register_failing_virtual_responder, register_virtual_responder, Canister};
 
     use crate::mock::*;
-    use crate::types::{Metadata, TokenHolder, TxRecord};
+    use crate::types::{Metadata, TxRecord};
 
     use super::*;
 

@@ -2,9 +2,8 @@ use candid::Principal;
 use ic_helpers::tokens::Tokens128;
 
 use crate::canister::erc20_transactions::{charge_fee, transfer_balance};
-use crate::principal::{CheckedPrincipal, WithRecipient};
 use crate::state::CanisterState;
-use crate::types::{TokenHolder, TokenReceiver, TxError, TxId, TxReceipt};
+use crate::types::{TokenHolder, TokenReceiver, TxError, TxReceipt};
 
 use super::TokenCanisterAPI;
 
@@ -15,7 +14,6 @@ use super::TokenCanisterAPI;
 /// transaction will fail with `TxError::AmountTooSmall` error.
 pub fn transfer_include_fee(
     canister: &impl TokenCanisterAPI,
-    // caller: CheckedPrincipal<WithRecipient>,
     from: TokenHolder,
     to: TokenReceiver,
     amount: Tokens128,
@@ -100,7 +98,7 @@ pub fn transfer_include_fee(
 
 #[cfg(test)]
 mod tests {
-    use ic_canister::ic_kit::mock_principals::{alice, bob, john, xtc};
+    use ic_canister::ic_kit::mock_principals::{alice, bob, john};
     use ic_canister::ic_kit::MockContext;
     use ic_canister::Canister;
 

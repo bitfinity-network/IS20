@@ -4,9 +4,9 @@ use ic_helpers::tokens::Tokens128;
 
 use crate::types::{Operation, TokenHolder, TokenReceiver, TransactionStatus, TxId};
 
-// from can be either a TokenHolder or a TokenReceiver or a Principal.
+// `from/to` can be either a TokenHolder or a TokenReceiver or a Principal.
 #[derive(Deserialize, CandidType, Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
-pub enum FromToOption {
+pub enum RecordOption {
     TokenHolder(TokenHolder),
     TokenReceiver(TokenReceiver),
     Principal(Principal),
@@ -16,8 +16,8 @@ pub enum FromToOption {
 pub struct TxRecord {
     pub caller: Option<Principal>,
     pub index: TxId,
-    pub from: FromToOption,
-    pub to: FromToOption,
+    pub from: RecordOption,
+    pub to: RecordOption,
     pub amount: Tokens128,
     pub fee: Tokens128,
     pub timestamp: u64,
@@ -37,8 +37,8 @@ impl TxRecord {
         Self {
             caller: Some(caller),
             index,
-            from: FromToOption::TokenHolder(from),
-            to: FromToOption::TokenReceiver(to),
+            from: RecordOption::TokenHolder(from),
+            to: RecordOption::TokenReceiver(to),
             amount,
             fee,
             timestamp: ic::time(),
@@ -58,8 +58,8 @@ impl TxRecord {
         Self {
             caller: Some(caller),
             index,
-            from: FromToOption::TokenHolder(from),
-            to: FromToOption::TokenReceiver(to),
+            from: RecordOption::TokenHolder(from),
+            to: RecordOption::TokenReceiver(to),
             amount,
             fee,
             timestamp: ic::time(),
@@ -79,8 +79,8 @@ impl TxRecord {
         Self {
             caller: Some(caller),
             index,
-            from: FromToOption::TokenHolder(from),
-            to: FromToOption::TokenReceiver(to),
+            from: RecordOption::TokenHolder(from),
+            to: RecordOption::TokenReceiver(to),
             amount,
             fee,
             timestamp: ic::time(),
@@ -93,8 +93,8 @@ impl TxRecord {
         Self {
             caller: Some(from),
             index,
-            from: FromToOption::Principal(from),
-            to: FromToOption::Principal(to),
+            from: RecordOption::Principal(from),
+            to: RecordOption::Principal(to),
             amount,
             fee: Tokens128::from(0u128),
             timestamp: ic::time(),
@@ -107,8 +107,8 @@ impl TxRecord {
         Self {
             caller: Some(caller),
             index,
-            from: FromToOption::Principal(from),
-            to: FromToOption::Principal(from),
+            from: RecordOption::Principal(from),
+            to: RecordOption::Principal(from),
             amount,
             fee: Tokens128::from(0u128),
             timestamp: ic::time(),
@@ -121,8 +121,8 @@ impl TxRecord {
         Self {
             caller: Some(to),
             index,
-            from: FromToOption::Principal(to),
-            to: FromToOption::Principal(to),
+            from: RecordOption::Principal(to),
+            to: RecordOption::Principal(to),
             amount,
             fee: Tokens128::from(0u128),
             timestamp: ic::time(),

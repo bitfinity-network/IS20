@@ -226,7 +226,7 @@ mod tests {
     use test_case::test_case;
 
     use crate::mock::*;
-    use crate::types::{Metadata, TokenHolder, TokenReceiver, TxError};
+    use crate::types::{Metadata, TokenHolder, TxError};
 
     use super::*;
 

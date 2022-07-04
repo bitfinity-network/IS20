@@ -1,10 +1,9 @@
-use ic_cdk::export::Principal;
-use ic_helpers::tokens::Tokens128;
-
 use crate::canister::is20_auction::auction_principal;
 use crate::principal::{CheckedPrincipal, Owner, TestNet};
 use crate::state::{Balances, CanisterState};
 use crate::types::{TokenHolder, TokenReceiver, TxError, TxReceipt};
+use ic_cdk::export::Principal;
+use ic_helpers::tokens::Tokens128;
 
 use super::TokenCanisterAPI;
 
@@ -304,8 +303,8 @@ mod tests {
     use ic_canister::Canister;
 
     use crate::mock::*;
-    use crate::types::{FromToOption, TokenHolder};
     use crate::types::{Metadata, Operation, TransactionStatus};
+    use crate::types::{RecordOption, TokenHolder};
 
     use super::*;
 
@@ -337,10 +336,6 @@ mod tests {
     fn transfer_without_fee() {
         let canister = test_canister();
         assert_eq!(Tokens128::from(1000), canister.balanceOf(alice(), None));
-
-        let caller = CheckedPrincipal::with_recipient(bob()).unwrap();
-        let from = TokenHolder::new(caller.inner(), None);
-        let to = TokenReceiver::new(caller.recipient(), None);
         let _ = canister.transfer(bob(), None, Tokens128::from(100), None, None);
         assert_eq!(canister.balanceOf(bob(), None), Tokens128::from(100));
         assert_eq!(canister.balanceOf(alice(), None), Tokens128::from(900));
@@ -469,9 +464,9 @@ mod tests {
             assert_eq!(tx.index, i + 1);
             assert_eq!(
                 tx.from,
-                FromToOption::TokenHolder(TokenHolder::from(alice()))
+                RecordOption::TokenHolder(TokenHolder::from(alice()))
             );
-            assert_eq!(tx.to, FromToOption::TokenReceiver(TokenHolder::from(bob())));
+            assert_eq!(tx.to, RecordOption::TokenReceiver(TokenHolder::from(bob())));
             assert!(ts < tx.timestamp);
             ts = tx.timestamp;
         }
@@ -525,8 +520,8 @@ mod tests {
             assert_eq!(tx.operation, Operation::Mint);
             assert_eq!(tx.status, TransactionStatus::Succeeded);
             assert_eq!(tx.index, i + 1);
-            assert_eq!(tx.from, FromToOption::Principal(alice()));
-            assert_eq!(tx.to, FromToOption::Principal(bob()));
+            assert_eq!(tx.from, RecordOption::Principal(alice()));
+            assert_eq!(tx.to, RecordOption::Principal(bob()));
 
             assert!(ts < tx.timestamp);
             ts = tx.timestamp;
@@ -613,8 +608,8 @@ mod tests {
             assert_eq!(tx.operation, Operation::Burn);
             assert_eq!(tx.status, TransactionStatus::Succeeded);
             assert_eq!(tx.index, i + 1);
-            assert_eq!(tx.to, FromToOption::Principal(alice()));
-            assert_eq!(tx.from, FromToOption::Principal(alice()));
+            assert_eq!(tx.to, RecordOption::Principal(alice()));
+            assert_eq!(tx.from, RecordOption::Principal(alice()));
             assert!(ts < tx.timestamp);
             ts = tx.timestamp;
         }
@@ -717,11 +712,11 @@ mod tests {
 
             assert_eq!(
                 tx.from,
-                FromToOption::TokenHolder(TokenHolder::from(alice()))
+                RecordOption::TokenHolder(TokenHolder::from(alice()))
             );
             assert_eq!(
                 tx.to,
-                FromToOption::TokenReceiver(TokenHolder::from(john()))
+                RecordOption::TokenReceiver(TokenHolder::from(john()))
             );
             assert!(ts < tx.timestamp);
             ts = tx.timestamp;
@@ -832,9 +827,9 @@ mod tests {
 
             assert_eq!(
                 tx.from,
-                FromToOption::TokenHolder(TokenHolder::from(alice()))
+                RecordOption::TokenHolder(TokenHolder::from(alice()))
             );
-            assert_eq!(tx.to, FromToOption::TokenReceiver(TokenHolder::from(bob())));
+            assert_eq!(tx.to, RecordOption::TokenReceiver(TokenHolder::from(bob())));
             assert!(ts < tx.timestamp);
             ts = tx.timestamp;
         }
@@ -956,11 +951,9 @@ mod proptests {
     use proptest::prelude::*;
     use proptest::sample::Index;
 
+    use super::*;
     use crate::mock::*;
     use crate::types::Metadata;
-    use crate::types::TokenHolder;
-
-    use super::*;
 
     #[derive(Debug, Clone, PartialEq, Eq)]
     enum Action {

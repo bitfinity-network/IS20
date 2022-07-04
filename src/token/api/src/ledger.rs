@@ -1,9 +1,8 @@
 use candid::{CandidType, Deserialize, Principal};
-use ic_cdk::api::call;
 use ic_helpers::tokens::Tokens128;
 
 use crate::types::{
-    FromToOption, PaginatedResult, PendingNotifications, TokenHolder, TokenReceiver, TxId, TxRecord,
+    PaginatedResult, PendingNotifications, RecordOption, TokenHolder, TokenReceiver, TxId, TxRecord,
 };
 
 const MAX_HISTORY_LENGTH: usize = 1_000_000;
@@ -47,8 +46,8 @@ impl Ledger {
             .rev()
             .filter(|tx| {
                 who.map_or(true, |c| {
-                    FromToOption::TokenHolder(c) == tx.from
-                        || FromToOption::TokenReceiver(c) == tx.to
+                    RecordOption::TokenHolder(c) == tx.from
+                        || RecordOption::TokenReceiver(c) == tx.to
                         || tx.caller == caller
                 })
             })
@@ -85,8 +84,8 @@ impl Ledger {
         self.history
             .iter()
             .filter(|tx| {
-                tx.to == FromToOption::TokenReceiver(user)
-                    || tx.from == FromToOption::TokenHolder(user)
+                tx.to == RecordOption::TokenReceiver(user)
+                    || tx.from == RecordOption::TokenHolder(user)
                     || tx.caller == Some(caller)
             })
             .count()
