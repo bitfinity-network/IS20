@@ -83,7 +83,7 @@ pub fn batch_transfer(
     let total_fee = (fee * transfers.len())
         .to_tokens128()
         .ok_or(TxError::AmountOverflow)?;
-    //
+
     if balances.balance_of(&from) < (total_value + total_fee).ok_or(TxError::AmountOverflow)? {
         return Err(TxError::InsufficientBalance);
     }

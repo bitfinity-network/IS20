@@ -437,7 +437,12 @@ pub trait TokenCanisterAPI: Canister + Sized {
         transaction_id: Option<TxId>,
     ) -> PaginatedResult {
         // We don't trap if the transaction count is greater than the MAX_TRANSACTION_QUERY_LEN, we take the MAX_TRANSACTION_QUERY_LEN instead.
-self.state().borrow_mut().ledger.get_gransactions(who.map(|p| TokenHolder::new(p, who_subaccount)), who, count.min(MAX_TRANSACTION_QUERY_LEN), transaction_id)
+        self.state().borrow_mut().ledger.get_transactions(
+            who.map(|p| TokenHolder::new(p, who_subaccount)),
+            who,
+            count.min(MAX_TRANSACTION_QUERY_LEN),
+            transaction_id,
+        )
     }
 
     /// Returns the total number of transactions related to the user `who`.
