@@ -4,6 +4,7 @@ use ic_helpers::tokens::Tokens128;
 use ic_storage::IcStorage;
 
 use crate::state::CanisterState;
+use crate::types::TokenHolder;
 use crate::types::TxId;
 
 static PUBLIC_METHODS: &[&str] = &[
@@ -80,7 +81,7 @@ fn inspect_message() {
             let state = CanisterState::get();
             let state = state.borrow();
             let balances = &state.balances;
-            if !balances.0.contains_key(&caller) {
+            if !balances.0.contains_key(&TokenHolder::from(caller)) {
                 ic_cdk::trap("Transaction method is not called by a stakeholder. Rejecting.");
             }
 
@@ -103,8 +104,8 @@ fn inspect_message() {
             let allowances = &state.allowances;
             let (from, _, value) =
                 ic_cdk::api::call::arg_data::<(Principal, Principal, Tokens128)>();
-            if let Some(user_allowances) = allowances.get(&caller) {
-                if let Some(allowance) = user_allowances.get(&from) {
+            if let Some(user_allowances) = allowances.get(&TokenHolder::from(caller)) {
+                if let Some(allowance) = user_allowances.get(&TokenHolder::from(from)) {
                     if value <= *allowance {
                         ic_cdk::api::call::accept_message();
                     } else {
