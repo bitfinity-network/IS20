@@ -6,7 +6,11 @@ version = "0.1.7"
 [features]
 default = ["mint_burn", "transfer"]
 no_api = []
+
+# Enable mint and burn API methods. Enabled by default.
 mint_burn = []
+
+# Enable API methods for funds transferring. Enabled by default.
 transfer = []
 
 [dependencies]

@@ -68,6 +68,7 @@ pub fn inspect_message(
 ) -> Result<AcceptReason, &'static str> {
     match method {
         // These are query methods, so no checks are needed.
+        #[cfg(feature = "mint_burn")]
         "mint" if state.stats.is_test_token => Ok(AcceptReason::Valid),
         m if PUBLIC_METHODS.contains(&m) => Ok(AcceptReason::Valid),
         // Owner
@@ -76,6 +77,7 @@ pub fn inspect_message(
         m if OWNER_METHODS.contains(&m) => {
             Err("Owner method is called not by an owner. Rejecting.")
         }
+        #[cfg(any(feature = "transfer", feature = "mint_burn"))]
         m if TRANSACTION_METHODS.contains(&m) => {
             // These methods requires that the caller have tokens.
             let state = CanisterState::get();
@@ -98,6 +100,7 @@ pub fn inspect_message(
 
             Ok(AcceptReason::Valid)
         }
+        #[cfg(feature = "transfer")]
         "transferFrom" => {
             // Check if the caller has allowance for this transfer.
             let allowances = &state.allowances;
