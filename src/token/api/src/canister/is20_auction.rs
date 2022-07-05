@@ -297,10 +297,10 @@ mod tests {
     fn auction_test() {
         let (context, canister) = test_context();
         context.update_msg_cycles(2_000_000);
-        canister.bidCycles(alice()).unwrap();
+        bid_cycles(&canister, alice()).unwrap();
 
         context.update_msg_cycles(4_000_000);
-        canister.bidCycles(bob()).unwrap();
+        bid_cycles(&canister, bob()).unwrap();
 
         canister
             .state()
