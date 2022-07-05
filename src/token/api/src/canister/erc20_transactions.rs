@@ -147,7 +147,7 @@ pub fn approve(
     Ok(id)
 }
 
-fn mint(
+pub fn mint(
     state: &mut CanisterState,
     caller: Principal,
     to: Principal,
@@ -183,7 +183,7 @@ pub fn mint_as_owner(
     mint(state, caller.inner(), to, amount)
 }
 
-fn burn(
+pub fn burn(
     state: &mut CanisterState,
     caller: Principal,
     from: Principal,
