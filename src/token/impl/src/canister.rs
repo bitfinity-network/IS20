@@ -60,7 +60,6 @@ fn inspect_message() {
     }
 }
 
-
 impl PreUpdate for TokenCanister {
     fn pre_update(&self, method_name: &str, method_type: ic_canister::MethodType) {
         token_api::canister::pre_update(self, method_name, method_type);
