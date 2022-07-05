@@ -7,5 +7,6 @@ Cargo.lock
 token.did
 token-factory.did
 token.wasm
+/proptest-regressions
 
 /.DS_Store
