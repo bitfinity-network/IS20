@@ -1,6 +1,8 @@
+use candid::Principal;
 use ic_helpers::tokens::Tokens128;
 
 use crate::canister::erc20_transactions::{charge_fee, transfer_balance};
+use crate::principal::{CheckedPrincipal, WithRecipient};
 use crate::state::CanisterState;
 use crate::types::{AccountIdentifier, BatchTransferArgs, Subaccount, TxError, TxId, TxReceipt};
 
@@ -11,12 +13,57 @@ use super::TokenCanisterAPI;
 ///
 /// Note, that the `value` cannot be less than the `fee` amount. If the value given is too small,
 /// transaction will fail with `TxError::AmountTooSmall` error.
-pub fn transfer_include_fee(
+pub fn icrc1_transfer_include_fee(
     canister: &impl TokenCanisterAPI,
-    from: AccountIdentifier,
+    caller: CheckedPrincipal<WithRecipient>,
+    from_subaccount: Option<Subaccount>,
+    to_subaccount: Option<Subaccount>,
+    amount: Tokens128,
+) -> TxReceipt {
+    let from = AccountIdentifier::new(caller.inner(), from_subaccount);
+    let to = AccountIdentifier::new(caller.recipient(), to_subaccount);
+    let state = canister.state();
+    let mut state = state.borrow_mut();
+    let CanisterState {
+        ref mut balances,
+        ref mut ledger,
+        ref bidding_state,
+        ref stats,
+        ..
+    } = *state;
+
+    let (fee, fee_to) = stats.fee_info();
+    let fee_ratio = bidding_state.fee_ratio;
+
+    if amount <= fee {
+        return Err(TxError::AmountTooSmall);
+    }
+
+    if balances.balance_of(&from) < amount {
+        return Err(TxError::InsufficientBalance);
+    }
+    let fee_to = AccountIdentifier::from(fee_to);
+
+    charge_fee(balances, from, fee_to, fee, fee_ratio).expect("never fails due to checks above");
+    transfer_balance(
+        balances,
+        from,
+        to,
+        (amount - fee).expect("amount > fee is checked above"),
+    )
+    .expect("never fails due to checks above");
+
+    let id = ledger.transfer(from, to, amount, fee);
+    Ok(id)
+}
+
+pub fn is20_transfer_include_fee(
+    canister: &impl TokenCanisterAPI,
+    from_subaccount: Option<Subaccount>,
     to: AccountIdentifier,
     amount: Tokens128,
 ) -> TxReceipt {
+    let from = AccountIdentifier::new(ic_canister::ic_kit::ic::caller(), from_subaccount);
     let state = canister.state();
     let mut state = state.borrow_mut();
     let CanisterState {
@@ -222,7 +269,7 @@ mod tests {
         assert_eq!(Tokens128::from(1000), canister.balanceOf(alice(), None));
 
         assert!(canister
-            .transferIncludeFee(bob(), None, None, Tokens128::from(100))
+            .icrc1_transferIncludeFee(None, bob(), None, Tokens128::from(100))
             .is_ok());
         assert_eq!(canister.balanceOf(bob(), None), Tokens128::from(100));
         assert_eq!(canister.balanceOf(alice(), None), Tokens128::from(900));
@@ -238,7 +285,7 @@ mod tests {
         drop(state);
 
         assert!(canister
-            .transferIncludeFee(bob(), None, None, Tokens128::from(200))
+            .icrc1_transferIncludeFee(None, bob(), None, Tokens128::from(200))
             .is_ok());
         assert_eq!(canister.balanceOf(bob(), None), Tokens128::from(100));
         assert_eq!(canister.balanceOf(alice(), None), Tokens128::from(800));
@@ -249,7 +296,7 @@ mod tests {
     fn transfer_insufficient_balance() {
         let canister = test_canister();
         assert_eq!(
-            canister.transferIncludeFee(bob(), None, None, Tokens128::from(1001)),
+            canister.icrc1_transferIncludeFee(None, bob(), None, Tokens128::from(1001)),
             Err(TxError::InsufficientBalance)
         );
         assert_eq!(canister.balanceOf(alice(), None), Tokens128::from(1000));

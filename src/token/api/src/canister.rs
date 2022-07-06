@@ -9,22 +9,27 @@ use ic_helpers::tokens::Tokens128;
 use ic_storage::IcStorage;
 
 use crate::canister::erc20_transactions::{
-    approve, burn_as_owner, burn_own_tokens, icrc1_transfer, icrc1_transfer_from, mint_as_owner,
-    mint_test_token,
+    approve, burn_as_owner, burn_own_tokens, icrc1_transfer, icrc1_transfer_from,
+    is20_mint_as_owner, is20_mint_test_token, mint_as_owner, mint_test_token,
 };
 use crate::canister::is20_auction::{
     auction_info, bid_cycles, bidding_info, run_auction, AuctionError, BiddingInfo,
 };
 use crate::canister::is20_notify::{approve_and_notify, consume_notification, notify};
-use crate::canister::is20_transactions::{batch_transfer, transfer_include_fee};
-use crate::canister::is20a_transactions::{is20_transfer, is20_transfer_from};
+use crate::canister::is20_transactions::{
+    batch_transfer, icrc1_transfer_include_fee, is20_transfer_include_fee,
+};
 use crate::principal::{CheckedPrincipal, Owner};
 use crate::state::CanisterState;
 use crate::types::BatchTransferArgs;
+use crate::types::CheckedIdentifier;
 use crate::types::{
     AccountIdentifier, AuctionInfo, Metadata, PaginatedResult, StatsData, Subaccount, Timestamp,
     TokenInfo, TxError, TxId, TxReceipt, TxRecord,
 };
+
+use self::erc20_transactions::is20_transfer_from;
+use self::erc20_transactions::{is20_burn_as_owner, is20_burn_own_tokens, is20_transfer};
 
 #[cfg(not(feature = "no_api"))]
 mod inspect;
@@ -33,7 +38,6 @@ pub mod erc20_transactions;
 pub mod is20_auction;
 pub mod is20_notify;
 pub mod is20_transactions;
-pub mod is20a_transactions;
 
 pub(crate) const MAX_TRANSACTION_QUERY_LEN: usize = 1000;
 // 1 day in nanoseconds.
@@ -241,7 +245,6 @@ pub trait TokenCanisterAPI: Canister + Sized {
         )
     }
 
-    // ICRC `transfer` method
     #[update(trait = true)]
     fn is20_transfer(
         &self,
@@ -250,7 +253,8 @@ pub trait TokenCanisterAPI: Canister + Sized {
         amount: Tokens128,
         fee_limit: Option<Tokens128>,
     ) -> TxReceipt {
-        is20_transfer(self, from_subaccount, to, amount, fee_limit)
+        let caller = CheckedIdentifier::with_recipient(to, from_subaccount)?;
+        is20_transfer(self, caller, amount, fee_limit)
     }
 
     #[update(trait = true)]
@@ -263,10 +267,7 @@ pub trait TokenCanisterAPI: Canister + Sized {
         amount: Tokens128,
     ) -> TxReceipt {
         let caller = CheckedPrincipal::from_to(from, to)?;
-        let from = AccountIdentifier::new(caller.from(), from_subaccount);
-        let to = AccountIdentifier::new(caller.to(), to_subaccount);
-
-        icrc1_transfer_from(self, from, to, amount)
+        icrc1_transfer_from(self, caller, from_subaccount, to_subaccount, amount)
     }
 
     #[update(trait = true)]
@@ -284,17 +285,25 @@ pub trait TokenCanisterAPI: Canister + Sized {
     /// Note, that the `value` cannot be less than the `fee` amount. If the value given is too small,
     /// transaction will fail with `TxError::AmountTooSmall` error.
     #[update(trait = true)]
-    fn transferIncludeFee(
+    fn icrc1_transferIncludeFee(
         &self,
+        from_subaccount: Option<Subaccount>,
         to: Principal,
         to_subaccount: Option<Subaccount>,
-        from_subaccount: Option<Subaccount>,
         amount: Tokens128,
     ) -> TxReceipt {
         let caller = CheckedPrincipal::with_recipient(to)?;
-        let from = AccountIdentifier::new(caller.inner(), from_subaccount);
-        let to = AccountIdentifier::new(caller.recipient(), to_subaccount);
-        transfer_include_fee(self, from, to, amount)
+        icrc1_transfer_include_fee(self, caller, from_subaccount, to_subaccount, amount)
+    }
+
+    #[update(trait = true)]
+    fn is20_transferIncludeFee(
+        &self,
+        from_subaccount: Option<Subaccount>,
+        to: AccountIdentifier,
+        amount: Tokens128,
+    ) -> TxReceipt {
+        is20_transfer_include_fee(self, from_subaccount, to, amount)
     }
 
     /// Takes a list of transfers, each of which is a pair of `to` and `value` fields, it returns a `TxReceipt` which contains
@@ -326,6 +335,16 @@ pub trait TokenCanisterAPI: Canister + Sized {
         }
     }
 
+    #[update(trait = true)]
+    fn is20_mint(&self, to: AccountIdentifier, amount: Tokens128) -> TxReceipt {
+        if self.isTestToken() {
+            let test_user = CheckedIdentifier::test_user(&self.state().borrow().stats, to)?;
+            is20_mint_test_token(self, test_user, amount)
+        } else {
+            let owner = CheckedIdentifier::owner(&self.state().borrow().stats, to)?;
+            is20_mint_as_owner(self, owner, amount)
+        }
+    }
     /// Burn `amount` of tokens from `from` principal.
     /// If `from` is None, then caller's tokens will be burned.
     /// If `from` is Some(_) but method called not by owner, `TxError::Unauthorized` will be returned.
@@ -344,8 +363,21 @@ pub trait TokenCanisterAPI: Canister + Sized {
         }
     }
 
-    /********************** AUCTION ***********************/
+    #[update(trait = true)]
+    fn is20_burn(&self, from: Option<AccountIdentifier>, amount: Tokens128) -> TxReceipt {
+        match from {
+            None => is20_burn_own_tokens(self, amount),
+            Some(from) if from == ic_canister::ic_kit::ic::caller().into() => {
+                is20_burn_own_tokens(self, amount)
+            }
+            Some(from) => {
+                let caller = CheckedIdentifier::owner(&self.state().borrow().stats, from)?;
+                is20_burn_as_owner(self, caller, amount)
+            }
+        }
+    }
 
+    /********************** AUCTION ***********************/
     /// Bid cycles for the next cycle auction.
     ///
     /// This method must be called with the cycles provided in the call. The amount of cycles cannot be

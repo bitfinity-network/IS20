@@ -2,9 +2,98 @@ use std::fmt::{Display, Formatter};
 use std::str::FromStr;
 
 use candid::{CandidType, Principal};
+use ic_canister::ic_kit::ic;
 use serde::de::Error;
 use serde::{de, Deserialize, Serialize};
 use sha2::{Digest, Sha224};
+
+use crate::types::StatsData;
+
+use super::TxError;
+
+pub struct CheckedIdentifier<T>(AccountIdentifier, T);
+
+impl<T> CheckedIdentifier<T> {
+    pub fn inner(&self) -> AccountIdentifier {
+        self.0
+    }
+}
+
+// Owner
+pub struct OwnerAid;
+
+impl CheckedIdentifier<OwnerAid> {
+    pub fn owner(stats: &StatsData, to: AccountIdentifier) -> Result<Self, TxError> {
+        let caller = ic::caller();
+        if caller == stats.owner {
+            Ok(Self(to, OwnerAid))
+        } else {
+            Err(TxError::Unauthorized)
+        }
+    }
+}
+
+pub struct TestNetAid;
+
+impl CheckedIdentifier<TestNetAid> {
+    pub fn test_user(stats: &StatsData, to: AccountIdentifier) -> Result<Self, TxError> {
+        if stats.is_test_token {
+            Ok(Self(to, TestNetAid))
+        } else {
+            Err(TxError::Unauthorized)
+        }
+    }
+}
+
+pub struct WithAidRecipient {
+    pub recipient: AccountIdentifier,
+}
+
+impl CheckedIdentifier<WithAidRecipient> {
+    pub fn with_recipient(
+        recipient: AccountIdentifier,
+        from_subaccount: Option<Subaccount>,
+    ) -> Result<Self, TxError> {
+        let caller = AccountIdentifier::new(ic::caller(), from_subaccount);
+        if caller == recipient {
+            Err(TxError::SelfTransfer)
+        } else {
+            Ok(Self(caller, WithAidRecipient { recipient }))
+        }
+    }
+
+    pub fn recipient(&self) -> AccountIdentifier {
+        self.1.recipient
+    }
+}
+
+pub struct SenderAidRecipient {
+    pub from: AccountIdentifier,
+    pub to: AccountIdentifier,
+}
+
+impl CheckedIdentifier<SenderAidRecipient> {
+    pub fn from_to(
+        from: AccountIdentifier,
+        to: AccountIdentifier,
+        from_subaccount: Option<Subaccount>,
+    ) -> Result<Self, TxError> {
+        let caller = AccountIdentifier::new(ic::caller(), from_subaccount);
+        if caller == from {
+            Err(TxError::SelfTransfer)
+        } else {
+            Ok(Self(caller, SenderAidRecipient { from, to }))
+        }
+    }
+
+    pub fn from(&self) -> AccountIdentifier {
+        self.1.from
+    }
+
+    pub fn to(&self) -> AccountIdentifier {
+        self.1.to
+    }
+}
 
 pub static SUB_ACCOUNT_ZERO: Subaccount = Subaccount([0; 32]);
 static ACCOUNT_DOMAIN_SEPERATOR: &[u8] = b"\x0Aaccount-id";
