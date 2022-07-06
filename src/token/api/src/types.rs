@@ -97,7 +97,7 @@ impl Default for StatsData {
     }
 }
 
-pub type Allowances = HashMap<TokenHolder, HashMap<TokenHolder, Tokens128>>;
+pub type Allowances = HashMap<AccountIdentifier, HashMap<AccountIdentifier, Tokens128>>;
 
 // TODO: a wrapper over `ic_helpers::TxError`, this is a most likely
 // place to make tests fail in amm.
@@ -169,15 +169,23 @@ pub type TxId = u64;
 pub type Cycles = u64;
 
 /// `TokenHolder` is the holder of a token. This is used to identify the holder of a token in the form of `AccountIdentifier`.
-pub type TokenHolder = AccountIdentifier;
-
-/// `TokenReceiver` is the recipient of a token. This is used to identify the recipient of a token in the form of `AccountIdentifier`.
-pub type TokenReceiver = AccountIdentifier;
+// #[derive(Debug, Clone, CandidType, Deserialize, Copy)]
+// pub struct AccountIdentifier(pub AccountIdentifier);
+//
+// impl AccountIdentifier {
+//     pub fn from(aid: AccountIdentifier) -> Self {
+//         AccountIdentifier(aid)
+//     }
+// }
+//
+// /// `TokenReceiver` is the recipient of a token. This is used to identify the recipient of a token in the form of `AccountIdentifier`.
+// #[derive(Debug, Clone, CandidType, Deserialize, Copy)]
+// pub struct AccountIdentifier(pub AccountIdentifier);
 
 // Batch transfer arguments.
 #[derive(Debug, Clone, CandidType, Deserialize)]
 pub struct BatchTransferArgs {
-    pub reciever: BatchAccount,
+    pub receiver: BatchAccount,
     pub amount: Tokens128,
 }
 

@@ -9,30 +9,31 @@ use ic_helpers::tokens::Tokens128;
 use ic_storage::IcStorage;
 
 use crate::canister::erc20_transactions::{
-    approve, burn_as_owner, burn_own_tokens, mint_as_owner, mint_test_token, transfer,
-    transfer_from,
+    approve, burn_as_owner, burn_own_tokens, icrc1_transfer, icrc1_transfer_from, mint_as_owner,
+    mint_test_token,
 };
 use crate::canister::is20_auction::{
     auction_info, bid_cycles, bidding_info, run_auction, AuctionError, BiddingInfo,
 };
 use crate::canister::is20_notify::{approve_and_notify, consume_notification, notify};
 use crate::canister::is20_transactions::{batch_transfer, transfer_include_fee};
+use crate::canister::is20a_transactions::{is20_transfer, is20_transfer_from};
 use crate::principal::{CheckedPrincipal, Owner};
 use crate::state::CanisterState;
 use crate::types::BatchTransferArgs;
 use crate::types::{
-    AuctionInfo, Metadata, PaginatedResult, StatsData, Subaccount, Timestamp, TokenHolder,
-    TokenInfo, TokenReceiver, TxError, TxId, TxReceipt, TxRecord,
+    AccountIdentifier, AuctionInfo, Metadata, PaginatedResult, StatsData, Subaccount, Timestamp,
+    TokenInfo, TxError, TxId, TxReceipt, TxRecord,
 };
-
-pub mod erc20_transactions;
 
 #[cfg(not(feature = "no_api"))]
 mod inspect;
 
+pub mod erc20_transactions;
 pub mod is20_auction;
 pub mod is20_notify;
 pub mod is20_transactions;
+pub mod is20a_transactions;
 
 pub(crate) const MAX_TRANSACTION_QUERY_LEN: usize = 1000;
 // 1 day in nanoseconds.
@@ -112,7 +113,7 @@ pub trait TokenCanisterAPI: Canister + Sized {
     }
 
     #[query(trait = true)]
-    fn getHolders(&self, start: usize, limit: usize) -> Vec<(TokenHolder, Tokens128)> {
+    fn getHolders(&self, start: usize, limit: usize) -> Vec<(AccountIdentifier, Tokens128)> {
         self.state().borrow().balances.get_holders(start, limit)
     }
 
@@ -126,14 +127,14 @@ pub trait TokenCanisterAPI: Canister + Sized {
         &self,
         who: Principal,
         who_subaccount: Option<Subaccount>,
-    ) -> Vec<(TokenHolder, Tokens128)> {
-        let who = TokenHolder::new(who, who_subaccount);
+    ) -> Vec<(AccountIdentifier, Tokens128)> {
+        let who = AccountIdentifier::new(who, who_subaccount);
         self.state().borrow().user_approvals(who)
     }
 
     #[query(trait = true)]
     fn balanceOf(&self, holder: Principal, holder_subaccount: Option<Subaccount>) -> Tokens128 {
-        let holder = TokenHolder::new(holder, holder_subaccount);
+        let holder = AccountIdentifier::new(holder, holder_subaccount);
         self.state().borrow().balances.balance_of(&holder)
     }
 
@@ -145,8 +146,8 @@ pub trait TokenCanisterAPI: Canister + Sized {
         spender: Principal,
         spender_subaccount: Option<Subaccount>,
     ) -> Tokens128 {
-        let owner = TokenHolder::new(owner, owner_subaccount);
-        let spender = TokenHolder::new(spender, spender_subaccount);
+        let owner = AccountIdentifier::new(owner, owner_subaccount);
+        let spender = AccountIdentifier::new(spender, spender_subaccount);
         self.state().borrow().allowance(owner, spender)
     }
 
@@ -214,29 +215,46 @@ pub trait TokenCanisterAPI: Canister + Sized {
         owner_subaccount: Option<Subaccount>,
     ) -> TxReceipt {
         let caller = CheckedPrincipal::with_recipient(spender)?;
-        let spender = TokenHolder::new(caller.recipient(), spender_subaccount);
-        let owner = TokenHolder::new(caller.inner(), owner_subaccount);
+        let spender = AccountIdentifier::new(caller.recipient(), spender_subaccount);
+        let owner = AccountIdentifier::new(caller.inner(), owner_subaccount);
         approve(self, owner, spender, amount)
     }
 
     /********************** TRANSFERS ***********************/
     #[update(trait = true)]
-    fn transfer(
+    fn icrc1_transfer(
         &self,
+        from_subaccount: Option<Subaccount>,
         to: Principal,
         to_subaccount: Option<Subaccount>,
         amount: Tokens128,
-        from_subaccount: Option<Subaccount>,
         fee_limit: Option<Tokens128>,
     ) -> TxReceipt {
         let caller = CheckedPrincipal::with_recipient(to)?;
-        let from = TokenHolder::new(caller.inner(), from_subaccount);
-        let to = TokenReceiver::new(caller.recipient(), to_subaccount);
-        transfer(self, from, to, amount, fee_limit)
+        icrc1_transfer(
+            self,
+            caller,
+            from_subaccount,
+            to_subaccount,
+            amount,
+            fee_limit,
+        )
+    }
+
+    // ICRC `transfer` method
+    #[update(trait = true)]
+    fn is20_transfer(
+        &self,
+        from_subaccount: Option<Subaccount>,
+        to: AccountIdentifier,
+        amount: Tokens128,
+        fee_limit: Option<Tokens128>,
+    ) -> TxReceipt {
+        is20_transfer(self, from_subaccount, to, amount, fee_limit)
     }
 
     #[update(trait = true)]
-    fn transferFrom(
+    fn icrc1_transferFrom(
         &self,
         from: Principal,
         from_subaccount: Option<Subaccount>,
@@ -245,12 +263,21 @@ pub trait TokenCanisterAPI: Canister + Sized {
         amount: Tokens128,
     ) -> TxReceipt {
         let caller = CheckedPrincipal::from_to(from, to)?;
-        let from = TokenHolder::new(caller.from(), from_subaccount);
-        let to = TokenReceiver::new(caller.to(), to_subaccount);
+        let from = AccountIdentifier::new(caller.from(), from_subaccount);
+        let to = AccountIdentifier::new(caller.to(), to_subaccount);
 
-        transfer_from(self, from, to, amount)
+        icrc1_transfer_from(self, from, to, amount)
     }
 
+    #[update(trait = true)]
+    fn is20_transferFrom(
+        &self,
+        from: AccountIdentifier,
+        to: AccountIdentifier,
+        amount: Tokens128,
+    ) -> TxReceipt {
+        is20_transfer_from(self, from, to, amount)
+    }
     /// Transfers `value` amount to the `to` principal, applying American style fee. This means, that
     /// the recipient will receive `value - fee`, and the sender account will be reduced exactly by `value`.
     ///
@@ -265,8 +292,8 @@ pub trait TokenCanisterAPI: Canister + Sized {
         amount: Tokens128,
     ) -> TxReceipt {
         let caller = CheckedPrincipal::with_recipient(to)?;
-        let from = TokenHolder::new(caller.inner(), from_subaccount);
-        let to = TokenReceiver::new(caller.recipient(), to_subaccount);
+        let from = AccountIdentifier::new(caller.inner(), from_subaccount);
+        let to = AccountIdentifier::new(caller.recipient(), to_subaccount);
         transfer_include_fee(self, from, to, amount)
     }
 
@@ -282,7 +309,7 @@ pub trait TokenCanisterAPI: Canister + Sized {
         transfers: Vec<BatchTransferArgs>,
     ) -> Result<Vec<TxId>, TxError> {
         for x in transfers.clone() {
-            CheckedPrincipal::with_recipient(x.reciever.to)?;
+            CheckedPrincipal::with_recipient(x.receiver.to)?;
         }
 
         batch_transfer(self, from_subaccount, transfers)
@@ -438,8 +465,7 @@ pub trait TokenCanisterAPI: Canister + Sized {
     ) -> PaginatedResult {
         // We don't trap if the transaction count is greater than the MAX_TRANSACTION_QUERY_LEN, we take the MAX_TRANSACTION_QUERY_LEN instead.
         self.state().borrow_mut().ledger.get_transactions(
-            who.map(|p| TokenHolder::new(p, who_subaccount)),
-            who,
+            who.map(|p| AccountIdentifier::new(p, who_subaccount)),
             count.min(MAX_TRANSACTION_QUERY_LEN),
             transaction_id,
         )
@@ -448,11 +474,8 @@ pub trait TokenCanisterAPI: Canister + Sized {
     /// Returns the total number of transactions related to the user `who`.
     #[query(trait = true)]
     fn getUserTransactionCount(&self, who: Principal, who_subaccount: Option<Subaccount>) -> usize {
-        let who_aid = TokenHolder::new(who, who_subaccount);
-        self.state()
-            .borrow()
-            .ledger
-            .get_len_user_history(who_aid, who)
+        let who_aid = AccountIdentifier::new(who, who_subaccount);
+        self.state().borrow().ledger.get_len_user_history(who_aid)
     }
 
     // Important: This function *must* be defined to be the

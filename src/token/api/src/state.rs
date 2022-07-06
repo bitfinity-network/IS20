@@ -1,5 +1,7 @@
 use crate::ledger::Ledger;
-use crate::types::{Allowances, AuctionInfo, Cycles, Metadata, StatsData, Timestamp, TokenHolder};
+use crate::types::{
+    AccountIdentifier, Allowances, AuctionInfo, Cycles, Metadata, StatsData, Timestamp,
+};
 use candid::{CandidType, Deserialize, Principal};
 use ic_helpers::tokens::Tokens128;
 use ic_storage::stable::Versioned;
@@ -31,7 +33,7 @@ impl CanisterState {
         }
     }
 
-    pub fn allowance(&self, owner: TokenHolder, spender: TokenHolder) -> Tokens128 {
+    pub fn allowance(&self, owner: AccountIdentifier, spender: AccountIdentifier) -> Tokens128 {
         match self.allowances.get(&owner) {
             Some(inner) => match inner.get(&spender) {
                 Some(value) => *value,
@@ -49,7 +51,7 @@ impl CanisterState {
             .unwrap_or(0)
     }
 
-    pub fn user_approvals(&self, who: TokenHolder) -> Vec<(TokenHolder, Tokens128)> {
+    pub fn user_approvals(&self, who: AccountIdentifier) -> Vec<(AccountIdentifier, Tokens128)> {
         match self.allowances.get(&who) {
             Some(allow) => Vec::from_iter(allow.clone().into_iter()),
             None => Vec::new(),
@@ -65,17 +67,17 @@ impl Versioned for CanisterState {
 }
 
 #[derive(Debug, Default, CandidType, Deserialize)]
-pub struct Balances(pub HashMap<TokenHolder, Tokens128>);
+pub struct Balances(pub HashMap<AccountIdentifier, Tokens128>);
 
 impl Balances {
-    pub fn balance_of(&self, who: &TokenHolder) -> Tokens128 {
+    pub fn balance_of(&self, who: &AccountIdentifier) -> Tokens128 {
         self.0
             .get(who)
             .cloned()
             .unwrap_or_else(|| Tokens128::from(0u128))
     }
 
-    pub fn get_holders(&self, start: usize, limit: usize) -> Vec<(TokenHolder, Tokens128)> {
+    pub fn get_holders(&self, start: usize, limit: usize) -> Vec<(AccountIdentifier, Tokens128)> {
         let mut balance = self.0.iter().map(|(&k, v)| (k, *v)).collect::<Vec<_>>();
 
         // Sort balance and principals by the balance

@@ -6,7 +6,7 @@ use ic_canister::{Canister, PreUpdate};
 use crate::{
     canister::TokenCanisterAPI,
     state::CanisterState,
-    types::{Metadata, TokenHolder},
+    types::{AccountIdentifier, Metadata},
 };
 
 #[derive(Debug, Clone, Canister)]
@@ -19,16 +19,16 @@ pub struct TokenCanisterMock {
 
 impl TokenCanisterMock {
     pub fn init(&self, metadata: Metadata) {
-        self.state
-            .borrow_mut()
-            .balances
-            .0
-            .insert(TokenHolder::from(metadata.owner), metadata.totalSupply);
+        self.state.borrow_mut().balances.0.insert(
+            AccountIdentifier::from(metadata.owner),
+            metadata.totalSupply,
+        );
 
-        self.state
-            .borrow_mut()
-            .ledger
-            .mint(metadata.owner, metadata.owner, metadata.totalSupply);
+        self.state.borrow_mut().ledger.mint(
+            metadata.owner.into(),
+            metadata.owner.into(),
+            metadata.totalSupply,
+        );
 
         self.state.borrow_mut().stats = metadata.into();
         self.state.borrow_mut().bidding_state.auction_period =

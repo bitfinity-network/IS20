@@ -2,9 +2,7 @@ use ic_helpers::tokens::Tokens128;
 
 use crate::canister::erc20_transactions::{charge_fee, transfer_balance};
 use crate::state::CanisterState;
-use crate::types::{
-    BatchTransferArgs, Subaccount, TokenHolder, TokenReceiver, TxError, TxId, TxReceipt,
-};
+use crate::types::{AccountIdentifier, BatchTransferArgs, Subaccount, TxError, TxId, TxReceipt};
 
 use super::TokenCanisterAPI;
 
@@ -15,11 +13,10 @@ use super::TokenCanisterAPI;
 /// transaction will fail with `TxError::AmountTooSmall` error.
 pub fn transfer_include_fee(
     canister: &impl TokenCanisterAPI,
-    from: TokenHolder,
-    to: TokenReceiver,
+    from: AccountIdentifier,
+    to: AccountIdentifier,
     amount: Tokens128,
 ) -> TxReceipt {
-    let caller = ic_canister::ic_kit::ic::caller();
     let state = canister.state();
     let mut state = state.borrow_mut();
     let CanisterState {
@@ -40,7 +37,7 @@ pub fn transfer_include_fee(
     if balances.balance_of(&from) < amount {
         return Err(TxError::InsufficientBalance);
     }
-    let fee_to = TokenReceiver::from(fee_to);
+    let fee_to = AccountIdentifier::from(fee_to);
 
     charge_fee(balances, from, fee_to, fee, fee_ratio).expect("never fails due to checks above");
     transfer_balance(
@@ -51,7 +48,7 @@ pub fn transfer_include_fee(
     )
     .expect("never fails due to checks above");
 
-    let id = ledger.transfer(from, to, amount, fee, caller);
+    let id = ledger.transfer(from, to, amount, fee);
     Ok(id)
 }
 
@@ -61,7 +58,7 @@ pub fn batch_transfer(
     transfers: Vec<BatchTransferArgs>,
 ) -> Result<Vec<TxId>, TxError> {
     let caller = ic_canister::ic_kit::ic::caller();
-    let from = TokenHolder::new(caller, from_subaccount);
+    let from = AccountIdentifier::new(caller, from_subaccount);
     let state = canister.state();
     let mut state = state.borrow_mut();
 
@@ -88,12 +85,12 @@ pub fn batch_transfer(
         return Err(TxError::InsufficientBalance);
     }
 
-    let fee_to = TokenReceiver::from(fee_to);
+    let fee_to = AccountIdentifier::from(fee_to);
 
     {
         for x in transfers.clone() {
             let value = x.amount;
-            let to = TokenReceiver::new(x.reciever.to, x.reciever.to_subaccount);
+            let to = AccountIdentifier::new(x.receiver.to, x.receiver.to_subaccount);
             charge_fee(balances, from, fee_to, fee, fee_ratio)
                 .expect("never fails due to checks above");
             transfer_balance(balances, from, to, value).expect("never fails due to checks above");
@@ -139,14 +136,14 @@ mod tests {
         let canister = test_canister();
         assert_eq!(Tokens128::from(1000), canister.balanceOf(alice(), None));
         let transfer1 = BatchTransferArgs {
-            reciever: BatchAccount {
+            receiver: BatchAccount {
                 to: bob(),
                 to_subaccount: None,
             },
             amount: Tokens128::from(100),
         };
         let transfer2 = BatchTransferArgs {
-            reciever: BatchAccount {
+            receiver: BatchAccount {
                 to: john(),
                 to_subaccount: None,
             },
@@ -170,14 +167,14 @@ mod tests {
         drop(state);
         assert_eq!(Tokens128::from(1000), canister.balanceOf(alice(), None));
         let transfer1 = BatchTransferArgs {
-            reciever: BatchAccount {
+            receiver: BatchAccount {
                 to: bob(),
                 to_subaccount: None,
             },
             amount: Tokens128::from(100),
         };
         let transfer2 = BatchTransferArgs {
-            reciever: BatchAccount {
+            receiver: BatchAccount {
                 to: xtc(),
                 to_subaccount: None,
             },
@@ -198,14 +195,14 @@ mod tests {
         let canister = test_canister();
 
         let transfer1 = BatchTransferArgs {
-            reciever: BatchAccount {
+            receiver: BatchAccount {
                 to: bob(),
                 to_subaccount: None,
             },
             amount: Tokens128::from(500),
         };
         let transfer2 = BatchTransferArgs {
-            reciever: BatchAccount {
+            receiver: BatchAccount {
                 to: john(),
                 to_subaccount: None,
             },

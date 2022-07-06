@@ -5,7 +5,7 @@ use ic_canister::virtual_canister_notify;
 use ic_helpers::tokens::Tokens128;
 
 use crate::principal::{CheckedPrincipal, WithRecipient};
-use crate::types::{RecordOption, TokenHolder, TxError, TxId, TxReceipt};
+use crate::types::{AccountIdentifier, TxError, TxId, TxReceipt};
 
 use super::TokenCanisterAPI;
 
@@ -56,7 +56,7 @@ pub(crate) async fn notify(
         .get(transaction_id)
         .ok_or(TxError::TransactionDoesNotExist)?;
 
-    if RecordOption::TokenHolder(TokenHolder::from(ic_canister::ic_kit::ic::caller())) != tx.from {
+    if AccountIdentifier::from(ic_canister::ic_kit::ic::caller()) != tx.from {
         return Err(TxError::Unauthorized);
     }
 
@@ -152,7 +152,7 @@ mod tests {
         });
         let canister = test_canister();
         let id = canister
-            .transfer(bob(), None, Tokens128::from(100), None, None)
+            .icrc1_transfer(None, bob(), None, Tokens128::from(100), None)
             .unwrap();
         canister.notify(id, bob()).await.unwrap();
 
@@ -175,7 +175,7 @@ mod tests {
 
         let canister = test_canister();
         let id = canister
-            .transfer(bob(), None, Tokens128::from(100), None, None)
+            .icrc1_transfer(None, bob(), None, Tokens128::from(100), None)
             .unwrap();
         let response = canister.notify(id, bob()).await;
         assert_eq!(

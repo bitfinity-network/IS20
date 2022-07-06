@@ -2,22 +2,14 @@ use candid::{CandidType, Deserialize, Principal};
 use ic_canister::ic_kit::ic;
 use ic_helpers::tokens::Tokens128;
 
-use crate::types::{Operation, TokenHolder, TokenReceiver, TransactionStatus, TxId};
-
-// `from/to` can be either a TokenHolder or a TokenReceiver or a Principal.
-#[derive(Deserialize, CandidType, Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
-pub enum RecordOption {
-    TokenHolder(TokenHolder),
-    TokenReceiver(TokenReceiver),
-    Principal(Principal),
-}
+use crate::types::{AccountIdentifier, Operation, TransactionStatus, TxId};
 
 #[derive(Deserialize, CandidType, Debug, Clone)]
 pub struct TxRecord {
-    pub caller: Option<Principal>,
+    pub caller: Option<AccountIdentifier>,
     pub index: TxId,
-    pub from: RecordOption,
-    pub to: RecordOption,
+    pub from: AccountIdentifier,
+    pub to: AccountIdentifier,
     pub amount: Tokens128,
     pub fee: Tokens128,
     pub timestamp: u64,
@@ -28,17 +20,16 @@ pub struct TxRecord {
 impl TxRecord {
     pub fn transfer(
         index: TxId,
-        from: TokenHolder,
-        to: TokenReceiver,
+        from: AccountIdentifier,
+        to: AccountIdentifier,
         amount: Tokens128,
         fee: Tokens128,
-        caller: Principal,
     ) -> Self {
         Self {
-            caller: Some(caller),
+            caller: Some(from),
             index,
-            from: RecordOption::TokenHolder(from),
-            to: RecordOption::TokenReceiver(to),
+            from,
+            to,
             amount,
             fee,
             timestamp: ic::time(),
@@ -49,17 +40,17 @@ impl TxRecord {
 
     pub fn transfer_from(
         index: TxId,
-        caller: Principal,
-        from: TokenHolder,
-        to: TokenReceiver,
+        from: AccountIdentifier,
+        to: AccountIdentifier,
         amount: Tokens128,
         fee: Tokens128,
+        caller: AccountIdentifier,
     ) -> Self {
         Self {
             caller: Some(caller),
             index,
-            from: RecordOption::TokenHolder(from),
-            to: RecordOption::TokenReceiver(to),
+            from,
+            to,
             amount,
             fee,
             timestamp: ic::time(),
@@ -70,17 +61,16 @@ impl TxRecord {
 
     pub fn approve(
         index: TxId,
-        from: TokenHolder,
-        to: TokenReceiver,
+        from: AccountIdentifier,
+        to: AccountIdentifier,
         amount: Tokens128,
         fee: Tokens128,
-        caller: Principal,
     ) -> Self {
         Self {
-            caller: Some(caller),
+            caller: Some(from),
             index,
-            from: RecordOption::TokenHolder(from),
-            to: RecordOption::TokenReceiver(to),
+            from,
+            to,
             amount,
             fee,
             timestamp: ic::time(),
@@ -89,12 +79,17 @@ impl TxRecord {
         }
     }
 
-    pub fn mint(index: TxId, from: Principal, to: Principal, amount: Tokens128) -> Self {
+    pub fn mint(
+        index: TxId,
+        from: AccountIdentifier,
+        to: AccountIdentifier,
+        amount: Tokens128,
+    ) -> Self {
         Self {
             caller: Some(from),
             index,
-            from: RecordOption::Principal(from),
-            to: RecordOption::Principal(to),
+            from,
+            to,
             amount,
             fee: Tokens128::from(0u128),
             timestamp: ic::time(),
@@ -103,12 +98,17 @@ impl TxRecord {
         }
     }
 
-    pub fn burn(index: TxId, caller: Principal, from: Principal, amount: Tokens128) -> Self {
+    pub fn burn(
+        index: TxId,
+        caller: AccountIdentifier,
+        from: AccountIdentifier,
+        amount: Tokens128,
+    ) -> Self {
         Self {
             caller: Some(caller),
             index,
-            from: RecordOption::Principal(from),
-            to: RecordOption::Principal(from),
+            from,
+            to: from,
             amount,
             fee: Tokens128::from(0u128),
             timestamp: ic::time(),
@@ -117,12 +117,12 @@ impl TxRecord {
         }
     }
 
-    pub fn auction(index: TxId, to: Principal, amount: Tokens128) -> Self {
+    pub fn auction(index: TxId, to: AccountIdentifier, amount: Tokens128) -> Self {
         Self {
             caller: Some(to),
             index,
-            from: RecordOption::Principal(to),
-            to: RecordOption::Principal(to),
+            from: to,
+            to,
             amount,
             fee: Tokens128::from(0u128),
             timestamp: ic::time(),

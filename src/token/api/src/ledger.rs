@@ -2,8 +2,7 @@ use candid::{CandidType, Deserialize, Principal};
 use ic_helpers::tokens::Tokens128;
 
 use crate::types::{
-    BatchTransferArgs, PaginatedResult, PendingNotifications, RecordOption, TokenHolder,
-    TokenReceiver, TxId, TxRecord,
+    AccountIdentifier, BatchTransferArgs, PaginatedResult, PendingNotifications, TxId, TxRecord,
 };
 
 const MAX_HISTORY_LENGTH: usize = 1_000_000;
@@ -35,8 +34,7 @@ impl Ledger {
 
     pub fn get_transactions(
         &self,
-        who: Option<TokenHolder>,
-        caller: Option<Principal>,
+        who: Option<AccountIdentifier>,
         count: usize,
         transaction_id: Option<TxId>,
     ) -> PaginatedResult {
@@ -45,13 +43,7 @@ impl Ledger {
             .history
             .iter()
             .rev()
-            .filter(|tx| {
-                who.map_or(true, |c| {
-                    RecordOption::TokenHolder(c) == tx.from
-                        || RecordOption::TokenReceiver(c) == tx.to
-                        || tx.caller == caller
-                })
-            })
+            .filter(|tx| who.map_or(true, |c| c == tx.from || c == tx.to || tx.caller == who))
             .filter(|tx| transaction_id.map_or(true, |id| id >= tx.index))
             .take(count + 1)
             .cloned()
@@ -81,34 +73,29 @@ impl Ledger {
         }
     }
 
-    pub fn get_len_user_history(&self, user: TokenHolder, caller: Principal) -> usize {
+    pub fn get_len_user_history(&self, user: AccountIdentifier) -> usize {
         self.history
             .iter()
-            .filter(|tx| {
-                tx.to == RecordOption::TokenReceiver(user)
-                    || tx.from == RecordOption::TokenHolder(user)
-                    || tx.caller == Some(caller)
-            })
+            .filter(|tx| tx.to == user || tx.from == user || tx.caller == Some(user))
             .count()
     }
 
     pub fn transfer(
         &mut self,
-        from: TokenHolder,
-        to: TokenReceiver,
+        from: AccountIdentifier,
+        to: AccountIdentifier,
         amount: Tokens128,
         fee: Tokens128,
-        caller: Principal,
     ) -> TxId {
         let id = self.next_id();
-        self.push(TxRecord::transfer(id, from, to, amount, fee, caller));
+        self.push(TxRecord::transfer(id, from, to, amount, fee));
 
         id
     }
 
     pub fn batch_transfer(
         &mut self,
-        from: TokenHolder,
+        from: AccountIdentifier,
         transfers: Vec<BatchTransferArgs>,
         fee: Tokens128,
         caller: Principal,
@@ -118,10 +105,9 @@ impl Ledger {
             .map(|x| {
                 self.transfer(
                     from,
-                    TokenReceiver::new(x.reciever.to, x.reciever.to_subaccount),
+                    AccountIdentifier::new(x.receiver.to, x.receiver.to_subaccount),
                     x.amount,
                     fee,
-                    caller,
                 )
             })
             .collect()
@@ -129,40 +115,49 @@ impl Ledger {
 
     pub fn transfer_from(
         &mut self,
-        from: TokenHolder,
-        to: TokenReceiver,
+        from: AccountIdentifier,
+        to: AccountIdentifier,
         amount: Tokens128,
         fee: Tokens128,
-        caller: Principal,
+        caller: AccountIdentifier,
     ) -> TxId {
         let id = self.next_id();
-        self.push(TxRecord::transfer_from(id, caller, from, to, amount, fee));
+        self.push(TxRecord::transfer_from(id, from, to, amount, fee, caller));
 
         id
     }
 
     pub fn approve(
         &mut self,
-        from: TokenHolder,
-        to: TokenReceiver,
+        from: AccountIdentifier,
+        to: AccountIdentifier,
         amount: Tokens128,
         fee: Tokens128,
-        caller: Principal,
     ) -> TxId {
         let id = self.next_id();
-        self.push(TxRecord::approve(id, from, to, amount, fee, caller));
+        self.push(TxRecord::approve(id, from, to, amount, fee));
 
         id
     }
 
-    pub fn mint(&mut self, from: Principal, to: Principal, amount: Tokens128) -> TxId {
+    pub fn mint(
+        &mut self,
+        from: AccountIdentifier,
+        to: AccountIdentifier,
+        amount: Tokens128,
+    ) -> TxId {
         let id = self.len();
         self.push(TxRecord::mint(id, from, to, amount));
 
         id
     }
 
-    pub fn burn(&mut self, caller: Principal, from: Principal, amount: Tokens128) -> TxId {
+    pub fn burn(
+        &mut self,
+        caller: AccountIdentifier,
+        from: AccountIdentifier,
+        amount: Tokens128,
+    ) -> TxId {
         let id = self.next_id();
         self.push(TxRecord::burn(id, caller, from, amount));
 
@@ -171,7 +166,7 @@ impl Ledger {
 
     pub fn auction(&mut self, to: Principal, amount: Tokens128) {
         let id = self.next_id();
-        self.push(TxRecord::auction(id, to, amount))
+        self.push(TxRecord::auction(id, to.into(), amount))
     }
 
     fn push(&mut self, record: TxRecord) {

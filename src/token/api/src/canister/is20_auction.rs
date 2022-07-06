@@ -9,7 +9,7 @@ use ic_helpers::tokens::Tokens128;
 use crate::canister::erc20_transactions::transfer_balance;
 use crate::ledger::Ledger;
 use crate::state::{AuctionHistory, Balances, BiddingState, CanisterState};
-use crate::types::{AuctionInfo, Cycles, StatsData, Timestamp, TokenHolder, TokenReceiver};
+use crate::types::{AccountIdentifier, AuctionInfo, Cycles, StatsData, Timestamp};
 
 use super::TokenCanisterAPI;
 
@@ -154,8 +154,8 @@ fn perform_auction(
             .expect("total cycles is smaller then single user bid cycles");
         transfer_balance(
             balances,
-            TokenHolder::from(auction_principal()),
-            TokenReceiver::from(*bidder),
+            AccountIdentifier::from(auction_principal()),
+            AccountIdentifier::from(*bidder),
             amount,
         )
         .expect("auction principal always have enough balance");
@@ -213,7 +213,7 @@ pub fn auction_principal() -> Principal {
 pub fn accumulated_fees(balances: &Balances) -> Tokens128 {
     balances
         .0
-        .get(&TokenHolder::from(auction_principal()))
+        .get(&AccountIdentifier::from(auction_principal()))
         .cloned()
         .unwrap_or_else(|| Tokens128::from(0u128))
 }
@@ -226,7 +226,7 @@ mod tests {
     use test_case::test_case;
 
     use crate::mock::*;
-    use crate::types::{Metadata, TokenHolder, TxError};
+    use crate::types::{AccountIdentifier, Metadata, TxError};
 
     use super::*;
 
@@ -308,7 +308,7 @@ mod tests {
         canister.bidCycles(bob()).unwrap();
 
         canister.state().borrow_mut().balances.0.insert(
-            TokenHolder::from(auction_principal()),
+            AccountIdentifier::from(auction_principal()),
             Tokens128::from(6_000),
         );
 
@@ -319,7 +319,7 @@ mod tests {
         assert_eq!(result.tokens_distributed, Tokens128::from(6_000));
 
         assert_eq!(
-            canister.state().borrow().balances.0[&TokenHolder::from(bob())],
+            canister.state().borrow().balances.0[&AccountIdentifier::from(bob())],
             Tokens128::from(4_000)
         );
 

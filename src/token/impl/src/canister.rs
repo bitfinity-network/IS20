@@ -2,7 +2,8 @@ use std::{cell::RefCell, rc::Rc};
 
 use candid::Principal;
 use ic_canister::{init, Canister, PreUpdate};
-use token_api::types::TokenHolder;
+
+use token_api::types::AccountIdentifier;
 use token_api::{
     canister::{TokenCanisterAPI, DEFAULT_AUCTION_PERIOD},
     state::CanisterState,
@@ -20,16 +21,16 @@ pub struct TokenCanister {
 impl TokenCanister {
     #[init]
     pub fn init(&self, metadata: Metadata) {
-        self.state
-            .borrow_mut()
-            .balances
-            .0
-            .insert(TokenHolder::from(metadata.owner), metadata.totalSupply);
+        self.state.borrow_mut().balances.0.insert(
+            AccountIdentifier::from(metadata.owner),
+            metadata.totalSupply,
+        );
 
-        self.state
-            .borrow_mut()
-            .ledger
-            .mint(metadata.owner, metadata.owner, metadata.totalSupply);
+        self.state.borrow_mut().ledger.mint(
+            AccountIdentifier::from(metadata.owner),
+            AccountIdentifier::from(metadata.owner),
+            metadata.totalSupply,
+        );
 
         self.state.borrow_mut().stats = metadata.into();
         self.state.borrow_mut().bidding_state.auction_period = DEFAULT_AUCTION_PERIOD;
@@ -46,8 +47,9 @@ impl TokenCanisterAPI for TokenCanister {
 
 #[cfg(test)]
 mod test {
-    use super::*;
     use ic_canister::ic_kit::MockContext;
+
+    use super::*;
 
     #[test]
     fn test_upgrade_from_previous() {
