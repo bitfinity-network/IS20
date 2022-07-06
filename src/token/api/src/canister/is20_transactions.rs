@@ -175,6 +175,12 @@ mod tests {
             isTestToken: None,
         });
 
+        // This is to make tests that don't rely on auction state
+        // pass, because since we are running auction state on each
+        // endpoint call, it affects `BiddingInfo.fee_ratio` that is
+        // used for charging fees in `approve` endpoint.
+        canister.state.borrow_mut().stats.min_cycles = 0;
+
         canister
     }
 

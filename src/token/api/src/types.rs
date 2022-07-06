@@ -48,7 +48,7 @@ impl StatsData {
 
 // 10T cycles is an equivalent of approximately $10. This should be enough to last the canister
 // for the default auction cycle, which is 1 day.
-const DEFAULT_MIN_CYCLES: u64 = 10_000_000_000_000;
+pub const DEFAULT_MIN_CYCLES: u64 = 10_000_000_000_000;
 
 impl From<Metadata> for StatsData {
     fn from(md: Metadata) -> Self {

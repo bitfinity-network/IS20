@@ -517,6 +517,12 @@ mod tests {
             isTestToken: None,
         });
 
+        // This is to make tests that don't rely on auction state
+        // pass, because since we are running auction state on each
+        // endpoint call, it affects `BiddingInfo.fee_ratio` that is
+        // used for charging fees in `approve` endpoint.
+        canister.state.borrow_mut().stats.min_cycles = 0;
+
         (context, canister)
     }
 
@@ -581,6 +587,7 @@ mod tests {
         let canister = test_canister();
         canister.state().borrow_mut().stats.fee = Tokens128::from(50);
         canister.state().borrow_mut().stats.fee_to = john();
+        canister.state().borrow_mut().stats.min_cycles = crate::types::DEFAULT_MIN_CYCLES;
         canister.state().borrow_mut().bidding_state.fee_ratio = 0.5;
 
         canister
@@ -1319,6 +1326,11 @@ mod proptests {
             };
             let canister = TokenCanisterMock::init_instance();
             canister.init(meta);
+            // This is to make tests that don't rely on auction state
+            // pass, because since we are running auction state on each
+            // endpoint call, it affects `BiddingInfo.fee_ratio` that is
+            // used for charging fees in `approve` endpoint.
+            canister.state.borrow_mut().stats.min_cycles = 0;
             (canister, principals)
         }
     }

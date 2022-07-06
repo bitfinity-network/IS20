@@ -36,7 +36,11 @@ impl TokenCanisterMock {
     }
 }
 
-impl PreUpdate for TokenCanisterMock {}
+impl PreUpdate for TokenCanisterMock {
+    fn pre_update(&self, method_name: &str, method_type: ic_canister::MethodType) {
+        crate::canister::pre_update(self, method_name, method_type);
+    }
+}
 
 impl TokenCanisterAPI for TokenCanisterMock {
     fn state(&self) -> Rc<RefCell<CanisterState>> {

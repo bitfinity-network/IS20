@@ -3,6 +3,7 @@ use std::rc::Rc;
 
 use ic_canister::generate_exports;
 use ic_canister::Canister;
+use ic_canister::MethodType;
 use ic_canister::{query, update, AsyncReturn};
 use ic_cdk::export::candid::Principal;
 use ic_helpers::tokens::Tokens128;
@@ -42,6 +43,14 @@ pub mod is20_transactions;
 pub(crate) const MAX_TRANSACTION_QUERY_LEN: usize = 1000;
 // 1 day in nanoseconds.
 pub const DEFAULT_AUCTION_PERIOD: Timestamp = 24 * 60 * 60 * 1_000_000;
+
+pub fn pre_update(canister: &impl TokenCanisterAPI, method_name: &str, _method_type: MethodType) {
+    if method_name != "runAuction" {
+        if let Err(auction_error) = canister.runAuction() {
+            ic_cdk::println!("Auction error: {auction_error:#?}");
+        }
+    }
+}
 
 pub enum CanisterUpdate {
     Name(String),
