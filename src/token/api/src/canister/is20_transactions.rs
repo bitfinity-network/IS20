@@ -152,10 +152,10 @@ pub fn batch_transfer(
 
 #[cfg(test)]
 mod tests {
-    use candid::parser::token::Token;
+
     use ic_canister::ic_kit::mock_principals::{alice, bob, john, xtc};
     use ic_canister::ic_kit::MockContext;
-    use ic_canister::{ic_kit, Canister};
+    use ic_canister::Canister;
     use rand::{thread_rng, Rng};
 
     use crate::mock::TokenCanisterMock;

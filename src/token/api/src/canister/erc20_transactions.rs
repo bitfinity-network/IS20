@@ -344,12 +344,6 @@ mod tests {
         subaccount
     }
 
-    fn gen_accountidentifier() -> AccountIdentifier {
-        let mut aid = AccountIdentifier { hash: [0u8; 28] };
-        thread_rng().fill(&mut aid.hash);
-        aid
-    }
-
     fn test_context() -> (&'static MockContext, TokenCanisterMock) {
         let context = MockContext::new().with_caller(alice()).inject();
 
@@ -527,8 +521,6 @@ mod tests {
 
     #[test]
     fn transfer_wrong_caller() {
-        let alice_sub = gen_subaccount();
-        let alice_aid = AccountIdentifier::new(alice(), Some(alice_sub));
         let bob_sub = gen_subaccount();
         let bob_aid = AccountIdentifier::new(bob(), Some(bob_sub));
         let canister = test_canister();
@@ -951,7 +943,7 @@ mod proptests {
             // Without fee
             (
                 select_principal(principals.clone()),
-                select_principal(principals.clone()),
+                select_principal(principals),
                 make_tokens128(),
                 make_option(),
             )

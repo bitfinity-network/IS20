@@ -2,9 +2,7 @@
 
 use candid::Principal;
 use ic_canister::virtual_canister_notify;
-use ic_helpers::tokens::Tokens128;
 
-use crate::principal::{CheckedPrincipal, WithRecipient};
 use crate::types::{AccountIdentifier, TxError, TxId, TxReceipt};
 
 use super::TokenCanisterAPI;
@@ -81,11 +79,12 @@ pub(crate) async fn notify(
 #[cfg(test)]
 mod tests {
     use std::rc::Rc;
-    use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
+    use std::sync::atomic::{AtomicU32, Ordering};
 
     use ic_canister::ic_kit::mock_principals::{alice, bob};
     use ic_canister::ic_kit::MockContext;
     use ic_canister::{register_failing_virtual_responder, register_virtual_responder, Canister};
+    use ic_helpers::tokens::Tokens128;
 
     use crate::mock::*;
     use crate::types::{Metadata, TxRecord};
