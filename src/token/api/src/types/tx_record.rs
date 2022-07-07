@@ -1,4 +1,4 @@
-use candid::{CandidType, Deserialize, Principal};
+use candid::{CandidType, Deserialize};
 use ic_canister::ic_kit::ic;
 use ic_helpers::tokens::Tokens128;
 

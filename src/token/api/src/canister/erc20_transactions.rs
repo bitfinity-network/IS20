@@ -501,6 +501,20 @@ mod tests {
 
     use super::*;
 
+    // Method for generating random Subaccount.
+    fn gen_subaccount() -> Subaccount {
+        // generate a random subaccount
+        let mut subaccount = Subaccount([0u8; 32]);
+        thread_rng().fill(&mut subaccount.0);
+        subaccount
+    }
+
+    fn gen_accountidentifier() -> AccountIdentifier {
+        let mut aid = AccountIdentifier { hash: [0u8; 28] };
+        thread_rng().fill(&mut aid.hash);
+        aid
+    }
+
     fn test_context() -> (&'static MockContext, TokenCanisterMock) {
         let context = MockContext::new().with_caller(alice()).inject();
 
@@ -1129,14 +1143,6 @@ mod tests {
                 .unwrap();
         }
         assert_eq!(canister.getUserTransactionCount(alice(), None), COUNT);
-    }
-
-    // Method for generating random Subaccount.
-    fn gen_subaccount() -> Subaccount {
-        // generate a random subaccount
-        let mut subaccount = Subaccount([0u8; 32]);
-        thread_rng().fill(&mut subaccount.0);
-        subaccount
     }
 
     //     Test ICRC_TRANSFER

@@ -98,7 +98,6 @@ impl Ledger {
         from: AccountIdentifier,
         transfers: Vec<BatchTransferArgs>,
         fee: Tokens128,
-        caller: Principal,
     ) -> Vec<TxId> {
         transfers
             .into_iter()

@@ -18,7 +18,7 @@ use crate::canister::is20_auction::{
 };
 use crate::canister::is20_notify::{approve_and_notify, consume_notification, notify};
 use crate::canister::is20_transactions::{
-    batch_transfer, icrc1_transfer_include_fee, is20_transfer_include_fee,
+    icrc1_batch_transfer, icrc1_transfer_include_fee, is20_transfer_include_fee,
 };
 use crate::principal::{CheckedPrincipal, Owner};
 use crate::state::CanisterState;
@@ -148,6 +148,11 @@ pub trait TokenCanisterAPI: Canister + Sized {
     #[query(trait = true)]
     fn balanceOf(&self, holder: Principal, holder_subaccount: Option<Subaccount>) -> Tokens128 {
         let holder = AccountIdentifier::new(holder, holder_subaccount);
+        self.state().borrow().balances.balance_of(&holder)
+    }
+
+    #[query(trait = true)]
+    fn is20_balanceOf(&self, holder: AccountIdentifier) -> Tokens128 {
         self.state().borrow().balances.balance_of(&holder)
     }
 
@@ -312,7 +317,8 @@ pub trait TokenCanisterAPI: Canister + Sized {
         to: AccountIdentifier,
         amount: Tokens128,
     ) -> TxReceipt {
-        is20_transfer_include_fee(self, from_subaccount, to, amount)
+        let caller = CheckedIdentifier::with_recipient(to, from_subaccount)?;
+        is20_transfer_include_fee(self, caller, amount)
     }
 
     /// Takes a list of transfers, each of which is a pair of `to` and `value` fields, it returns a `TxReceipt` which contains
@@ -329,8 +335,7 @@ pub trait TokenCanisterAPI: Canister + Sized {
         for x in transfers.clone() {
             CheckedPrincipal::with_recipient(x.receiver.to)?;
         }
-
-        batch_transfer(self, from_subaccount, transfers)
+        icrc1_batch_transfer(self, from_subaccount, transfers)
     }
 
     #[update(trait = true)]

@@ -1,10 +1,12 @@
-use candid::Principal;
 use ic_helpers::tokens::Tokens128;
 
 use crate::canister::erc20_transactions::{charge_fee, transfer_balance};
 use crate::principal::{CheckedPrincipal, WithRecipient};
 use crate::state::CanisterState;
-use crate::types::{AccountIdentifier, BatchTransferArgs, Subaccount, TxError, TxId, TxReceipt};
+use crate::types::{
+    AccountIdentifier, BatchTransferArgs, CheckedIdentifier, Subaccount, TxError, TxId, TxReceipt,
+    WithAidRecipient,
+};
 
 use super::TokenCanisterAPI;
 
@@ -59,11 +61,11 @@ pub fn icrc1_transfer_include_fee(
 
 pub fn is20_transfer_include_fee(
     canister: &impl TokenCanisterAPI,
-    from_subaccount: Option<Subaccount>,
-    to: AccountIdentifier,
+    caller: CheckedIdentifier<WithAidRecipient>,
     amount: Tokens128,
 ) -> TxReceipt {
-    let from = AccountIdentifier::new(ic_canister::ic_kit::ic::caller(), from_subaccount);
+    let from = caller.inner();
+    let to = caller.recipient();
     let state = canister.state();
     let mut state = state.borrow_mut();
     let CanisterState {
@@ -99,7 +101,7 @@ pub fn is20_transfer_include_fee(
     Ok(id)
 }
 
-pub fn batch_transfer(
+pub fn icrc1_batch_transfer(
     canister: &impl TokenCanisterAPI,
     from_subaccount: Option<Subaccount>,
     transfers: Vec<BatchTransferArgs>,
@@ -144,20 +146,37 @@ pub fn batch_transfer(
         }
     }
 
-    let id = state.ledger.batch_transfer(from, transfers, fee, caller);
+    let id = state.ledger.batch_transfer(from, transfers, fee);
     Ok(id)
 }
 
 #[cfg(test)]
 mod tests {
+    use candid::parser::token::Token;
     use ic_canister::ic_kit::mock_principals::{alice, bob, john, xtc};
     use ic_canister::ic_kit::MockContext;
-    use ic_canister::Canister;
+    use ic_canister::{ic_kit, Canister};
+    use rand::{thread_rng, Rng};
 
     use crate::mock::TokenCanisterMock;
     use crate::types::{BatchAccount, Metadata};
 
     use super::*;
+
+    // Method for generating random Subaccount.
+    fn gen_subaccount() -> Subaccount {
+        // generate a random subaccount
+        let mut subaccount = Subaccount([0u8; 32]);
+        thread_rng().fill(&mut subaccount.0);
+        subaccount
+    }
+
+    // Generate account identifier
+    fn gen_accountidentifier() -> AccountIdentifier {
+        let mut aid = AccountIdentifier { hash: [0u8; 28] };
+        thread_rng().fill(&mut aid.hash);
+        aid
+    }
 
     fn test_canister() -> TokenCanisterMock {
         MockContext::new().with_caller(alice()).inject();
@@ -279,6 +298,22 @@ mod tests {
             .is_ok());
         assert_eq!(canister.balanceOf(bob(), None), Tokens128::from(100));
         assert_eq!(canister.balanceOf(alice(), None), Tokens128::from(900));
+        let max = gen_accountidentifier();
+        assert!(canister
+            .is20_transferIncludeFee(None, max, Tokens128::from(100))
+            .is_ok());
+        assert_eq!(canister.is20_balanceOf(max), Tokens128::from(100));
+        assert_eq!(canister.balanceOf(alice(), None), Tokens128::from(800));
+        let john_sub = gen_subaccount();
+        let alice_aid = AccountIdentifier::new(alice(), Some(john_sub));
+        let _ = canister.is20_mint(alice_aid, Tokens128::from(500));
+        assert_eq!(canister.is20_balanceOf(alice_aid), Tokens128::from(500));
+        println!("BALANCE {}", canister.balanceOf(john(), Some(john_sub)));
+        assert!(canister
+            .is20_transferIncludeFee(Some(john_sub), max, Tokens128::from(100))
+            .is_ok());
+        assert_eq!(canister.is20_balanceOf(max), Tokens128::from(200));
+        assert_eq!(canister.is20_balanceOf(alice_aid), Tokens128::from(400));
     }
 
     #[test]
@@ -296,6 +331,30 @@ mod tests {
         assert_eq!(canister.balanceOf(bob(), None), Tokens128::from(100));
         assert_eq!(canister.balanceOf(alice(), None), Tokens128::from(800));
         assert_eq!(canister.balanceOf(john(), None), Tokens128::from(100));
+        let mary = gen_accountidentifier();
+        assert!(canister
+            .is20_transferIncludeFee(None, mary, Tokens128::from(200))
+            .is_ok());
+        assert_eq!(
+            canister.state.borrow().balances.balance_of(&mary),
+            Tokens128::from(100)
+        );
+        assert_eq!(canister.balanceOf(alice(), None), Tokens128::from(600));
+        assert_eq!(canister.balanceOf(john(), None), Tokens128::from(200));
+        let alice_sub = gen_subaccount();
+        assert!(canister
+            .is20_transferIncludeFee(Some(alice_sub), mary, Tokens128::from(200))
+            .is_err());
+        let alice_aid = AccountIdentifier::new(alice(), Some(alice_sub));
+        let _ = canister.is20_mint(alice_aid, Tokens128::from(500));
+        assert!(canister
+            .is20_transferIncludeFee(Some(alice_sub), mary, Tokens128::from(200))
+            .is_ok());
+        assert_eq!(canister.is20_balanceOf(mary), Tokens128::from(200));
+        assert_eq!(
+            canister.balanceOf(alice(), Some(alice_sub)),
+            Tokens128::from(300)
+        );
     }
 
     #[test]
@@ -307,5 +366,13 @@ mod tests {
         );
         assert_eq!(canister.balanceOf(alice(), None), Tokens128::from(1000));
         assert_eq!(canister.balanceOf(bob(), None), Tokens128::from(0));
+
+        let mary = gen_accountidentifier();
+        assert_eq!(
+            canister.is20_transferIncludeFee(None, mary, Tokens128::from(1001)),
+            Err(TxError::InsufficientBalance)
+        );
+        assert_eq!(canister.is20_balanceOf(mary), Tokens128::from(0));
+        assert_eq!(canister.balanceOf(alice(), None), Tokens128::from(1000));
     }
 }
