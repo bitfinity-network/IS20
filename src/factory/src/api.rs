@@ -10,6 +10,7 @@ use crate::{error::TokenFactoryError, state::State};
 use candid::Principal;
 use ic_canister::{init, post_upgrade, pre_upgrade, query, update, Canister, PreUpdate};
 use ic_factory::{api::FactoryCanister, error::FactoryError, FactoryConfiguration, FactoryState};
+use ic_helpers::candid_header::{candid_header, CandidHeader};
 use token::types::Metadata;
 
 const DEFAULT_LEDGER_PRINCIPAL: &str = "ryjl3-tyaaa-aaaaa-aaaba-cai";
@@ -196,6 +197,11 @@ impl TokenFactoryCanister {
         let wasm = self.state.borrow().token_wasm.clone();
         let result = FactoryCanister::upgrade(self, wasm).await;
         result
+    }
+
+    #[query]
+    pub fn state_check(&self) -> CandidHeader {
+        candid_header::<StableState>()
     }
 }
 

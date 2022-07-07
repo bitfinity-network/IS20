@@ -1,8 +1,9 @@
 use std::{cell::RefCell, rc::Rc};
 
 use candid::Principal;
-use ic_canister::{init, Canister, PreUpdate};
+use ic_canister::{init, query, Canister, PreUpdate};
 
+use ic_helpers::candid_header::{candid_header, CandidHeader};
 use token_api::types::AccountIdentifier;
 use token_api::{
     canister::{TokenCanisterAPI, DEFAULT_AUCTION_PERIOD},
@@ -34,6 +35,11 @@ impl TokenCanister {
 
         self.state.borrow_mut().stats = metadata.into();
         self.state.borrow_mut().bidding_state.auction_period = DEFAULT_AUCTION_PERIOD;
+    }
+
+    #[query]
+    pub fn state_check(&self) -> CandidHeader {
+        candid_header::<CanisterState>()
     }
 }
 
