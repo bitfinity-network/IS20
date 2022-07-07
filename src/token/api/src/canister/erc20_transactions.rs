@@ -2,7 +2,7 @@ use ic_cdk::export::Principal;
 use ic_helpers::tokens::Tokens128;
 
 use crate::canister::is20_auction::auction_principal;
-use crate::principal::{CheckedPrincipal, Owner, SenderRecipient, TestNet, WithRecipient};
+use crate::principal::{CheckedPrincipal, Owner, TestNet, WithRecipient};
 use crate::state::{Balances, CanisterState};
 use crate::types::{
     AccountIdentifier, CheckedIdentifier, OwnerAid, Subaccount, TestNetAid, TxError, TxReceipt,
