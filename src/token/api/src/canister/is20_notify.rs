@@ -9,18 +9,18 @@ use crate::types::{AccountIdentifier, TxError, TxId, TxReceipt};
 
 use super::TokenCanisterAPI;
 
-pub(crate) async fn approve_and_notify(
-    canister: &impl TokenCanisterAPI,
-    caller: CheckedPrincipal<WithRecipient>,
-    amount: Tokens128,
-) -> TxReceipt {
-    let transaction_id = canister.approve(caller.recipient(), None, amount, None)?;
-    notify(canister, transaction_id, caller.recipient())
-        .await
-        .map_err(|e| TxError::ApproveSucceededButNotifyFailed {
-            tx_error: Box::from(e),
-        })
-}
+// pub(crate) async fn approve_and_notify(
+//     canister: &impl TokenCanisterAPI,
+//     caller: CheckedPrincipal<WithRecipient>,
+//     amount: Tokens128,
+// ) -> TxReceipt {
+//     let transaction_id = canister.approve(caller.recipient(), None, amount, None)?;
+//     notify(canister, transaction_id, caller.recipient())
+//         .await
+//         .map_err(|e| TxError::ApproveSucceededButNotifyFailed {
+//             tx_error: Box::from(e),
+//         })
+// }
 
 pub(crate) async fn consume_notification(
     canister: &impl TokenCanisterAPI,
@@ -109,31 +109,6 @@ mod tests {
         });
 
         canister
-    }
-
-    #[tokio::test]
-    async fn approve_notify() {
-        const AMOUNT: Tokens128 = Tokens128 { amount: 100 };
-
-        let is_notified = Rc::new(AtomicBool::new(false));
-        let is_notified_clone = is_notified.clone();
-        let counter = Rc::new(AtomicU32::new(0));
-        let counter_copy = counter.clone();
-        register_virtual_responder(
-            bob(),
-            "transaction_notification",
-            move |(notification,): (TxRecord,)| {
-                is_notified.swap(true, Ordering::Relaxed);
-                counter.fetch_add(1, Ordering::Relaxed);
-                assert_eq!(notification.amount, AMOUNT);
-            },
-        );
-
-        let canister = test_canister();
-
-        canister.approveAndNotify(bob(), AMOUNT).await.unwrap();
-        assert!(is_notified_clone.load(Ordering::Relaxed));
-        assert_eq!(counter_copy.load(Ordering::Relaxed), 1);
     }
 
     #[tokio::test]

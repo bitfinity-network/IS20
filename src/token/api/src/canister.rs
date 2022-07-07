@@ -10,15 +10,15 @@ use ic_helpers::tokens::Tokens128;
 use ic_storage::IcStorage;
 
 use crate::canister::erc20_transactions::{
-    approve, burn_as_owner, burn_own_tokens, icrc1_transfer, icrc1_transfer_from,
-    is20_mint_as_owner, is20_mint_test_token, mint_as_owner, mint_test_token,
+    burn_as_owner, burn_own_tokens, icrc1_transfer, is20_mint_as_owner, is20_mint_test_token,
+    mint_as_owner, mint_test_token,
 };
 use crate::canister::is20_auction::{
     auction_info, bid_cycles, bidding_info, run_auction, AuctionError, BiddingInfo,
 };
-use crate::canister::is20_notify::{approve_and_notify, consume_notification, notify};
+use crate::canister::is20_notify::{consume_notification, notify};
 use crate::canister::is20_transactions::{
-    icrc1_batch_transfer, icrc1_transfer_include_fee, is20_transfer_include_fee,
+    batch_transfer, icrc1_transfer_include_fee, is20_transfer_include_fee,
 };
 use crate::principal::{CheckedPrincipal, Owner};
 use crate::state::CanisterState;
@@ -29,8 +29,9 @@ use crate::types::{
     TokenInfo, TxError, TxId, TxReceipt, TxRecord,
 };
 
-use self::erc20_transactions::is20_transfer_from;
-use self::erc20_transactions::{is20_burn_as_owner, is20_burn_own_tokens, is20_transfer};
+use crate::canister::erc20_transactions::{
+    is20_burn_as_owner, is20_burn_own_tokens, is20_transfer,
+};
 
 #[cfg(not(feature = "no_api"))]
 mod inspect;
@@ -224,20 +225,6 @@ pub trait TokenCanisterAPI: Canister + Sized {
         Ok(())
     }
 
-    #[update(trait = true)]
-    fn approve(
-        &self,
-        spender: Principal,
-        spender_subaccount: Option<Subaccount>,
-        amount: Tokens128,
-        owner_subaccount: Option<Subaccount>,
-    ) -> TxReceipt {
-        let caller = CheckedPrincipal::with_recipient(spender)?;
-        let spender = AccountIdentifier::new(caller.recipient(), spender_subaccount);
-        let owner = AccountIdentifier::new(caller.inner(), owner_subaccount);
-        approve(self, owner, spender, amount)
-    }
-
     /********************** TRANSFERS ***********************/
     #[update(trait = true)]
     fn icrc1_transfer(
@@ -271,28 +258,6 @@ pub trait TokenCanisterAPI: Canister + Sized {
         is20_transfer(self, caller, amount, fee_limit)
     }
 
-    #[update(trait = true)]
-    fn icrc1_transferFrom(
-        &self,
-        from: Principal,
-        from_subaccount: Option<Subaccount>,
-        to: Principal,
-        to_subaccount: Option<Subaccount>,
-        amount: Tokens128,
-    ) -> TxReceipt {
-        let caller = CheckedPrincipal::from_to(from, to)?;
-        icrc1_transfer_from(self, caller, from_subaccount, to_subaccount, amount)
-    }
-
-    #[update(trait = true)]
-    fn is20_transferFrom(
-        &self,
-        from: AccountIdentifier,
-        to: AccountIdentifier,
-        amount: Tokens128,
-    ) -> TxReceipt {
-        is20_transfer_from(self, from, to, amount)
-    }
     /// Transfers `value` amount to the `to` principal, applying American style fee. This means, that
     /// the recipient will receive `value - fee`, and the sender account will be reduced exactly by `value`.
     ///
@@ -335,7 +300,7 @@ pub trait TokenCanisterAPI: Canister + Sized {
         for x in transfers.clone() {
             CheckedPrincipal::with_recipient(x.receiver.to)?;
         }
-        icrc1_batch_transfer(self, from_subaccount, transfers)
+        batch_transfer(self, from_subaccount, transfers)
     }
 
     #[update(trait = true)]
@@ -461,22 +426,6 @@ pub trait TokenCanisterAPI: Canister + Sized {
     fn consume_notification<'a>(&'a self, transaction_id: TxId) -> AsyncReturn<TxReceipt> {
         let fut = async move { consume_notification(self, transaction_id).await };
 
-        Box::pin(fut)
-    }
-
-    #[update(trait = true)]
-    fn approveAndNotify<'a>(
-        &'a self,
-        spender: Principal,
-        amount: Tokens128,
-    ) -> AsyncReturn<TxReceipt> {
-        let caller = CheckedPrincipal::with_recipient(spender);
-        let fut = async move {
-            match caller {
-                Ok(caller) => approve_and_notify(self, caller, amount).await,
-                Err(e) => Err(e).into(),
-            }
-        };
         Box::pin(fut)
     }
 

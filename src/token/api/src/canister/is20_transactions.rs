@@ -101,7 +101,7 @@ pub fn is20_transfer_include_fee(
     Ok(id)
 }
 
-pub fn icrc1_batch_transfer(
+pub fn batch_transfer(
     canister: &impl TokenCanisterAPI,
     from_subaccount: Option<Subaccount>,
     transfers: Vec<BatchTransferArgs>,
@@ -308,7 +308,6 @@ mod tests {
         let alice_aid = AccountIdentifier::new(alice(), Some(john_sub));
         let _ = canister.is20_mint(alice_aid, Tokens128::from(500));
         assert_eq!(canister.is20_balanceOf(alice_aid), Tokens128::from(500));
-        println!("BALANCE {}", canister.balanceOf(john(), Some(john_sub)));
         assert!(canister
             .is20_transferIncludeFee(Some(john_sub), max, Tokens128::from(100))
             .is_ok());
