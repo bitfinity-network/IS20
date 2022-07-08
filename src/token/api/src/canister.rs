@@ -13,6 +13,9 @@ use crate::canister::erc20_transactions::{
     burn_as_owner, burn_own_tokens, icrc1_transfer, is20_mint_as_owner, is20_mint_test_token,
     mint_as_owner, mint_test_token,
 };
+use crate::canister::erc20_transactions::{
+    is20_burn_as_owner, is20_burn_own_tokens, is20_transfer,
+};
 use crate::canister::is20_auction::{
     auction_info, bid_cycles, bidding_info, run_auction, AuctionError, BiddingInfo,
 };
@@ -27,10 +30,6 @@ use crate::types::CheckedIdentifier;
 use crate::types::{
     AccountIdentifier, AuctionInfo, Metadata, PaginatedResult, StatsData, Subaccount, Timestamp,
     TokenInfo, TxError, TxId, TxReceipt, TxRecord,
-};
-
-use crate::canister::erc20_transactions::{
-    is20_burn_as_owner, is20_burn_own_tokens, is20_transfer,
 };
 
 #[cfg(not(feature = "no_api"))]
@@ -453,14 +452,13 @@ pub trait TokenCanisterAPI: Canister + Sized {
     #[query(trait = true)]
     fn getTransactions(
         &self,
-        who: Option<Principal>,
-        who_subaccount: Option<Subaccount>,
+        who: Option<AccountIdentifier>,
         count: usize,
         transaction_id: Option<TxId>,
     ) -> PaginatedResult {
         // We don't trap if the transaction count is greater than the MAX_TRANSACTION_QUERY_LEN, we take the MAX_TRANSACTION_QUERY_LEN instead.
         self.state().borrow_mut().ledger.get_transactions(
-            who.map(|p| AccountIdentifier::new(p, who_subaccount)),
+            who,
             count.min(MAX_TRANSACTION_QUERY_LEN),
             transaction_id,
         )
