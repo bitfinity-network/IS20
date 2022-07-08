@@ -1,12 +1,14 @@
-use crate::ledger::Ledger;
-use crate::types::{
-    AccountIdentifier, Allowances, AuctionInfo, Cycles, Metadata, StatsData, Timestamp,
-};
+use std::collections::HashMap;
+
 use candid::{CandidType, Deserialize, Principal};
 use ic_helpers::tokens::Tokens128;
 use ic_storage::stable::Versioned;
 use ic_storage::IcStorage;
-use std::collections::HashMap;
+
+use crate::ledger::Ledger;
+use crate::types::{
+    Account, Allowances, AuctionInfo, Cycles, Metadata, StatsData, Subaccount, Timestamp,
+};
 
 #[derive(Debug, Default, CandidType, Deserialize, IcStorage)]
 pub struct CanisterState {
@@ -32,32 +34,8 @@ impl CanisterState {
             isTestToken: Some(self.stats.is_test_token),
         }
     }
-
-    pub fn allowance(&self, owner: AccountIdentifier, spender: AccountIdentifier) -> Tokens128 {
-        match self.allowances.get(&owner) {
-            Some(inner) => match inner.get(&spender) {
-                Some(value) => *value,
-                None => Tokens128::from(0u128),
-            },
-            None => Tokens128::from(0u128),
-        }
-    }
-
-    pub fn allowance_size(&self) -> usize {
-        self.allowances
-            .iter()
-            .map(|(_, v)| v.len())
-            .reduce(|accum, v| accum + v)
-            .unwrap_or(0)
-    }
-
-    pub fn user_approvals(&self, who: AccountIdentifier) -> Vec<(AccountIdentifier, Tokens128)> {
-        match self.allowances.get(&who) {
-            Some(allow) => Vec::from_iter(allow.clone().into_iter()),
-            None => Vec::new(),
-        }
-    }
 }
+
 impl Versioned for CanisterState {
     type Previous = ();
 
@@ -67,24 +45,58 @@ impl Versioned for CanisterState {
 }
 
 #[derive(Debug, Default, CandidType, Deserialize)]
-pub struct Balances(pub HashMap<AccountIdentifier, Tokens128>);
+pub struct Balances(pub HashMap<Principal, HashMap<Subaccount, Tokens128>>);
 
 impl Balances {
-    pub fn balance_of(&self, who: &AccountIdentifier) -> Tokens128 {
+    pub fn insert(
+        &mut self,
+        principal: Principal,
+        subaccount: Option<Subaccount>,
+        token: Tokens128,
+    ) {
         self.0
-            .get(who)
-            .cloned()
-            .unwrap_or_else(|| Tokens128::from(0u128))
+            .entry(principal)
+            .or_default()
+            .insert(subaccount.unwrap_or_default(), token);
     }
 
-    pub fn get_holders(&self, start: usize, limit: usize) -> Vec<(AccountIdentifier, Tokens128)> {
-        let mut balance = self.0.iter().map(|(&k, v)| (k, *v)).collect::<Vec<_>>();
+    pub fn balance_of(&self, who: &Principal, who_subaccount: Option<Subaccount>) -> Tokens128 {
+        let who_subaccount = who_subaccount.unwrap_or_default();
+        *self
+            .0
+            .get(&who)
+            .and_then(|subaccount| subaccount.get(&who_subaccount))
+            .unwrap_or(&Tokens128::default())
+    }
 
-        // Sort balance and principals by the balance
-        balance.sort_by(|a, b| b.1.cmp(&a.1));
+    pub fn get_holders(&self) -> Vec<Principal> {
+        self.0.keys().cloned().collect()
+    }
 
-        let end = (start + limit).min(balance.len());
-        balance[start..end].to_vec()
+    pub fn get_balances(&self, who: &Principal) -> HashMap<Subaccount, Tokens128> {
+        self.0.get(who).cloned().unwrap_or_default()
+    }
+
+    pub fn remove(&mut self, account: Account) {
+        if let Some(subaccount) = account.subaccount {
+            self.0
+                .get_mut(&account.account)
+                .map(|subaccounts| subaccounts.remove(&subaccount));
+        } else {
+            self.0.remove(&account.account);
+        }
+    }
+
+    pub fn set_balance(&mut self, account: Account, token: Tokens128) {
+        if let Some(subaccount) = account.subaccount {
+            self.0
+                .get_mut(&account.account)
+                .map(|subaccounts| subaccounts.insert(subaccount, token));
+        } else {
+            self.0
+                .get_mut(&account.account)
+                .map(|subaccounts| subaccounts.insert(Subaccount::default(), token));
+        }
     }
 }
 

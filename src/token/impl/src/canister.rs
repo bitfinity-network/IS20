@@ -4,11 +4,10 @@ use candid::Principal;
 use ic_canister::{init, query, Canister, PreUpdate};
 
 use ic_helpers::candid_header::{candid_header, CandidHeader};
-use token_api::types::AccountIdentifier;
 use token_api::{
     canister::{TokenCanisterAPI, DEFAULT_AUCTION_PERIOD},
     state::CanisterState,
-    types::Metadata,
+    types::{Account, Metadata},
 };
 
 #[derive(Debug, Clone, Canister)]
@@ -22,14 +21,14 @@ pub struct TokenCanister {
 impl TokenCanister {
     #[init]
     pub fn init(&self, metadata: Metadata) {
-        self.state.borrow_mut().balances.0.insert(
-            AccountIdentifier::from(metadata.owner),
-            metadata.totalSupply,
-        );
+        self.state
+            .borrow_mut()
+            .balances
+            .insert(metadata.owner, None, metadata.totalSupply);
 
         self.state.borrow_mut().ledger.mint(
-            AccountIdentifier::from(metadata.owner),
-            AccountIdentifier::from(metadata.owner),
+            Account::from(metadata.owner),
+            Account::from(metadata.owner),
             metadata.totalSupply,
         );
 

@@ -1,10 +1,10 @@
+use crate::state::CanisterState;
+use crate::types::Account;
 use candid::{Nat, Principal};
 use ic_cdk_macros::inspect_message;
 use ic_helpers::tokens::Tokens128;
 use ic_storage::IcStorage;
 
-use crate::state::CanisterState;
-use crate::types::AccountIdentifier;
 use crate::types::TxId;
 
 static PUBLIC_METHODS: &[&str] = &[
@@ -81,7 +81,7 @@ fn inspect_message() {
             let state = CanisterState::get();
             let state = state.borrow();
             let balances = &state.balances;
-            if !balances.0.contains_key(&AccountIdentifier::from(caller)) {
+            if !balances.0.contains_key(&caller) {
                 ic_cdk::trap("Transaction method is not called by a stakeholder. Rejecting.");
             }
 
@@ -98,25 +98,6 @@ fn inspect_message() {
             }
 
             ic_cdk::api::call::accept_message();
-        }
-        "transferFrom" => {
-            // Check if the caller has allowance for this transfer.
-            let allowances = &state.allowances;
-            let (from, _, value) =
-                ic_cdk::api::call::arg_data::<(Principal, Principal, Tokens128)>();
-            if let Some(user_allowances) = allowances.get(&AccountIdentifier::from(caller)) {
-                if let Some(allowance) = user_allowances.get(&AccountIdentifier::from(from)) {
-                    if value <= *allowance {
-                        ic_cdk::api::call::accept_message();
-                    } else {
-                        ic_cdk::trap("Allowance amount is less then the requested transfer amount. Rejecting.");
-                    }
-                } else {
-                    ic_cdk::trap("Caller is not allowed to transfer tokens for the requested principal. Rejecting.");
-                }
-            } else {
-                ic_cdk::trap("Caller is not allowed to transfer tokens for the requested principal. Rejecting.");
-            }
         }
         "notify" => {
             // This method can only be called if the notification id is in the pending notifications

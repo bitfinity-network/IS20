@@ -2,7 +2,7 @@ use candid::{CandidType, Deserialize, Principal};
 use ic_helpers::tokens::Tokens128;
 
 use crate::types::{
-    AccountIdentifier, BatchTransferArgs, PaginatedResult, PendingNotifications, TxId, TxRecord,
+    Account, BatchTransferArgs, PaginatedResult, PendingNotifications, TxId, TxRecord,
 };
 
 const MAX_HISTORY_LENGTH: usize = 1_000_000;
@@ -34,7 +34,7 @@ impl Ledger {
 
     pub fn get_transactions(
         &self,
-        who: Option<AccountIdentifier>,
+        who: Option<Account>,
         count: usize,
         transaction_id: Option<TxId>,
     ) -> PaginatedResult {
@@ -73,7 +73,7 @@ impl Ledger {
         }
     }
 
-    pub fn get_len_user_history(&self, user: AccountIdentifier) -> usize {
+    pub fn get_len_user_history(&self, user: Account) -> usize {
         self.history
             .iter()
             .filter(|tx| tx.to == user || tx.from == user || tx.caller == Some(user))
@@ -82,8 +82,8 @@ impl Ledger {
 
     pub fn transfer(
         &mut self,
-        from: AccountIdentifier,
-        to: AccountIdentifier,
+        from: Account,
+        to: Account,
         amount: Tokens128,
         fee: Tokens128,
     ) -> TxId {
@@ -95,7 +95,7 @@ impl Ledger {
 
     pub fn batch_transfer(
         &mut self,
-        from: AccountIdentifier,
+        from: Account,
         transfers: Vec<BatchTransferArgs>,
         fee: Tokens128,
     ) -> Vec<TxId> {
@@ -104,7 +104,7 @@ impl Ledger {
             .map(|x| {
                 self.transfer(
                     from,
-                    AccountIdentifier::new(x.receiver.to, x.receiver.to_subaccount),
+                    Account::new(x.receiver.to, x.receiver.to_subaccount),
                     x.amount,
                     fee,
                 )
@@ -114,11 +114,11 @@ impl Ledger {
 
     pub fn transfer_from(
         &mut self,
-        from: AccountIdentifier,
-        to: AccountIdentifier,
+        from: Account,
+        to: Account,
         amount: Tokens128,
         fee: Tokens128,
-        caller: AccountIdentifier,
+        caller: Account,
     ) -> TxId {
         let id = self.next_id();
         self.push(TxRecord::transfer_from(id, from, to, amount, fee, caller));
@@ -128,8 +128,8 @@ impl Ledger {
 
     pub fn approve(
         &mut self,
-        from: AccountIdentifier,
-        to: AccountIdentifier,
+        from: Account,
+        to: Account,
         amount: Tokens128,
         fee: Tokens128,
     ) -> TxId {
@@ -139,24 +139,14 @@ impl Ledger {
         id
     }
 
-    pub fn mint(
-        &mut self,
-        from: AccountIdentifier,
-        to: AccountIdentifier,
-        amount: Tokens128,
-    ) -> TxId {
+    pub fn mint(&mut self, from: Account, to: Account, amount: Tokens128) -> TxId {
         let id = self.len();
         self.push(TxRecord::mint(id, from, to, amount));
 
         id
     }
 
-    pub fn burn(
-        &mut self,
-        caller: AccountIdentifier,
-        from: AccountIdentifier,
-        amount: Tokens128,
-    ) -> TxId {
+    pub fn burn(&mut self, caller: Account, from: Account, amount: Tokens128) -> TxId {
         let id = self.next_id();
         self.push(TxRecord::burn(id, caller, from, amount));
 

@@ -3,12 +3,9 @@ use std::{cell::RefCell, rc::Rc};
 use candid::Principal;
 use ic_canister::{Canister, PreUpdate};
 
-use crate::{
-    canister::TokenCanisterAPI,
-    state::CanisterState,
-    types::{AccountIdentifier, Metadata},
-};
+use crate::{canister::TokenCanisterAPI, state::CanisterState, types::Metadata};
 
+use std::collections::HashMap;
 #[derive(Debug, Clone, Canister)]
 pub struct TokenCanisterMock {
     #[id]
@@ -19,10 +16,10 @@ pub struct TokenCanisterMock {
 
 impl TokenCanisterMock {
     pub fn init(&self, metadata: Metadata) {
-        self.state.borrow_mut().balances.0.insert(
-            AccountIdentifier::from(metadata.owner),
-            metadata.totalSupply,
-        );
+        self.state
+            .borrow_mut()
+            .balances
+            .insert(metadata.owner, None, metadata.totalSupply);
 
         self.state.borrow_mut().ledger.mint(
             metadata.owner.into(),

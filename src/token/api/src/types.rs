@@ -3,10 +3,10 @@ use std::collections::HashMap;
 use candid::{CandidType, Deserialize, Principal};
 use ic_helpers::tokens::Tokens128;
 
-pub use account_identifier::*;
+pub use account::*;
 pub use tx_record::*;
 
-mod account_identifier;
+mod account;
 mod tx_record;
 
 pub type Timestamp = u64;
@@ -97,7 +97,7 @@ impl Default for StatsData {
     }
 }
 
-pub type Allowances = HashMap<AccountIdentifier, HashMap<AccountIdentifier, Tokens128>>;
+pub type Allowances = HashMap<Principal, HashMap<Subaccount, Tokens128>>;
 
 // TODO: a wrapper over `ic_helpers::TxError`, this is a most likely
 // place to make tests fail in amm.
@@ -167,20 +167,6 @@ pub struct PaginatedResult {
 
 pub type TxId = u64;
 pub type Cycles = u64;
-
-/// `TokenHolder` is the holder of a token. This is used to identify the holder of a token in the form of `AccountIdentifier`.
-// #[derive(Debug, Clone, CandidType, Deserialize, Copy)]
-// pub struct AccountIdentifier(pub AccountIdentifier);
-//
-// impl AccountIdentifier {
-//     pub fn from(aid: AccountIdentifier) -> Self {
-//         AccountIdentifier(aid)
-//     }
-// }
-//
-// /// `TokenReceiver` is the recipient of a token. This is used to identify the recipient of a token in the form of `AccountIdentifier`.
-// #[derive(Debug, Clone, CandidType, Deserialize, Copy)]
-// pub struct AccountIdentifier(pub AccountIdentifier);
 
 // Batch transfer arguments.
 #[derive(Debug, Clone, CandidType, Deserialize)]

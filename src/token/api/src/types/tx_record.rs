@@ -2,14 +2,14 @@ use candid::{CandidType, Deserialize};
 use ic_canister::ic_kit::ic;
 use ic_helpers::tokens::Tokens128;
 
-use crate::types::{AccountIdentifier, Operation, TransactionStatus, TxId};
+use crate::types::{Account, Operation, TransactionStatus, TxId};
 
 #[derive(Deserialize, CandidType, Debug, Clone)]
 pub struct TxRecord {
-    pub caller: Option<AccountIdentifier>,
+    pub caller: Option<Account>,
     pub index: TxId,
-    pub from: AccountIdentifier,
-    pub to: AccountIdentifier,
+    pub from: Account,
+    pub to: Account,
     pub amount: Tokens128,
     pub fee: Tokens128,
     pub timestamp: u64,
@@ -20,8 +20,8 @@ pub struct TxRecord {
 impl TxRecord {
     pub fn transfer(
         index: TxId,
-        from: AccountIdentifier,
-        to: AccountIdentifier,
+        from: Account,
+        to: Account,
         amount: Tokens128,
         fee: Tokens128,
     ) -> Self {
@@ -40,11 +40,11 @@ impl TxRecord {
 
     pub fn transfer_from(
         index: TxId,
-        from: AccountIdentifier,
-        to: AccountIdentifier,
+        from: Account,
+        to: Account,
         amount: Tokens128,
         fee: Tokens128,
-        caller: AccountIdentifier,
+        caller: Account,
     ) -> Self {
         Self {
             caller: Some(caller),
@@ -61,8 +61,8 @@ impl TxRecord {
 
     pub fn approve(
         index: TxId,
-        from: AccountIdentifier,
-        to: AccountIdentifier,
+        from: Account,
+        to: Account,
         amount: Tokens128,
         fee: Tokens128,
     ) -> Self {
@@ -79,12 +79,7 @@ impl TxRecord {
         }
     }
 
-    pub fn mint(
-        index: TxId,
-        from: AccountIdentifier,
-        to: AccountIdentifier,
-        amount: Tokens128,
-    ) -> Self {
+    pub fn mint(index: TxId, from: Account, to: Account, amount: Tokens128) -> Self {
         Self {
             caller: Some(from),
             index,
@@ -98,12 +93,7 @@ impl TxRecord {
         }
     }
 
-    pub fn burn(
-        index: TxId,
-        caller: AccountIdentifier,
-        from: AccountIdentifier,
-        amount: Tokens128,
-    ) -> Self {
+    pub fn burn(index: TxId, caller: Account, from: Account, amount: Tokens128) -> Self {
         Self {
             caller: Some(caller),
             index,
@@ -117,7 +107,7 @@ impl TxRecord {
         }
     }
 
-    pub fn auction(index: TxId, to: AccountIdentifier, amount: Tokens128) -> Self {
+    pub fn auction(index: TxId, to: Account, amount: Tokens128) -> Self {
         Self {
             caller: Some(to),
             index,
