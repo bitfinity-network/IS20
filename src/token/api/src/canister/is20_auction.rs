@@ -211,11 +211,6 @@ pub fn auction_principal() -> Principal {
 }
 
 pub fn accumulated_fees(balances: &Balances) -> Tokens128 {
-    // balances
-    //     .0
-    //     .get(&AccountIdentifier::from(auction_principal()))
-    //     .cloned()
-    //     .unwrap_or_else(|| Tokens128::from(0u128))
     balances.balance_of(&auction_principal(), None)
 }
 
