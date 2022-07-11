@@ -13,7 +13,7 @@ pub struct State {
 }
 
 #[derive(CandidType, Deserialize, Default)]
-pub(crate) struct StableState {
+pub struct StableState {
     pub token_factory_state: State,
     pub base_factory_state: FactoryState,
 }

@@ -4,6 +4,8 @@ use ic_canister::{init, Canister, PreUpdate};
 #[cfg(not(feature = "no_api"))]
 use ic_cdk_macros::inspect_message;
 
+use ic_canister::query;
+use ic_helpers::candid_header::{candid_header, CandidHeader};
 use std::{cell::RefCell, rc::Rc};
 use token_api::{
     canister::{TokenCanisterAPI, DEFAULT_AUCTION_PERIOD},
@@ -35,6 +37,11 @@ impl TokenCanister {
 
         self.state.borrow_mut().stats = metadata.into();
         self.state.borrow_mut().bidding_state.auction_period = DEFAULT_AUCTION_PERIOD;
+    }
+
+    #[query]
+    pub fn state_check(&self) -> CandidHeader {
+        candid_header::<CanisterState>()
     }
 }
 
