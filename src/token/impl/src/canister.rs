@@ -38,6 +38,7 @@ impl TokenCanister {
     }
 }
 
+#[cfg(not(feature = "no_api"))]
 #[inspect_message]
 fn inspect_message() {
     use ic_storage::IcStorage;
