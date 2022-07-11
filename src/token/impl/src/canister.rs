@@ -1,8 +1,12 @@
-use std::{cell::RefCell, rc::Rc};
-
 use candid::Principal;
-use ic_canister::{init, query, Canister, PreUpdate};
+use ic_canister::{init, Canister, PreUpdate};
+
+#[cfg(not(feature = "no_api"))]
+use ic_cdk_macros::inspect_message;
+
+use ic_canister::query;
 use ic_helpers::candid_header::{candid_header, CandidHeader};
+use std::{cell::RefCell, rc::Rc};
 use token_api::{
     canister::{TokenCanisterAPI, DEFAULT_AUCTION_PERIOD},
     state::CanisterState,
@@ -38,6 +42,29 @@ impl TokenCanister {
     #[query]
     pub fn state_check(&self) -> CandidHeader {
         candid_header::<CanisterState>()
+    }
+}
+
+#[cfg(not(feature = "no_api"))]
+#[inspect_message]
+fn inspect_message() {
+    use ic_storage::IcStorage;
+    use token_api::canister::AcceptReason;
+
+    let method = ic_cdk::api::call::method_name();
+
+    let state = CanisterState::get();
+    let state = state.borrow();
+    let caller = ic_cdk::api::caller();
+
+    let accept_reason = match TokenCanister::inspect_message(&state, &method, caller) {
+        Ok(accept_reason) => accept_reason,
+        Err(msg) => ic_cdk::trap(msg),
+    };
+
+    match accept_reason {
+        AcceptReason::Valid => ic_cdk::api::call::accept_message(),
+        AcceptReason::NotIS20Method => ic_cdk::trap("Unknown method"),
     }
 }
 

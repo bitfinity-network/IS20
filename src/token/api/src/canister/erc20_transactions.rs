@@ -147,7 +147,7 @@ pub fn approve(
     Ok(id)
 }
 
-fn mint(
+pub fn mint(
     state: &mut CanisterState,
     caller: Principal,
     to: Principal,
@@ -165,7 +165,7 @@ fn mint(
     Ok(id)
 }
 
-pub(crate) fn mint_test_token(
+pub fn mint_test_token(
     state: &mut CanisterState,
     caller: CheckedPrincipal<TestNet>,
     to: Principal,
@@ -174,7 +174,7 @@ pub(crate) fn mint_test_token(
     mint(state, caller.inner(), to, amount)
 }
 
-pub(crate) fn mint_as_owner(
+pub fn mint_as_owner(
     state: &mut CanisterState,
     caller: CheckedPrincipal<Owner>,
     to: Principal,
@@ -183,7 +183,7 @@ pub(crate) fn mint_as_owner(
     mint(state, caller.inner(), to, amount)
 }
 
-fn burn(
+pub fn burn(
     state: &mut CanisterState,
     caller: Principal,
     from: Principal,
@@ -224,7 +224,7 @@ pub fn burn_as_owner(
     burn(state, caller.inner(), from, amount)
 }
 
-pub(crate) fn transfer_balance(
+pub fn transfer_balance(
     balances: &mut Balances,
     from: Principal,
     to: Principal,
