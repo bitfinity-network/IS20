@@ -227,7 +227,7 @@ pub fn transfer_balance(
     }
 
     if balances.balance_of(&from.account, from.subaccount) == Tokens128::ZERO {
-        balances.0.remove(&from.account);
+        balances.remove(from);
     }
 
     Ok(())
@@ -923,7 +923,7 @@ mod proptests {
 
     prop_compose! {
         fn make_tokens128() (num in "[0-9]{1,10}") -> Tokens128 {
-            Tokens128::from(u128::from_str_radix(&num, 10).unwrap())
+            Tokens128::from(num.parse::<u128>().unwrap())
         }
     }
     prop_compose! {

@@ -98,11 +98,16 @@ impl Balances {
     }
 
     pub fn remove(&mut self, account: Account) {
-        if let Some(subaccount) = account.subaccount {
-            self.0
-                .get_mut(&account.account)
-                .map(|subaccounts| subaccounts.remove(&subaccount));
-        } else {
+        if let Some(subaccounts) = self.0.get_mut(&account.account) {
+            subaccounts.remove(&account.subaccount.unwrap_or(SUB_ACCOUNT_ZERO));
+        }
+
+        if self
+            .0
+            .get(&account.account)
+            .map(|subaccounts| subaccounts.is_empty())
+            .unwrap_or(true)
+        {
             self.0.remove(&account.account);
         }
     }
