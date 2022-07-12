@@ -25,10 +25,12 @@ use crate::types::{
     TxId, TxReceipt, TxRecord,
 };
 
-#[cfg(not(feature = "no_api"))]
-mod inspect;
+pub use inspect::AcceptReason;
 
 pub mod erc20_transactions;
+
+mod inspect;
+
 pub mod is20_auction;
 pub mod is20_notify;
 pub mod is20_transactions;
@@ -59,6 +61,16 @@ pub enum CanisterUpdate {
 pub trait TokenCanisterAPI: Canister + Sized {
     fn state(&self) -> Rc<RefCell<CanisterState>> {
         CanisterState::get()
+    }
+
+    /// The `inspect_message()` call is not exported by default. Add your custom #[inspect_message]
+    /// function and use this method there to export the `inspect_message()` call.
+    fn inspect_message(
+        state: &CanisterState,
+        method: &str,
+        caller: Principal,
+    ) -> Result<AcceptReason, &'static str> {
+        inspect::inspect_message(state, method, caller)
     }
 
     #[query(trait = true)]
@@ -187,7 +199,7 @@ pub trait TokenCanisterAPI: Canister + Sized {
     }
 
     /********************** TRANSFERS ***********************/
-    #[update(trait = true)]
+    #[cfg_attr(feature = "transfer", update(trait = true))]
     fn transfer(
         &self,
         from_subaccount: Option<Subaccount>,
@@ -212,7 +224,7 @@ pub trait TokenCanisterAPI: Canister + Sized {
     ///
     /// Note, that the `value` cannot be less than the `fee` amount. If the value given is too small,
     /// transaction will fail with `TxError::AmountTooSmall` error.
-    #[update(trait = true)]
+    #[cfg_attr(feature = "transfer", update(trait = true))]
     fn transferIncludeFee(
         &self,
         from_subaccount: Option<Subaccount>,
@@ -229,7 +241,7 @@ pub trait TokenCanisterAPI: Canister + Sized {
     /// is set, the `fee` amount is applied to each transfer.
     /// The balance of the caller is reduced by sum of `value + fee` amount for each transfer. If the total sum of `value + fee` for all transfers,
     /// is less than the `balance` of the caller, the transaction will fail with `TxError::InsufficientBalance` error.
-    // #[update(trait = true)]
+    // #[cfg_attr(feature = "transfer", update(trait = true))]
     // fn batchTransfer(
     //     &self,
     //     from_subaccount: Option<Subaccount>,
@@ -240,7 +252,8 @@ pub trait TokenCanisterAPI: Canister + Sized {
     //     }
     //     batch_transfer(self, from_subaccount, transfers)
     // }
-    #[update(trait = true)]
+
+    #[cfg_attr(feature = "mint_burn", update(trait = true))]
     fn mint(
         &self,
         to: Principal,
@@ -272,7 +285,7 @@ pub trait TokenCanisterAPI: Canister + Sized {
     /// If `from` is None, then caller's tokens will be burned.
     /// If `from` is Some(_) but method called not by owner, `TxError::Unauthorized` will be returned.
     /// If owner calls this method and `from` is Some(who), then who's tokens will be burned.
-    #[update(trait = true)]
+    #[cfg_attr(feature = "mint_burn", update(trait = true))]
     fn burn(
         &self,
         from: Option<Principal>,

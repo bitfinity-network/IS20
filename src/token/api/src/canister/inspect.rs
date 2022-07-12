@@ -1,7 +1,6 @@
 use crate::state::CanisterState;
 use crate::types::Account;
 use candid::{Nat, Principal};
-use ic_cdk_macros::inspect_message;
 use ic_helpers::tokens::Tokens128;
 use ic_storage::IcStorage;
 
@@ -51,53 +50,57 @@ static TRANSACTION_METHODS: &[&str] = &[
     "transferIncludeFee",
 ];
 
+/// Reason why the method may be accepted.
+#[derive(Debug, Clone, Copy)]
+pub enum AcceptReason {
+    /// The call is a part of the IS20 API and can be performed.
+    Valid,
+    /// The method isn't a part of the IS20 API, and may require further validation.
+    NotIS20Method,
+}
+
 /// This function checks if the canister should accept ingress message or not. We allow query
 /// calls for anyone, but update calls have different checks to see, if it's reasonable to spend
 /// canister cycles on accepting this call. Check the comments in this method for details on
 /// the checks for different methods.
-#[cfg(not(feature = "no_api"))]
-#[inspect_message]
-fn inspect_message() {
-    let method = ic_cdk::api::call::method_name();
-
-    let state = CanisterState::get();
-    let state = state.borrow();
-    let caller = ic_cdk::api::caller();
-
-    match &method[..] {
+pub fn inspect_message(
+    state: &CanisterState,
+    method: &str,
+    caller: Principal,
+) -> Result<AcceptReason, &'static str> {
+    match method {
         // These are query methods, so no checks are needed.
-        "mint" if state.stats.is_test_token => ic_cdk::api::call::accept_message(),
-        m if PUBLIC_METHODS.contains(&m) => ic_cdk::api::call::accept_message(),
+        #[cfg(feature = "mint_burn")]
+        "mint" if state.stats.is_test_token => Ok(AcceptReason::Valid),
+        m if PUBLIC_METHODS.contains(&m) => Ok(AcceptReason::Valid),
         // Owner
-        m if OWNER_METHODS.contains(&m) && caller == state.stats.owner => {
-            ic_cdk::api::call::accept_message()
-        }
+        m if OWNER_METHODS.contains(&m) && caller == state.stats.owner => Ok(AcceptReason::Valid),
         // Not owner
         m if OWNER_METHODS.contains(&m) => {
-            ic_cdk::trap("Owner method is called not by an owner. Rejecting.")
+            Err("Owner method is called not by an owner. Rejecting.")
         }
+        #[cfg(any(feature = "transfer", feature = "mint_burn"))]
         m if TRANSACTION_METHODS.contains(&m) => {
             // These methods requires that the caller have tokens.
             let state = CanisterState::get();
             let state = state.borrow();
             let balances = &state.balances;
             if !balances.0.contains_key(&caller) {
-                ic_cdk::trap("Transaction method is not called by a stakeholder. Rejecting.");
+                return Err("Transaction method is not called by a stakeholder. Rejecting.");
             }
 
             // Anything but the `burn` method
             if caller == state.stats.owner || m != "burn" {
-                ic_cdk::api::call::accept_message();
-                return;
+                return Ok(AcceptReason::Valid);
             }
 
             // It's the `burn` method and the caller isn't the owner.
             let from = ic_cdk::api::call::arg_data::<(Option<Principal>, Nat)>().0;
             if from.is_some() {
-                ic_cdk::trap("Only the owner can burn other's tokens. Rejecting.");
+                return Err("Only the owner can burn other's tokens. Rejecting.");
             }
 
-            ic_cdk::api::call::accept_message();
+            Ok(AcceptReason::Valid)
         }
         "notify" => {
             // This method can only be called if the notification id is in the pending notifications
@@ -106,9 +109,9 @@ fn inspect_message() {
             let (tx_id,) = ic_cdk::api::call::arg_data::<(TxId,)>();
 
             if notifications.contains_key(&tx_id) {
-                ic_cdk::api::call::accept_message();
+                Ok(AcceptReason::Valid)
             } else {
-                ic_cdk::trap("No pending notification with the given id. Rejecting.");
+                Err("No pending notification with the given id. Rejecting.")
             }
         }
         "ConsumeNotification" => {
@@ -119,17 +122,17 @@ fn inspect_message() {
 
             match notifications.get(&tx_id) {
                 Some(Some(x)) if *x != ic_canister::ic_kit::ic::caller() => {
-                    ic_cdk::trap("Unauthorized")
+                    return Err("Unauthorized")
                 }
                 Some(_) => {
                     if !state.ledger.notifications.contains_key(&tx_id) {
-                        ic_cdk::trap("Already removed");
+                        return Err("Already removed");
                     }
                 }
-                None => ic_cdk::trap("Transaction does not exist"),
+                None => return Err("Transaction does not exist"),
             }
 
-            ic_cdk::api::call::accept_message();
+            Ok(AcceptReason::Valid)
         }
         "runAuction" => {
             // We allow running auction only to the owner or any of the cycle bidders.
@@ -139,17 +142,16 @@ fn inspect_message() {
             if bidding_state.is_auction_due()
                 && (bidding_state.bids.contains_key(&caller) || caller == state.stats.owner)
             {
-                ic_cdk::api::call::accept_message();
+                Ok(AcceptReason::Valid)
             } else {
-                ic_cdk::trap("Auction is not due yet or auction run method is called not by owner or bidder. Rejecting.");
+                Err("Auction is not due yet or auction run method is called not by owner or bidder. Rejecting.")
             }
         }
         "bidCycles" => {
             // We reject this message, because a call with cycles cannot be made through ingress,
             // only from the wallet canister.
+            Err("Call with cycles cannot be made through ingress.")
         }
-        _ => {
-            ic_cdk::trap("The method called is not listed in the access checks. This is probably a code error.");
-        }
+        _ => Ok(AcceptReason::NotIS20Method),
     }
 }
