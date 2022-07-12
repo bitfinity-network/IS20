@@ -34,7 +34,7 @@ impl Ledger {
 
     pub fn get_transactions(
         &self,
-        who: Option<Account>,
+        who: Option<Principal>,
         count: usize,
         transaction_id: Option<TxId>,
     ) -> PaginatedResult {
@@ -43,7 +43,11 @@ impl Ledger {
             .history
             .iter()
             .rev()
-            .filter(|tx| who.map_or(true, |c| c == tx.from || c == tx.to || tx.caller == who))
+            .filter(|tx| {
+                who.map_or(true, |c| {
+                    c == tx.from.account || c == tx.to.account || c == tx.caller
+                })
+            })
             .filter(|tx| transaction_id.map_or(true, |id| id >= tx.index))
             .take(count + 1)
             .cloned()
@@ -73,10 +77,10 @@ impl Ledger {
         }
     }
 
-    pub fn get_len_user_history(&self, user: Account) -> usize {
+    pub fn get_len_user_history(&self, user: Principal) -> usize {
         self.history
             .iter()
-            .filter(|tx| tx.to == user || tx.from == user || tx.caller == Some(user))
+            .filter(|tx| tx.to.account == user || tx.from.account == user || tx.caller == user)
             .count()
     }
 
@@ -110,33 +114,6 @@ impl Ledger {
                 )
             })
             .collect()
-    }
-
-    pub fn transfer_from(
-        &mut self,
-        from: Account,
-        to: Account,
-        amount: Tokens128,
-        fee: Tokens128,
-        caller: Account,
-    ) -> TxId {
-        let id = self.next_id();
-        self.push(TxRecord::transfer_from(id, from, to, amount, fee, caller));
-
-        id
-    }
-
-    pub fn approve(
-        &mut self,
-        from: Account,
-        to: Account,
-        amount: Tokens128,
-        fee: Tokens128,
-    ) -> TxId {
-        let id = self.next_id();
-        self.push(TxRecord::approve(id, from, to, amount, fee));
-
-        id
     }
 
     pub fn mint(&mut self, from: Account, to: Account, amount: Tokens128) -> TxId {

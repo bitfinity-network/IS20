@@ -12,7 +12,7 @@ use super::TokenCanisterAPI;
 ///
 /// Note, that the `value` cannot be less than the `fee` amount. If the value given is too small,
 /// transaction will fail with `TxError::AmountTooSmall` error.
-pub fn transfer_include_fee(
+pub fn icrc1_transfer_include_fee(
     canister: &impl TokenCanisterAPI,
     caller: CheckedPrincipal<WithRecipient>,
     from_subaccount: Option<Subaccount>,
@@ -55,54 +55,54 @@ pub fn transfer_include_fee(
     Ok(id)
 }
 
-// pub fn batch_transfer(
-//     canister: &impl TokenCanisterAPI,
-//     from_subaccount: Option<Subaccount>,
-//     transfers: Vec<BatchTransferArgs>,
-// ) -> Result<Vec<TxId>, TxError> {
-//     let caller = ic_canister::ic_kit::ic::caller();
-//     // let from = AccountIdentifier::new(caller, from_subaccount);
-//     let state = canister.state();
-//     let mut state = state.borrow_mut();
+pub fn batch_transfer(
+    canister: &impl TokenCanisterAPI,
+    from_subaccount: Option<Subaccount>,
+    transfers: Vec<BatchTransferArgs>,
+) -> Result<Vec<TxId>, TxError> {
+    let caller = ic_canister::ic_kit::ic::caller();
+    let from = Account::new(caller, from_subaccount);
+    let state = canister.state();
+    let mut state = state.borrow_mut();
 
-//     let mut total_value = Tokens128::from(0u128);
-//     for target in transfers.iter() {
-//         total_value = (total_value + target.amount).ok_or(TxError::AmountOverflow)?;
-//     }
+    let mut total_value = Tokens128::from(0u128);
+    for target in transfers.iter() {
+        total_value = (total_value + target.amount).ok_or(TxError::AmountOverflow)?;
+    }
 
-//     let CanisterState {
-//         ref mut balances,
-//         ref bidding_state,
-//         ref stats,
-//         ..
-//     } = &mut *state;
+    let CanisterState {
+        ref mut balances,
+        ref bidding_state,
+        ref stats,
+        ..
+    } = &mut *state;
 
-//     let (fee, fee_to) = stats.fee_info();
-//     let fee_ratio = bidding_state.fee_ratio;
+    let (fee, fee_to) = stats.fee_info();
+    let fee_ratio = bidding_state.fee_ratio;
 
-//     let total_fee = (fee * transfers.len())
-//         .to_tokens128()
-//         .ok_or(TxError::AmountOverflow)?;
+    let total_fee = (fee * transfers.len())
+        .to_tokens128()
+        .ok_or(TxError::AmountOverflow)?;
 
-//     if balances.balance_of(&caller) < (total_value + total_fee).ok_or(TxError::AmountOverflow)? {
-//         return Err(TxError::InsufficientBalance);
-//     }
+    if balances.balance_of(&caller, from_subaccount)
+        < (total_value + total_fee).ok_or(TxError::AmountOverflow)?
+    {
+        return Err(TxError::InsufficientBalance);
+    }
 
-//     let fee_to = AccountIdentifier::from(fee_to);
+    {
+        for x in transfers.clone() {
+            let value = x.amount;
+            let to = Account::new(x.receiver.to, x.receiver.to_subaccount);
+            charge_fee(balances, from, fee_to, fee, fee_ratio)
+                .expect("never fails due to checks above");
+            transfer_balance(balances, from, to, value).expect("never fails due to checks above");
+        }
+    }
 
-//     {
-//         for x in transfers.clone() {
-//             let value = x.amount;
-//             let to = AccountIdentifier::new(x.receiver.to, x.receiver.to_subaccount);
-//             charge_fee(balances, from, fee_to, fee, fee_ratio)
-//                 .expect("never fails due to checks above");
-//             transfer_balance(balances, from, to, value).expect("never fails due to checks above");
-//         }
-//     }
-
-//     let id = state.ledger.batch_transfer(from, transfers, fee);
-//     Ok(id)
-// }
+    let id = state.ledger.batch_transfer(from, transfers, fee);
+    Ok(id)
+}
 
 #[cfg(test)]
 mod tests {
@@ -149,90 +149,90 @@ mod tests {
         canister
     }
 
-    // #[test]
-    // fn batch_transfer_without_fee() {
-    //     let canister = test_canister();
-    //     assert_eq!(Tokens128::from(1000), canister.balanceOf(alice(), None));
-    //     let transfer1 = BatchTransferArgs {
-    //         receiver: BatchAccount {
-    //             to: bob(),
-    //             to_subaccount: None,
-    //         },
-    //         amount: Tokens128::from(100),
-    //     };
-    //     let transfer2 = BatchTransferArgs {
-    //         receiver: BatchAccount {
-    //             to: john(),
-    //             to_subaccount: None,
-    //         },
-    //         amount: Tokens128::from(200),
-    //     };
-    //     let receipt = canister
-    //         .batchTransfer(None, vec![transfer1, transfer2])
-    //         .unwrap();
-    //     assert_eq!(receipt.len(), 2);
-    //     assert_eq!(canister.balanceOf(alice(), None), Tokens128::from(700));
-    //     assert_eq!(canister.balanceOf(bob(), None), Tokens128::from(100));
-    //     assert_eq!(canister.balanceOf(john(), None), Tokens128::from(200));
-    // }
+    #[test]
+    fn batch_transfer_without_fee() {
+        let canister = test_canister();
+        assert_eq!(Tokens128::from(1000), canister.balanceOf(alice(), None));
+        let transfer1 = BatchTransferArgs {
+            receiver: BatchAccount {
+                to: bob(),
+                to_subaccount: None,
+            },
+            amount: Tokens128::from(100),
+        };
+        let transfer2 = BatchTransferArgs {
+            receiver: BatchAccount {
+                to: john(),
+                to_subaccount: None,
+            },
+            amount: Tokens128::from(200),
+        };
+        let receipt = canister
+            .batchTransfer(None, vec![transfer1, transfer2])
+            .unwrap();
+        assert_eq!(receipt.len(), 2);
+        assert_eq!(canister.balanceOf(alice(), None), Tokens128::from(700));
+        assert_eq!(canister.balanceOf(bob(), None), Tokens128::from(100));
+        assert_eq!(canister.balanceOf(john(), None), Tokens128::from(200));
+    }
 
-    // #[test]
-    // fn batch_transfer_with_fee() {
-    //     let canister = test_canister();
-    //     let mut state = canister.state.borrow_mut();
-    //     state.stats.fee = Tokens128::from(50);
-    //     state.stats.fee_to = john();
-    //     drop(state);
-    //     assert_eq!(Tokens128::from(1000), canister.balanceOf(alice(), None));
-    //     let transfer1 = BatchTransferArgs {
-    //         receiver: BatchAccount {
-    //             to: bob(),
-    //             to_subaccount: None,
-    //         },
-    //         amount: Tokens128::from(100),
-    //     };
-    //     let transfer2 = BatchTransferArgs {
-    //         receiver: BatchAccount {
-    //             to: xtc(),
-    //             to_subaccount: None,
-    //         },
-    //         amount: Tokens128::from(200),
-    //     };
-    //     let receipt = canister
-    //         .batchTransfer(None, vec![transfer1, transfer2])
-    //         .unwrap();
-    //     assert_eq!(receipt.len(), 2);
-    //     assert_eq!(canister.balanceOf(alice(), None), Tokens128::from(600));
-    //     assert_eq!(canister.balanceOf(bob(), None), Tokens128::from(100));
-    //     assert_eq!(canister.balanceOf(xtc(), None), Tokens128::from(200));
-    //     assert_eq!(canister.balanceOf(john(), None), Tokens128::from(100));
-    // }
+    #[test]
+    fn batch_transfer_with_fee() {
+        let canister = test_canister();
+        let mut state = canister.state.borrow_mut();
+        state.stats.fee = Tokens128::from(50);
+        state.stats.fee_to = john();
+        drop(state);
+        assert_eq!(Tokens128::from(1000), canister.balanceOf(alice(), None));
+        let transfer1 = BatchTransferArgs {
+            receiver: BatchAccount {
+                to: bob(),
+                to_subaccount: None,
+            },
+            amount: Tokens128::from(100),
+        };
+        let transfer2 = BatchTransferArgs {
+            receiver: BatchAccount {
+                to: xtc(),
+                to_subaccount: None,
+            },
+            amount: Tokens128::from(200),
+        };
+        let receipt = canister
+            .batchTransfer(None, vec![transfer1, transfer2])
+            .unwrap();
+        assert_eq!(receipt.len(), 2);
+        assert_eq!(canister.balanceOf(alice(), None), Tokens128::from(600));
+        assert_eq!(canister.balanceOf(bob(), None), Tokens128::from(100));
+        assert_eq!(canister.balanceOf(xtc(), None), Tokens128::from(200));
+        assert_eq!(canister.balanceOf(john(), None), Tokens128::from(100));
+    }
 
-    // #[test]
-    // fn batch_transfer_insufficient_balance() {
-    //     let canister = test_canister();
+    #[test]
+    fn batch_transfer_insufficient_balance() {
+        let canister = test_canister();
 
-    //     let transfer1 = BatchTransferArgs {
-    //         receiver: BatchAccount {
-    //             to: bob(),
-    //             to_subaccount: None,
-    //         },
-    //         amount: Tokens128::from(500),
-    //     };
-    //     let transfer2 = BatchTransferArgs {
-    //         receiver: BatchAccount {
-    //             to: john(),
-    //             to_subaccount: None,
-    //         },
-    //         amount: Tokens128::from(600),
-    //     };
-    //     let receipt = canister.batchTransfer(None, vec![transfer1, transfer2]);
-    //     assert!(receipt.is_err());
-    //     assert_eq!(receipt.unwrap_err(), TxError::InsufficientBalance);
-    //     assert_eq!(canister.balanceOf(alice(), None), Tokens128::from(1000));
-    //     assert_eq!(canister.balanceOf(bob(), None), Tokens128::from(0));
-    //     assert_eq!(canister.balanceOf(john(), None), Tokens128::from(0));
-    // }
+        let transfer1 = BatchTransferArgs {
+            receiver: BatchAccount {
+                to: bob(),
+                to_subaccount: None,
+            },
+            amount: Tokens128::from(500),
+        };
+        let transfer2 = BatchTransferArgs {
+            receiver: BatchAccount {
+                to: john(),
+                to_subaccount: None,
+            },
+            amount: Tokens128::from(600),
+        };
+        let receipt = canister.batchTransfer(None, vec![transfer1, transfer2]);
+        assert!(receipt.is_err());
+        assert_eq!(receipt.unwrap_err(), TxError::InsufficientBalance);
+        assert_eq!(canister.balanceOf(alice(), None), Tokens128::from(1000));
+        assert_eq!(canister.balanceOf(bob(), None), Tokens128::from(0));
+        assert_eq!(canister.balanceOf(john(), None), Tokens128::from(0));
+    }
 
     #[test]
     fn transfer_without_fee() {
@@ -240,7 +240,7 @@ mod tests {
         assert_eq!(Tokens128::from(1000), canister.balanceOf(alice(), None));
 
         assert!(canister
-            .transferIncludeFee(None, bob(), None, Tokens128::from(100))
+            .icrc1_transferIncludeFee(None, bob(), None, Tokens128::from(100))
             .is_ok());
         assert_eq!(canister.balanceOf(bob(), None), Tokens128::from(100));
         assert_eq!(canister.balanceOf(alice(), None), Tokens128::from(900));
@@ -256,7 +256,7 @@ mod tests {
         drop(state);
 
         assert!(canister
-            .transferIncludeFee(None, bob(), None, Tokens128::from(200))
+            .icrc1_transferIncludeFee(None, bob(), None, Tokens128::from(200))
             .is_ok());
         assert_eq!(canister.balanceOf(bob(), None), Tokens128::from(100));
         assert_eq!(canister.balanceOf(alice(), None), Tokens128::from(800));
@@ -267,7 +267,7 @@ mod tests {
     fn transfer_insufficient_balance() {
         let canister = test_canister();
         assert_eq!(
-            canister.transferIncludeFee(None, bob(), None, Tokens128::from(1001)),
+            canister.icrc1_transferIncludeFee(None, bob(), None, Tokens128::from(1001)),
             Err(TxError::InsufficientBalance)
         );
         assert_eq!(canister.balanceOf(alice(), None), Tokens128::from(1000));

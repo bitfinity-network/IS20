@@ -7,19 +7,6 @@ use crate::types::{Account, TxError, TxId, TxReceipt};
 
 use super::TokenCanisterAPI;
 
-// pub(crate) async fn approve_and_notify(
-//     canister: &impl TokenCanisterAPI,
-//     caller: CheckedPrincipal<WithRecipient>,
-//     amount: Tokens128,
-// ) -> TxReceipt {
-//     let transaction_id = canister.approve(caller.recipient(), None, amount, None)?;
-//     notify(canister, transaction_id, caller.recipient())
-//         .await
-//         .map_err(|e| TxError::ApproveSucceededButNotifyFailed {
-//             tx_error: Box::from(e),
-//         })
-// }
-
 pub(crate) async fn consume_notification(
     canister: &impl TokenCanisterAPI,
     transaction_id: TxId,
@@ -126,7 +113,7 @@ mod tests {
         });
         let canister = test_canister();
         let id = canister
-            .transfer(None, bob(), None, Tokens128::from(100), None)
+            .icrc1_transfer(None, bob(), None, Tokens128::from(100), None)
             .unwrap();
         canister.notify(id, bob()).await.unwrap();
 
@@ -149,7 +136,7 @@ mod tests {
 
         let canister = test_canister();
         let id = canister
-            .transfer(None, bob(), None, Tokens128::from(100), None)
+            .icrc1_transfer(None, bob(), None, Tokens128::from(100), None)
             .unwrap();
         let response = canister.notify(id, bob()).await;
         assert_eq!(

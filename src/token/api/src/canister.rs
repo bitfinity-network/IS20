@@ -10,26 +10,28 @@ use ic_helpers::tokens::Tokens128;
 use ic_storage::IcStorage;
 
 use crate::canister::erc20_transactions::{
-    burn_as_owner, burn_own_tokens, mint_as_owner, mint_test_token, transfer,
+    burn_as_owner, burn_own_tokens, icrc1_transfer, mint_as_owner, mint_test_token,
 };
 use crate::canister::is20_auction::{
     auction_info, bid_cycles, bidding_info, run_auction, AuctionError, BiddingInfo,
 };
 use crate::canister::is20_notify::{consume_notification, notify};
-use crate::canister::is20_transactions::transfer_include_fee;
+use crate::canister::is20_transactions::icrc1_transfer_include_fee;
 use crate::principal::{CheckedPrincipal, Owner};
 use crate::state::CanisterState;
-use crate::types::Account;
+use crate::types::BatchTransferArgs;
 use crate::types::{
     AuctionInfo, Metadata, PaginatedResult, StatsData, Subaccount, Timestamp, TokenInfo, TxError,
     TxId, TxReceipt, TxRecord,
 };
 
+use self::is20_transactions::batch_transfer;
+
+mod inspect;
+
 pub use inspect::AcceptReason;
 
 pub mod erc20_transactions;
-
-mod inspect;
 
 pub mod is20_auction;
 pub mod is20_notify;
@@ -200,7 +202,7 @@ pub trait TokenCanisterAPI: Canister + Sized {
 
     /********************** TRANSFERS ***********************/
     #[cfg_attr(feature = "transfer", update(trait = true))]
-    fn transfer(
+    fn icrc1_transfer(
         &self,
         from_subaccount: Option<Subaccount>,
         to: Principal,
@@ -209,7 +211,7 @@ pub trait TokenCanisterAPI: Canister + Sized {
         fee_limit: Option<Tokens128>,
     ) -> TxReceipt {
         let caller = CheckedPrincipal::with_recipient(to)?;
-        transfer(
+        icrc1_transfer(
             self,
             caller,
             from_subaccount,
@@ -225,7 +227,7 @@ pub trait TokenCanisterAPI: Canister + Sized {
     /// Note, that the `value` cannot be less than the `fee` amount. If the value given is too small,
     /// transaction will fail with `TxError::AmountTooSmall` error.
     #[cfg_attr(feature = "transfer", update(trait = true))]
-    fn transferIncludeFee(
+    fn icrc1_transferIncludeFee(
         &self,
         from_subaccount: Option<Subaccount>,
         to: Principal,
@@ -233,7 +235,7 @@ pub trait TokenCanisterAPI: Canister + Sized {
         amount: Tokens128,
     ) -> TxReceipt {
         let caller = CheckedPrincipal::with_recipient(to)?;
-        transfer_include_fee(self, caller, from_subaccount, to_subaccount, amount)
+        icrc1_transfer_include_fee(self, caller, from_subaccount, to_subaccount, amount)
     }
 
     /// Takes a list of transfers, each of which is a pair of `to` and `value` fields, it returns a `TxReceipt` which contains
@@ -241,20 +243,19 @@ pub trait TokenCanisterAPI: Canister + Sized {
     /// is set, the `fee` amount is applied to each transfer.
     /// The balance of the caller is reduced by sum of `value + fee` amount for each transfer. If the total sum of `value + fee` for all transfers,
     /// is less than the `balance` of the caller, the transaction will fail with `TxError::InsufficientBalance` error.
-    // #[cfg_attr(feature = "transfer", update(trait = true))]
-    // fn batchTransfer(
-    //     &self,
-    //     from_subaccount: Option<Subaccount>,
-    //     transfers: Vec<BatchTransferArgs>,
-    // ) -> Result<Vec<TxId>, TxError> {
-    //     for x in transfers.clone() {
-    //         CheckedPrincipal::with_recipient(x.receiver.to)?;
-    //     }
-    //     batch_transfer(self, from_subaccount, transfers)
-    // }
-
+    #[cfg_attr(feature = "transfer", update(trait = true))]
+    fn batchTransfer(
+        &self,
+        from_subaccount: Option<Subaccount>,
+        transfers: Vec<BatchTransferArgs>,
+    ) -> Result<Vec<TxId>, TxError> {
+        for x in transfers.clone() {
+            CheckedPrincipal::with_recipient(x.receiver.to)?;
+        }
+        batch_transfer(self, from_subaccount, transfers)
+    }
     #[cfg_attr(feature = "mint_burn", update(trait = true))]
-    fn mint(
+    fn icrc1_mint(
         &self,
         to: Principal,
         to_subaccount: Option<Subaccount>,
@@ -286,7 +287,7 @@ pub trait TokenCanisterAPI: Canister + Sized {
     /// If `from` is Some(_) but method called not by owner, `TxError::Unauthorized` will be returned.
     /// If owner calls this method and `from` is Some(who), then who's tokens will be burned.
     #[cfg_attr(feature = "mint_burn", update(trait = true))]
-    fn burn(
+    fn icrc1_burn(
         &self,
         from: Option<Principal>,
         from_subaccount: Option<Subaccount>,
@@ -407,11 +408,10 @@ pub trait TokenCanisterAPI: Canister + Sized {
     #[query(trait = true)]
     fn getTransactions(
         &self,
-        who: Option<Account>,
+        who: Option<Principal>,
         count: usize,
         transaction_id: Option<TxId>,
     ) -> PaginatedResult {
-        // We don't trap if the transaction count is greater than the MAX_TRANSACTION_QUERY_LEN, we take the MAX_TRANSACTION_QUERY_LEN instead.
         self.state().borrow_mut().ledger.get_transactions(
             who,
             count.min(MAX_TRANSACTION_QUERY_LEN),
@@ -421,9 +421,8 @@ pub trait TokenCanisterAPI: Canister + Sized {
 
     /// Returns the total number of transactions related to the user `who`.
     #[query(trait = true)]
-    fn getUserTransactionCount(&self, who: Principal, who_subaccount: Option<Subaccount>) -> usize {
-        let who_aid = Account::new(who, who_subaccount);
-        self.state().borrow().ledger.get_len_user_history(who_aid)
+    fn getUserTransactionCount(&self, who: Principal) -> usize {
+        self.state().borrow().ledger.get_len_user_history(who)
     }
 
     // Important: This function *must* be defined to be the

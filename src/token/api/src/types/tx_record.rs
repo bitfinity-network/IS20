@@ -1,4 +1,4 @@
-use candid::{CandidType, Deserialize};
+use candid::{CandidType, Deserialize, Principal};
 use ic_canister::ic_kit::ic;
 use ic_helpers::tokens::Tokens128;
 
@@ -6,7 +6,7 @@ use crate::types::{Account, Operation, TransactionStatus, TxId};
 
 #[derive(Deserialize, CandidType, Debug, Clone)]
 pub struct TxRecord {
-    pub caller: Option<Account>,
+    pub caller: Principal,
     pub index: TxId,
     pub from: Account,
     pub to: Account,
@@ -26,7 +26,7 @@ impl TxRecord {
         fee: Tokens128,
     ) -> Self {
         Self {
-            caller: Some(from),
+            caller: from.account,
             index,
             from,
             to,
@@ -38,50 +38,9 @@ impl TxRecord {
         }
     }
 
-    pub fn transfer_from(
-        index: TxId,
-        from: Account,
-        to: Account,
-        amount: Tokens128,
-        fee: Tokens128,
-        caller: Account,
-    ) -> Self {
-        Self {
-            caller: Some(caller),
-            index,
-            from,
-            to,
-            amount,
-            fee,
-            timestamp: ic::time(),
-            status: TransactionStatus::Succeeded,
-            operation: Operation::TransferFrom,
-        }
-    }
-
-    pub fn approve(
-        index: TxId,
-        from: Account,
-        to: Account,
-        amount: Tokens128,
-        fee: Tokens128,
-    ) -> Self {
-        Self {
-            caller: Some(from),
-            index,
-            from,
-            to,
-            amount,
-            fee,
-            timestamp: ic::time(),
-            status: TransactionStatus::Succeeded,
-            operation: Operation::Approve,
-        }
-    }
-
     pub fn mint(index: TxId, from: Account, to: Account, amount: Tokens128) -> Self {
         Self {
-            caller: Some(from),
+            caller: from.account,
             index,
             from,
             to,
@@ -95,7 +54,7 @@ impl TxRecord {
 
     pub fn burn(index: TxId, caller: Account, from: Account, amount: Tokens128) -> Self {
         Self {
-            caller: Some(caller),
+            caller: caller.account,
             index,
             from,
             to: from,
@@ -109,7 +68,7 @@ impl TxRecord {
 
     pub fn auction(index: TxId, to: Account, amount: Tokens128) -> Self {
         Self {
-            caller: Some(to),
+            caller: to.account,
             index,
             from: to,
             to,
