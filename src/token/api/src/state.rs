@@ -1,13 +1,14 @@
 use std::collections::HashMap;
 
 use candid::{CandidType, Deserialize, Principal};
+use ic_helpers::ledger::{AccountIdentifier, Subaccount};
 use ic_helpers::tokens::Tokens128;
 use ic_storage::stable::Versioned;
 use ic_storage::IcStorage;
 
 use crate::ledger::Ledger;
 use crate::types::{
-    Account, Allowances, AuctionInfo, Cycles, Metadata, StatsData, Subaccount, Timestamp,
+    Account, AuctionInfo, Claims, Cycles, Metadata, StatsData, Timestamp, SUB_ACCOUNT_ZERO,
 };
 
 #[derive(Debug, Default, CandidType, Deserialize, IcStorage)]
@@ -16,8 +17,8 @@ pub struct CanisterState {
     pub balances: Balances,
     pub auction_history: AuctionHistory,
     pub stats: StatsData,
-    pub allowances: Allowances,
     pub ledger: Ledger,
+    pub claims: Claims,
 }
 
 impl CanisterState {
@@ -33,6 +34,10 @@ impl CanisterState {
             feeTo: self.stats.fee_to,
             isTestToken: Some(self.stats.is_test_token),
         }
+    }
+
+    pub fn claim_amount(&self, account: AccountIdentifier) -> Tokens128 {
+        *self.claims.get(&account).unwrap_or(&Tokens128::ZERO)
     }
 }
 
@@ -57,20 +62,35 @@ impl Balances {
         self.0
             .entry(principal)
             .or_default()
-            .insert(subaccount.unwrap_or_default(), token);
+            .insert(subaccount.unwrap_or(SUB_ACCOUNT_ZERO), token);
     }
 
     pub fn balance_of(&self, who: &Principal, who_subaccount: Option<Subaccount>) -> Tokens128 {
-        let who_subaccount = who_subaccount.unwrap_or_default();
+        let who_subaccount = who_subaccount.unwrap_or(SUB_ACCOUNT_ZERO);
         *self
             .0
-            .get(&who)
+            .get(who)
             .and_then(|subaccount| subaccount.get(&who_subaccount))
             .unwrap_or(&Tokens128::default())
     }
 
-    pub fn get_holders(&self) -> Vec<Principal> {
-        self.0.keys().cloned().collect()
+    pub fn get_holders(
+        &self,
+        start: usize,
+        limit: usize,
+    ) -> Vec<((Principal, Subaccount), Tokens128)> {
+        let mut holders = self
+            .0
+            .iter()
+            .flat_map(|(principal, subaccounts)| {
+                subaccounts
+                    .iter()
+                    .map(|(subaccount, token)| ((*principal, *subaccount), *token))
+                    .collect::<Vec<_>>()
+            })
+            .collect::<Vec<_>>();
+        holders.sort_by(|a, b| b.1.cmp(&a.1));
+        holders[start..].iter().take(limit).cloned().collect()
     }
 
     pub fn get_balances(&self, who: &Principal) -> HashMap<Subaccount, Tokens128> {
@@ -95,7 +115,7 @@ impl Balances {
         } else {
             self.0
                 .get_mut(&account.account)
-                .map(|subaccounts| subaccounts.insert(Subaccount::default(), token));
+                .map(|subaccounts| subaccounts.insert(SUB_ACCOUNT_ZERO, token));
         }
     }
 }

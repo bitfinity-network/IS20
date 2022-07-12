@@ -1,7 +1,7 @@
 use std::fmt::{Display, Formatter};
 
 use candid::{CandidType, Principal};
-
+use ic_helpers::ledger::Subaccount;
 use serde::{Deserialize, Serialize};
 
 pub static SUB_ACCOUNT_ZERO: Subaccount = Subaccount([0; 32]);
@@ -27,24 +27,8 @@ impl From<Principal> for Account {
     }
 }
 
-/// Subaccounts are arbitrary 32-byte values
-#[derive(Serialize, Deserialize, CandidType, Clone, Hash, Debug, PartialEq, Eq, Copy)]
-pub struct Subaccount(pub [u8; 32]);
-
-impl Subaccount {
-    pub fn to_vec(&self) -> Vec<u8> {
-        self.0.to_vec()
-    }
-}
-
-impl Default for Subaccount {
-    fn default() -> Self {
-        SUB_ACCOUNT_ZERO
-    }
-}
-
-impl Display for Subaccount {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        hex::encode(self.0).fmt(f)
+impl Display for Account {
+    fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
+        write!(f, "{}", self.account)
     }
 }

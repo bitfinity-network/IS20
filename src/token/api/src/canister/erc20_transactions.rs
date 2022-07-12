@@ -1,10 +1,11 @@
 use ic_cdk::export::Principal;
+use ic_helpers::ledger::{AccountIdentifier, Subaccount};
 use ic_helpers::tokens::Tokens128;
 
 use crate::canister::is20_auction::auction_principal;
 use crate::principal::{CheckedPrincipal, Owner, TestNet, WithRecipient};
 use crate::state::{Balances, CanisterState};
-use crate::types::{Account, Subaccount, TxError, TxReceipt};
+use crate::types::{Account, TxError, TxReceipt, SUB_ACCOUNT_ZERO};
 
 use super::TokenCanisterAPI;
 
@@ -66,7 +67,7 @@ fn mint(state: &mut CanisterState, caller: Principal, to: Account, amount: Token
         .0
         .entry(to.account)
         .or_default()
-        .entry(to.subaccount.unwrap_or_default())
+        .entry(to.subaccount.unwrap_or(SUB_ACCOUNT_ZERO))
         .or_default();
     let new_balance = (*balance + amount)
         .expect("balance cannot be larger than total_supply which is already checked");
@@ -160,6 +161,38 @@ pub fn burn_as_owner(
     )
 }
 
+pub fn mint_to_accountid(
+    state: &mut CanisterState,
+    to: AccountIdentifier,
+    amount: Tokens128,
+) -> Result<(), TxError> {
+    let balance = state.claims.entry(to).or_default();
+    let new_balance = (*balance + amount)
+        .expect("balance cannot be larger than total_supply which is already checked");
+    *balance = new_balance;
+    Ok(())
+}
+
+pub fn claim(
+    state: &mut CanisterState,
+    account: AccountIdentifier,
+    subaccount: Option<Subaccount>,
+) -> TxReceipt {
+    let caller = ic_canister::ic_kit::ic::caller();
+    let amount = state.claim_amount(account);
+
+    if account != AccountIdentifier::new(caller.into(), subaccount) {
+        return Err(TxError::ClaimNotAllowed);
+    }
+    let to = Account::new(caller, subaccount);
+
+    let id = mint(state, caller, to, amount);
+
+    state.claims.remove(&account);
+
+    id
+}
+
 pub fn transfer_balance(
     balances: &mut Balances,
     from: Account,
@@ -175,7 +208,7 @@ pub fn transfer_balance(
             .0
             .get_mut(&from.account)
             .ok_or(TxError::InsufficientBalance)?
-            .get_mut(&from.subaccount.unwrap_or_default())
+            .get_mut(&from.subaccount.unwrap_or(SUB_ACCOUNT_ZERO))
             .ok_or(TxError::InsufficientBalance)?;
 
         *from_balance = (*from_balance - amount).ok_or(TxError::InsufficientBalance)?;
@@ -186,7 +219,7 @@ pub fn transfer_balance(
             .0
             .entry(to.account)
             .or_default()
-            .entry(to.subaccount.unwrap_or_default())
+            .entry(to.subaccount.unwrap_or(SUB_ACCOUNT_ZERO))
             .or_default();
         *to_balance = (*to_balance + amount).expect(
             "never overflows since `from_balance + to_balance` is limited by `total_supply` amount",
@@ -765,6 +798,23 @@ mod tests {
                 .unwrap();
         }
         assert_eq!(canister.getUserTransactionCount(alice()), COUNT);
+    }
+
+    #[test]
+    fn mint_to_account_id() {
+        let subaccount = gen_subaccount();
+        let alice_aid = AccountIdentifier::new(alice().into(), Some(subaccount));
+
+        let canister = test_canister();
+        assert!(canister
+            .mintToAccountId(alice_aid, Tokens128::from(100))
+            .is_ok());
+        assert!(canister.claim(alice_aid, Some(subaccount)).is_ok());
+        assert_eq!(
+            canister.balanceOf(alice(), Some(subaccount)),
+            Tokens128::from(100)
+        );
+        assert_eq!(canister.totalSupply(), Tokens128::from(1100));
     }
 }
 

@@ -1,9 +1,10 @@
+use ic_helpers::ledger::Subaccount;
 use ic_helpers::tokens::Tokens128;
 
 use crate::canister::erc20_transactions::{charge_fee, transfer_balance};
 use crate::principal::{CheckedPrincipal, WithRecipient};
 use crate::state::CanisterState;
-use crate::types::{Account, BatchTransferArgs, Subaccount, TxError, TxId, TxReceipt};
+use crate::types::{Account, BatchTransferArgs, TxError, TxId, TxReceipt};
 
 use super::TokenCanisterAPI;
 
@@ -237,6 +238,7 @@ mod tests {
     #[test]
     fn transfer_without_fee() {
         let canister = test_canister();
+        let bob_sub = gen_subaccount();
         assert_eq!(Tokens128::from(1000), canister.balanceOf(alice(), None));
 
         assert!(canister
@@ -244,12 +246,20 @@ mod tests {
             .is_ok());
         assert_eq!(canister.balanceOf(bob(), None), Tokens128::from(100));
         assert_eq!(canister.balanceOf(alice(), None), Tokens128::from(900));
+
+        assert!(canister
+            .icrc1_transferIncludeFee(None, bob(), Some(bob_sub), Tokens128::from(100))
+            .is_ok());
+        assert_eq!(
+            canister.balanceOf(bob(), Some(bob_sub)),
+            Tokens128::from(100)
+        );
     }
 
     #[test]
     fn transfer_with_fee() {
+        let bob_sub = gen_subaccount();
         let canister = test_canister();
-
         let mut state = canister.state.borrow_mut();
         state.stats.fee = Tokens128::from(100);
         state.stats.fee_to = john();
@@ -261,6 +271,14 @@ mod tests {
         assert_eq!(canister.balanceOf(bob(), None), Tokens128::from(100));
         assert_eq!(canister.balanceOf(alice(), None), Tokens128::from(800));
         assert_eq!(canister.balanceOf(john(), None), Tokens128::from(100));
+
+        assert!(canister
+            .icrc1_transferIncludeFee(None, bob(), Some(bob_sub), Tokens128::from(150))
+            .is_ok());
+        assert_eq!(
+            canister.balanceOf(bob(), Some(bob_sub)),
+            Tokens128::from(50)
+        );
     }
 
     #[test]

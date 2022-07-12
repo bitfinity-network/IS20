@@ -6,11 +6,15 @@ use ic_canister::Canister;
 use ic_canister::MethodType;
 use ic_canister::{query, update, AsyncReturn};
 use ic_cdk::export::candid::Principal;
+use ic_helpers::ledger::{AccountIdentifier, Subaccount};
 use ic_helpers::tokens::Tokens128;
 use ic_storage::IcStorage;
 
+pub use inspect::AcceptReason;
+
 use crate::canister::erc20_transactions::{
-    burn_as_owner, burn_own_tokens, icrc1_transfer, mint_as_owner, mint_test_token,
+    burn_as_owner, burn_own_tokens, claim, icrc1_transfer, mint_as_owner, mint_test_token,
+    mint_to_accountid,
 };
 use crate::canister::is20_auction::{
     auction_info, bid_cycles, bidding_info, run_auction, AuctionError, BiddingInfo,
@@ -21,15 +25,13 @@ use crate::principal::{CheckedPrincipal, Owner};
 use crate::state::CanisterState;
 use crate::types::BatchTransferArgs;
 use crate::types::{
-    AuctionInfo, Metadata, PaginatedResult, StatsData, Subaccount, Timestamp, TokenInfo, TxError,
-    TxId, TxReceipt, TxRecord,
+    AuctionInfo, Metadata, PaginatedResult, StatsData, Timestamp, TokenInfo, TxError, TxId,
+    TxReceipt, TxRecord,
 };
 
 use self::is20_transactions::batch_transfer;
 
 mod inspect;
-
-pub use inspect::AcceptReason;
 
 pub mod erc20_transactions;
 
@@ -132,10 +134,10 @@ pub trait TokenCanisterAPI: Canister + Sized {
         }
     }
 
-    // #[query(trait = true)]
-    // fn getHolders(&self, start: usize, limit: usize) -> Vec<(AccountIdentifier, Tokens128)> {
-    //     self.state().borrow().balances.get_holders(start, limit)
-    // }
+    #[query(trait = true)]
+    fn getHolders(&self, start: usize, limit: usize) -> Vec<((Principal, Subaccount), Tokens128)> {
+        self.state().borrow().balances.get_holders(start, limit)
+    }
 
     #[query(trait = true)]
     fn balanceOf(&self, holder: Principal, holder_subaccount: Option<Subaccount>) -> Tokens128 {
@@ -309,6 +311,17 @@ pub trait TokenCanisterAPI: Canister + Sized {
                 )
             }
         }
+    }
+
+    #[cfg_attr(feature = "mint_burn", update(trait = true))]
+    fn mintToAccountId(&self, to: AccountIdentifier, amount: Tokens128) -> Result<(), TxError> {
+        let _ = CheckedPrincipal::owner(&self.state().borrow().stats)?;
+        mint_to_accountid(&mut *self.state().borrow_mut(), to, amount)
+    }
+
+    #[update(trait = true)]
+    fn claim(&self, account: AccountIdentifier, subaccount: Option<Subaccount>) -> TxReceipt {
+        claim(&mut *self.state().borrow_mut(), account, subaccount)
     }
 
     /********************** AUCTION ***********************/

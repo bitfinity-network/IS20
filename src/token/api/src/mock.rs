@@ -5,7 +5,6 @@ use ic_canister::{Canister, PreUpdate};
 
 use crate::{canister::TokenCanisterAPI, state::CanisterState, types::Metadata};
 
-use std::collections::HashMap;
 #[derive(Debug, Clone, Canister)]
 pub struct TokenCanisterMock {
     #[id]

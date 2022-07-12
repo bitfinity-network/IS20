@@ -1,7 +1,8 @@
 use std::collections::HashMap;
 
 use candid::{CandidType, Deserialize, Principal};
-use ic_helpers::tokens::Tokens128;
+use ic_helpers::ledger::Subaccount;
+use ic_helpers::{ledger::AccountIdentifier, tokens::Tokens128};
 
 pub use account::*;
 pub use tx_record::*;
@@ -97,15 +98,13 @@ impl Default for StatsData {
     }
 }
 
-pub type Allowances = HashMap<Principal, HashMap<Subaccount, Tokens128>>;
+pub type Claims = HashMap<AccountIdentifier, Tokens128>;
 
 // TODO: a wrapper over `ic_helpers::TxError`, this is a most likely
 // place to make tests fail in amm.
 #[derive(CandidType, Debug, PartialEq, Deserialize)]
 pub enum TxError {
     InsufficientBalance,
-    InsufficientAllowance,
-    NoAllowance,
     Unauthorized,
     AmountTooSmall,
     FeeExceededLimit,
@@ -121,6 +120,8 @@ pub enum TxError {
     TxDuplicate { duplicate_of: u64 },
     SelfTransfer,
     AmountOverflow,
+    AccountNotFound,
+    ClaimNotAllowed,
 }
 
 pub type TxReceipt = Result<u64, TxError>;

@@ -222,7 +222,7 @@ mod tests {
     use test_case::test_case;
 
     use crate::mock::*;
-    use crate::types::{Metadata, TxError, SUB_ACCOUNT_ZERO};
+    use crate::types::{Metadata, TxError};
 
     use super::*;
 
@@ -309,7 +309,7 @@ mod tests {
             Tokens128::from(6000),
         );
 
-        let result2 = canister
+        canister
             .state()
             .borrow()
             .balances

@@ -1,9 +1,7 @@
-use crate::state::CanisterState;
-use crate::types::Account;
 use candid::{Nat, Principal};
-use ic_helpers::tokens::Tokens128;
 use ic_storage::IcStorage;
 
+use crate::state::CanisterState;
 use crate::types::TxId;
 
 static PUBLIC_METHODS: &[&str] = &[
@@ -122,7 +120,7 @@ pub fn inspect_message(
 
             match notifications.get(&tx_id) {
                 Some(Some(x)) if *x != ic_canister::ic_kit::ic::caller() => {
-                    return Err("Unauthorized")
+                    return Err("Unauthorized");
                 }
                 Some(_) => {
                     if !state.ledger.notifications.contains_key(&tx_id) {
