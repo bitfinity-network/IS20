@@ -25,8 +25,8 @@ use crate::principal::{CheckedPrincipal, Owner};
 use crate::state::CanisterState;
 use crate::types::BatchTransferArgs;
 use crate::types::{
-    Account, AuctionInfo, Metadata, PaginatedResult, StatsData, Timestamp, TokenInfo, TxError, TxId,
-    TxReceipt, TxRecord,
+    Account, AuctionInfo, Metadata, PaginatedResult, StatsData, Timestamp, TokenInfo, TxError,
+    TxId, TxReceipt, TxRecord,
 };
 
 use self::is20_transactions::batch_transfer;
@@ -142,10 +142,7 @@ pub trait TokenCanisterAPI: Canister + Sized {
     #[query(trait = true)]
     fn balanceOf(&self, holder: Principal, holder_subaccount: Option<Subaccount>) -> Tokens128 {
         let account = Account::new(holder, holder_subaccount);
-        self.state()
-            .borrow()
-            .balances
-            .balance_of(account)
+        self.state().borrow().balances.balance_of(account)
     }
 
     #[query(trait = true)]

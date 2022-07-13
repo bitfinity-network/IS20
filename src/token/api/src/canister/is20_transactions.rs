@@ -85,9 +85,7 @@ pub fn batch_transfer(
         .to_tokens128()
         .ok_or(TxError::AmountOverflow)?;
 
-    if balances.balance_of(from)
-        < (total_value + total_fee).ok_or(TxError::AmountOverflow)?
-    {
+    if balances.balance_of(from) < (total_value + total_fee).ok_or(TxError::AmountOverflow)? {
         return Err(TxError::InsufficientBalance);
     }
 
