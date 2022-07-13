@@ -28,11 +28,7 @@ pub(crate) fn icrc1_transfer(
     let (fee, fee_to) = stats.fee_info();
     let fee_ratio = bidding_state.fee_ratio;
 
-    if let Some(fee_limit) = fee_limit {
-        if fee > fee_limit {
-            return Err(TxError::FeeExceededLimit);
-        }
-    }
+fee_limit.filter(|limit| fee.gt(limit)).ok_or(TxError::FeeExceededLimit)?;
 
     if balances.balance_of(from) < (amount + fee).ok_or(TxError::AmountOverflow)? {
         return Err(TxError::InsufficientBalance);
