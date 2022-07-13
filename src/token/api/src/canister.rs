@@ -211,11 +211,13 @@ pub trait TokenCanisterAPI: Canister + Sized {
         fee_limit: Option<Tokens128>,
     ) -> TxReceipt {
         let caller = CheckedPrincipal::with_recipient(to)?;
+
+        let from = Account::new(caller.inner(), from_subaccount);
+        let to = Account::new(caller.recipient(), to_subaccount);
         icrc1_transfer(
             self,
-            caller,
-            from_subaccount,
-            to_subaccount,
+            from,
+            to,
             amount,
             fee_limit,
         )

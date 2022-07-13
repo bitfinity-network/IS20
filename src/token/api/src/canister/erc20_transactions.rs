@@ -3,22 +3,19 @@ use ic_helpers::ledger::{AccountIdentifier, Subaccount};
 use ic_helpers::tokens::Tokens128;
 
 use crate::canister::is20_auction::auction_principal;
-use crate::principal::{CheckedPrincipal, Owner, TestNet, WithRecipient};
+use crate::principal::{CheckedPrincipal, Owner, TestNet};
 use crate::state::{Balances, CanisterState};
 use crate::types::{Account, TxError, TxReceipt};
 
 use super::TokenCanisterAPI;
 
-pub fn icrc1_transfer(
+pub(crate) fn icrc1_transfer(
     canister: &impl TokenCanisterAPI,
-    caller: CheckedPrincipal<WithRecipient>,
-    from_subaccount: Option<Subaccount>,
-    to_subaccount: Option<Subaccount>,
+    from: Account,
+    to: Account,
     amount: Tokens128,
     fee_limit: Option<Tokens128>,
 ) -> TxReceipt {
-    let from = Account::new(caller.inner(), from_subaccount);
-    let to = Account::new(caller.recipient(), to_subaccount);
     let state = canister.state();
     let mut state = state.borrow_mut();
     let CanisterState {
@@ -43,7 +40,7 @@ pub fn icrc1_transfer(
 
     charge_fee(
         balances,
-        Account::new(caller.inner(), from_subaccount),
+        from,
         fee_to,
         fee,
         fee_ratio,
