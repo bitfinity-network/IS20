@@ -405,6 +405,7 @@ mod tests {
             canister.transfer(bob(), Tokens128::from(950), None),
             Err(TxError::InsufficientBalance)
         );
+        println!("{:?}", TxError::InsufficientBalance);
         assert_eq!(canister.balanceOf(alice()), Tokens128::from(1000));
         assert_eq!(canister.balanceOf(bob()), Tokens128::from(0));
     }

@@ -373,7 +373,7 @@ pub trait TokenCanisterAPI: Canister + Sized {
         let fut = async move {
             match caller {
                 Ok(caller) => approve_and_notify(self, caller, amount).await,
-                Err(e) => Err(e).into(),
+                Err(e) => Err(e),
             }
         };
         Box::pin(fut)
