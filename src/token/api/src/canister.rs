@@ -214,13 +214,7 @@ pub trait TokenCanisterAPI: Canister + Sized {
 
         let from = Account::new(caller.inner(), from_subaccount);
         let to = Account::new(caller.recipient(), to_subaccount);
-        icrc1_transfer(
-            self,
-            from,
-            to,
-            amount,
-            fee_limit,
-        )
+        icrc1_transfer(self, from, to, amount, fee_limit)
     }
 
     /// Transfers `value` amount to the `to` principal, applying American style fee. This means, that

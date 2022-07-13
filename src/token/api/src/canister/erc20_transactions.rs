@@ -38,14 +38,7 @@ pub(crate) fn icrc1_transfer(
         return Err(TxError::InsufficientBalance);
     }
 
-    charge_fee(
-        balances,
-        from,
-        fee_to,
-        fee,
-        fee_ratio,
-    )
-    .expect("never fails due to checks above");
+    charge_fee(balances, from, fee_to, fee, fee_ratio).expect("never fails due to checks above");
 
     transfer_balance(balances, from, to, amount).expect("never fails due to checks above");
 
