@@ -245,7 +245,7 @@ pub trait TokenCanisterAPI: Canister + Sized {
         from_subaccount: Option<Subaccount>,
         transfers: Vec<BatchTransferArgs>,
     ) -> Result<Vec<TxId>, TxError> {
-        for x in transfers.clone() {
+        for x in &transfers {
             CheckedPrincipal::with_recipient(x.receiver.to)?;
         }
         batch_transfer(self, from_subaccount, transfers)
