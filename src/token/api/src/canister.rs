@@ -419,7 +419,7 @@ pub trait TokenCanisterAPI: Canister + Sized {
         count: usize,
         transaction_id: Option<TxId>,
     ) -> PaginatedResult {
-        self.state().borrow_mut().ledger.get_transactions(
+        self.state().borrow().ledger.get_transactions(
             who,
             count.min(MAX_TRANSACTION_QUERY_LEN),
             transaction_id,
