@@ -1,8 +1,8 @@
+use crate::account::Account;
+use crate::types::{Operation, TransactionStatus, TxId};
 use candid::{CandidType, Deserialize, Principal};
 use ic_canister::ic_kit::ic;
 use ic_helpers::tokens::Tokens128;
-
-use crate::types::{Account, Operation, TransactionStatus, TxId};
 
 #[derive(Deserialize, CandidType, Debug, Clone)]
 pub struct TxRecord {
@@ -78,5 +78,9 @@ impl TxRecord {
             status: TransactionStatus::Succeeded,
             operation: Operation::Auction,
         }
+    }
+
+    pub fn contains(&self, pid: Principal) -> bool {
+        self.caller == pid || self.from.account == pid || self.to.account == pid
     }
 }

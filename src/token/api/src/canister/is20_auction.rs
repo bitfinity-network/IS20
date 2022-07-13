@@ -6,10 +6,11 @@ use candid::{CandidType, Deserialize, Principal};
 use ic_canister::ic_kit::ic;
 use ic_helpers::tokens::Tokens128;
 
+use crate::account::Account;
 use crate::canister::erc20_transactions::transfer_balance;
 use crate::ledger::Ledger;
 use crate::state::{AuctionHistory, Balances, BiddingState, CanisterState};
-use crate::types::{Account, AuctionInfo, Cycles, StatsData, Timestamp};
+use crate::types::{AuctionInfo, Cycles, StatsData, Timestamp};
 
 use super::TokenCanisterAPI;
 
@@ -152,13 +153,8 @@ fn perform_auction(
             .expect("total cycles is not 0 checked by bids existing")
             .to_tokens128()
             .expect("total cycles is smaller then single user bid cycles");
-        transfer_balance(
-            balances,
-            Account::from(auction_principal()),
-            Account::from(*bidder),
-            amount,
-        )
-        .expect("auction principal always have enough balance");
+        transfer_balance(balances, auction_account(), (*bidder).into(), amount)
+            .expect("auction principal always have enough balance");
         ledger.auction(*bidder, amount);
         transferred_amount =
             (transferred_amount + amount).expect("can never be larger than total_supply");

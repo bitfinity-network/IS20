@@ -1,10 +1,11 @@
 use ic_helpers::ledger::Subaccount;
 use ic_helpers::tokens::Tokens128;
 
+use crate::account::Account;
 use crate::canister::erc20_transactions::{charge_fee, transfer_balance};
-use crate::principal::{CheckedPrincipal, WithRecipient};
+
 use crate::state::CanisterState;
-use crate::types::{Account, BatchTransferArgs, TxError, TxId, TxReceipt};
+use crate::types::{BatchTransferArgs, TxError, TxId, TxReceipt};
 
 use super::TokenCanisterAPI;
 
@@ -15,13 +16,10 @@ use super::TokenCanisterAPI;
 /// transaction will fail with `TxError::AmountTooSmall` error.
 pub fn icrc1_transfer_include_fee(
     canister: &impl TokenCanisterAPI,
-    caller: CheckedPrincipal<WithRecipient>,
-    from_subaccount: Option<Subaccount>,
-    to_subaccount: Option<Subaccount>,
+    from: Account,
+    to: Account,
     amount: Tokens128,
 ) -> TxReceipt {
-    let from = Account::new(caller.inner(), from_subaccount);
-    let to = Account::new(caller.recipient(), to_subaccount);
     let state = canister.state();
     let mut state = state.borrow_mut();
     let CanisterState {
@@ -67,13 +65,14 @@ pub fn batch_transfer(
     let mut state = state.borrow_mut();
 
     let mut total_value = Tokens128::from(0u128);
-    for target in transfers.iter() {
+    for target in &transfers {
         total_value = (total_value + target.amount).ok_or(TxError::AmountOverflow)?;
     }
 
     let CanisterState {
         ref mut balances,
         ref bidding_state,
+        ref mut ledger,
         ref stats,
         ..
     } = &mut *state;
@@ -99,7 +98,7 @@ pub fn batch_transfer(
         }
     }
 
-    let id = state.ledger.batch_transfer(from, transfers, fee);
+    let id = ledger.batch_transfer(from, transfers, fee);
     Ok(id)
 }
 

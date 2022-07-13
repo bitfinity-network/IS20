@@ -1,9 +1,7 @@
+use crate::account::Account;
+use crate::types::{BatchTransferArgs, PaginatedResult, PendingNotifications, TxId, TxRecord};
 use candid::{CandidType, Deserialize, Principal};
 use ic_helpers::tokens::Tokens128;
-
-use crate::types::{
-    Account, BatchTransferArgs, PaginatedResult, PendingNotifications, TxId, TxRecord,
-};
 
 const MAX_HISTORY_LENGTH: usize = 1_000_000;
 const HISTORY_REMOVAL_BATCH_SIZE: usize = 10_000;
@@ -43,11 +41,7 @@ impl Ledger {
             .history
             .iter()
             .rev()
-            .filter(|tx| {
-                who.map_or(true, |c| {
-                    c == tx.from.account || c == tx.to.account || c == tx.caller
-                })
-            })
+            .filter(|&tx| who.map_or(true, |c| tx.contains(c)))
             .filter(|tx| transaction_id.map_or(true, |id| id >= tx.index))
             .take(count + 1)
             .cloned()
@@ -78,10 +72,7 @@ impl Ledger {
     }
 
     pub fn get_len_user_history(&self, user: Principal) -> usize {
-        self.history
-            .iter()
-            .filter(|tx| tx.to.account == user || tx.from.account == user || tx.caller == user)
-            .count()
+        self.history.iter().filter(|&tx| tx.contains(user)).count()
     }
 
     pub fn transfer(

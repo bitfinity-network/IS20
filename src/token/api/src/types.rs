@@ -4,10 +4,8 @@ use candid::{CandidType, Deserialize, Principal};
 use ic_helpers::ledger::Subaccount;
 use ic_helpers::{ledger::AccountIdentifier, tokens::Tokens128};
 
-pub use account::*;
 pub use tx_record::*;
 
-mod account;
 mod tx_record;
 
 pub type Timestamp = u64;

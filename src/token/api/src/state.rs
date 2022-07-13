@@ -6,10 +6,9 @@ use ic_helpers::tokens::Tokens128;
 use ic_storage::stable::Versioned;
 use ic_storage::IcStorage;
 
+use crate::account::{Account, SUB_ACCOUNT_ZERO};
 use crate::ledger::Ledger;
-use crate::types::{
-    Account, AuctionInfo, Claims, Cycles, Metadata, StatsData, Timestamp, SUB_ACCOUNT_ZERO,
-};
+use crate::types::{AuctionInfo, Claims, Cycles, Metadata, StatsData, Timestamp};
 
 #[derive(Debug, Default, CandidType, Deserialize, IcStorage)]
 pub struct CanisterState {
@@ -37,7 +36,10 @@ impl CanisterState {
     }
 
     pub fn claim_amount(&self, account: AccountIdentifier) -> Tokens128 {
-        *self.claims.get(&account).unwrap_or(&Tokens128::ZERO)
+        self.claims
+            .get(&account)
+            .copied()
+            .unwrap_or(Tokens128::ZERO)
     }
 }
 
@@ -65,35 +67,45 @@ impl Balances {
             .insert(subaccount.unwrap_or(SUB_ACCOUNT_ZERO), token);
     }
 
-    pub fn balance_of(&self, account: Account) -> Tokens128 {
-        *self
-            .0
-            .get(&account.account)
-            .and_then(|subaccounts| subaccounts.get(&account.subaccount))
-            .unwrap_or(&Tokens128::default())
+    pub fn get_mut(&mut self, account: Account) -> Option<&mut Tokens128> {
+        self.0
+            .get_mut(&account.account)
+            .and_then(|subaccounts| subaccounts.get_mut(&account.subaccount))
     }
 
-    pub fn get_holders(
-        &self,
-        start: usize,
-        limit: usize,
-    ) -> Vec<((Principal, Subaccount), Tokens128)> {
+    pub fn get_mut_or_insert_default(&mut self, account: Account) -> &mut Tokens128 {
+        self.0
+            .entry(account.account)
+            .or_default()
+            .entry(account.subaccount)
+            .or_default()
+    }
+
+    pub fn balance_of(&self, account: Account) -> Tokens128 {
+        self.0
+            .get(&account.account)
+            .and_then(|subaccounts| subaccounts.get(&account.subaccount))
+            .copied()
+            .unwrap_or_default()
+    }
+
+    pub fn get_holders(&self, start: usize, limit: usize) -> Vec<(Account, Tokens128)> {
         let mut holders = self
             .0
             .iter()
             .flat_map(|(principal, subaccounts)| {
                 subaccounts
                     .iter()
-                    .map(|(subaccount, token)| ((*principal, *subaccount), *token))
+                    .map(|(subaccount, token)| {
+                        (Account::new(*principal, Some(*subaccount)), *token)
+                    })
                     .collect::<Vec<_>>()
             })
+            .skip(start)
+            .take(limit)
             .collect::<Vec<_>>();
         holders.sort_by(|a, b| b.1.cmp(&a.1));
-        holders[start..].iter().take(limit).cloned().collect()
-    }
-
-    pub fn get_balances(&self, who: &Principal) -> HashMap<Subaccount, Tokens128> {
-        self.0.get(who).cloned().unwrap_or_default()
+        holders
     }
 
     pub fn remove(&mut self, account: Account) {

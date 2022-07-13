@@ -2,10 +2,11 @@ use ic_cdk::export::Principal;
 use ic_helpers::ledger::{AccountIdentifier, Subaccount};
 use ic_helpers::tokens::Tokens128;
 
+use crate::account::Account;
 use crate::canister::is20_auction::auction_principal;
 use crate::principal::{CheckedPrincipal, Owner, TestNet};
 use crate::state::{Balances, CanisterState};
-use crate::types::{Account, TxError, TxReceipt};
+use crate::types::{TxError, TxReceipt};
 
 use super::TokenCanisterAPI;
 
@@ -28,7 +29,11 @@ pub(crate) fn icrc1_transfer(
     let (fee, fee_to) = stats.fee_info();
     let fee_ratio = bidding_state.fee_ratio;
 
-fee_limit.filter(|limit| fee.gt(limit)).ok_or(TxError::FeeExceededLimit)?;
+    if let Some(fee_limit) = fee_limit {
+        if fee > fee_limit {
+            return Err(TxError::FeeExceededLimit);
+        }
+    }
 
     if balances.balance_of(from) < (amount + fee).ok_or(TxError::AmountOverflow)? {
         return Err(TxError::InsufficientBalance);
@@ -186,28 +191,15 @@ pub fn transfer_balance(
         return Ok(());
     }
 
-    {
-        let from_balance = balances
-            .0
-            .get_mut(&from.account)
-            .ok_or(TxError::InsufficientBalance)?
-            .get_mut(&from.subaccount)
-            .ok_or(TxError::InsufficientBalance)?;
+    let from_balance = balances.get_mut(from).ok_or(TxError::InsufficientBalance)?;
 
-        *from_balance = (*from_balance - amount).ok_or(TxError::InsufficientBalance)?;
-    }
+    *from_balance = (*from_balance - amount).ok_or(TxError::InsufficientBalance)?;
 
-    {
-        let to_balance = balances
-            .0
-            .entry(to.account)
-            .or_default()
-            .entry(to.subaccount)
-            .or_default();
-        *to_balance = (*to_balance + amount).expect(
-            "never overflows since `from_balance + to_balance` is limited by `total_supply` amount",
-        );
-    }
+    let to_balance = balances.get_mut_or_insert_default(to);
+
+    *to_balance = (*to_balance + amount).expect(
+        "never overflows since `from_balance + to_balance` is limited by `total_supply` amount",
+    );
 
     if balances.balance_of(from) == Tokens128::ZERO {
         balances.remove(from);
@@ -226,7 +218,7 @@ pub(crate) fn charge_fee(
     // todo: check if this is enforced
     debug_assert!((0.0..=1.0).contains(&fee_ratio));
 
-    if fee == Tokens128::from(0) {
+    if fee == Tokens128::ZERO {
         return Ok(());
     }
 

@@ -7,9 +7,10 @@ use ic_cdk_macros::inspect_message;
 use ic_helpers::candid_header::{candid_header, CandidHeader};
 use std::{cell::RefCell, rc::Rc};
 use token_api::{
+    account::Account,
     canister::{TokenCanisterAPI, DEFAULT_AUCTION_PERIOD},
     state::CanisterState,
-    types::{Account, Metadata},
+    types::Metadata,
 };
 
 #[derive(Debug, Clone, Canister)]

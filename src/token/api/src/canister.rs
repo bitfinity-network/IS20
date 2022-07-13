@@ -12,6 +12,7 @@ use ic_storage::IcStorage;
 
 pub use inspect::AcceptReason;
 
+use crate::account::Account;
 use crate::canister::erc20_transactions::{
     burn_as_owner, burn_own_tokens, claim, icrc1_transfer, mint_as_owner, mint_test_token,
     mint_to_accountid,
@@ -25,8 +26,8 @@ use crate::principal::{CheckedPrincipal, Owner};
 use crate::state::CanisterState;
 use crate::types::BatchTransferArgs;
 use crate::types::{
-    Account, AuctionInfo, Metadata, PaginatedResult, StatsData, Timestamp, TokenInfo, TxError,
-    TxId, TxReceipt, TxRecord,
+    AuctionInfo, Metadata, PaginatedResult, StatsData, Timestamp, TokenInfo, TxError, TxId,
+    TxReceipt, TxRecord,
 };
 
 use self::is20_transactions::batch_transfer;
@@ -135,7 +136,7 @@ pub trait TokenCanisterAPI: Canister + Sized {
     }
 
     #[query(trait = true)]
-    fn getHolders(&self, start: usize, limit: usize) -> Vec<((Principal, Subaccount), Tokens128)> {
+    fn getHolders(&self, start: usize, limit: usize) -> Vec<(Account, Tokens128)> {
         self.state().borrow().balances.get_holders(start, limit)
     }
 
@@ -231,7 +232,9 @@ pub trait TokenCanisterAPI: Canister + Sized {
         amount: Tokens128,
     ) -> TxReceipt {
         let caller = CheckedPrincipal::with_recipient(to)?;
-        icrc1_transfer_include_fee(self, caller, from_subaccount, to_subaccount, amount)
+        let from = Account::new(caller.inner(), from_subaccount);
+        let to = Account::new(caller.recipient(), to_subaccount);
+        icrc1_transfer_include_fee(self, from, to, amount)
     }
 
     /// Takes a list of transfers, each of which is a pair of `to` and `value` fields, it returns a `TxReceipt` which contains

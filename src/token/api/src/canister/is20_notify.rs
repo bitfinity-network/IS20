@@ -3,7 +3,8 @@
 use candid::Principal;
 use ic_canister::virtual_canister_notify;
 
-use crate::types::{Account, TxError, TxId, TxReceipt};
+use crate::account::Account;
+use crate::types::{TxError, TxId, TxReceipt};
 
 use super::TokenCanisterAPI;
 
