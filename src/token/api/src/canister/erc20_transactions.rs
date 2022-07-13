@@ -5,7 +5,7 @@ use ic_helpers::tokens::Tokens128;
 use crate::canister::is20_auction::auction_principal;
 use crate::principal::{CheckedPrincipal, Owner, TestNet, WithRecipient};
 use crate::state::{Balances, CanisterState};
-use crate::types::{Account, TxError, TxReceipt, SUB_ACCOUNT_ZERO};
+use crate::types::{Account, TxError, TxReceipt};
 
 use super::TokenCanisterAPI;
 
@@ -37,9 +37,7 @@ pub fn icrc1_transfer(
         }
     }
 
-    if balances.balance_of(&caller.inner(), from_subaccount)
-        < (amount + fee).ok_or(TxError::AmountOverflow)?
-    {
+    if balances.balance_of(from) < (amount + fee).ok_or(TxError::AmountOverflow)? {
         return Err(TxError::InsufficientBalance);
     }
 
@@ -67,10 +65,12 @@ fn mint(state: &mut CanisterState, caller: Principal, to: Account, amount: Token
         .0
         .entry(to.account)
         .or_default()
-        .entry(to.subaccount.unwrap_or(SUB_ACCOUNT_ZERO))
+        .entry(to.subaccount)
         .or_default();
+
     let new_balance = (*balance + amount)
         .expect("balance cannot be larger than total_supply which is already checked");
+
     *balance = new_balance;
 
     let id = state.ledger.mint(caller.into(), to, amount);
@@ -114,22 +114,19 @@ pub fn burn(
     from: Account,
     amount: Tokens128,
 ) -> TxReceipt {
-    let balance = state.balances.balance_of(&from.account, from.subaccount);
-    match balance {
-        Tokens128::ZERO => {
-            if !amount.is_zero() {
-                return Err(TxError::InsufficientBalance);
-            }
-        }
-        _ => {
-            let new_balance = (balance - amount).ok_or(TxError::InsufficientBalance)?;
-            if new_balance == Tokens128::ZERO {
-                state.balances.remove(from)
-            } else {
-                state.balances.set_balance(from, new_balance)
-            }
-        }
+    let balance = state.balances.balance_of(from);
+
+    if !amount.is_zero() && balance == Tokens128::ZERO {
+        return Err(TxError::InsufficientBalance);
     }
+
+    let new_balance = (balance - amount).ok_or(TxError::InsufficientBalance)?;
+    if new_balance == Tokens128::ZERO {
+        state.balances.remove(from)
+    } else {
+        state.balances.set_balance(from, new_balance)
+    }
+
     state.stats.total_supply =
         (state.stats.total_supply - amount).expect("total supply cannot be less then user balance");
 
@@ -208,7 +205,7 @@ pub fn transfer_balance(
             .0
             .get_mut(&from.account)
             .ok_or(TxError::InsufficientBalance)?
-            .get_mut(&from.subaccount.unwrap_or(SUB_ACCOUNT_ZERO))
+            .get_mut(&from.subaccount)
             .ok_or(TxError::InsufficientBalance)?;
 
         *from_balance = (*from_balance - amount).ok_or(TxError::InsufficientBalance)?;
@@ -219,14 +216,14 @@ pub fn transfer_balance(
             .0
             .entry(to.account)
             .or_default()
-            .entry(to.subaccount.unwrap_or(SUB_ACCOUNT_ZERO))
+            .entry(to.subaccount)
             .or_default();
         *to_balance = (*to_balance + amount).expect(
             "never overflows since `from_balance + to_balance` is limited by `total_supply` amount",
         );
     }
 
-    if balances.balance_of(&from.account, from.subaccount) == Tokens128::ZERO {
+    if balances.balance_of(from) == Tokens128::ZERO {
         balances.remove(from);
     }
 

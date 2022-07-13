@@ -39,7 +39,7 @@ pub fn icrc1_transfer_include_fee(
         return Err(TxError::AmountTooSmall);
     }
 
-    if balances.balance_of(&caller.inner(), from_subaccount) < amount {
+    if balances.balance_of(from) < amount {
         return Err(TxError::InsufficientBalance);
     }
 
@@ -85,7 +85,7 @@ pub fn batch_transfer(
         .to_tokens128()
         .ok_or(TxError::AmountOverflow)?;
 
-    if balances.balance_of(&caller, from_subaccount)
+    if balances.balance_of(from)
         < (total_value + total_fee).ok_or(TxError::AmountOverflow)?
     {
         return Err(TxError::InsufficientBalance);

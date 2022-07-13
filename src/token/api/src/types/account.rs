@@ -9,14 +9,14 @@ pub static SUB_ACCOUNT_ZERO: Subaccount = Subaccount([0; 32]);
 #[derive(Debug, Clone, CandidType, Deserialize, Copy, PartialEq, Eq, Serialize)]
 pub struct Account {
     pub account: Principal,
-    pub subaccount: Option<Subaccount>,
+    pub subaccount: Subaccount,
 }
 
 impl Account {
     pub fn new(account: Principal, subaccount: Option<Subaccount>) -> Self {
         Self {
             account,
-            subaccount,
+            subaccount: subaccount.unwrap_or(SUB_ACCOUNT_ZERO),
         }
     }
 }

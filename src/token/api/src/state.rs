@@ -65,12 +65,11 @@ impl Balances {
             .insert(subaccount.unwrap_or(SUB_ACCOUNT_ZERO), token);
     }
 
-    pub fn balance_of(&self, who: &Principal, who_subaccount: Option<Subaccount>) -> Tokens128 {
-        let who_subaccount = who_subaccount.unwrap_or(SUB_ACCOUNT_ZERO);
+    pub fn balance_of(&self, account: Account) -> Tokens128 {
         *self
             .0
-            .get(who)
-            .and_then(|subaccount| subaccount.get(&who_subaccount))
+            .get(&account.account)
+            .and_then(|subaccounts| subaccounts.get(&account.subaccount))
             .unwrap_or(&Tokens128::default())
     }
 
@@ -99,7 +98,7 @@ impl Balances {
 
     pub fn remove(&mut self, account: Account) {
         if let Some(subaccounts) = self.0.get_mut(&account.account) {
-            subaccounts.remove(&account.subaccount.unwrap_or(SUB_ACCOUNT_ZERO));
+            subaccounts.remove(&account.subaccount);
         }
 
         if self
@@ -113,15 +112,9 @@ impl Balances {
     }
 
     pub fn set_balance(&mut self, account: Account, token: Tokens128) {
-        if let Some(subaccount) = account.subaccount {
-            self.0
-                .get_mut(&account.account)
-                .map(|subaccounts| subaccounts.insert(subaccount, token));
-        } else {
-            self.0
-                .get_mut(&account.account)
-                .map(|subaccounts| subaccounts.insert(SUB_ACCOUNT_ZERO, token));
-        }
+        self.0
+            .get_mut(&account.account)
+            .map(|subaccounts| subaccounts.insert(account.subaccount, token));
     }
 }
 

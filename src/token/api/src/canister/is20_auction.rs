@@ -210,8 +210,13 @@ pub fn auction_principal() -> Principal {
     Principal::management_canister()
 }
 
+pub fn auction_account() -> Account {
+    // There are no sub accounts for the auction principal
+    Account::new(Principal::management_canister(), None)
+}
+
 pub fn accumulated_fees(balances: &Balances) -> Tokens128 {
-    balances.balance_of(&auction_principal(), None)
+    balances.balance_of(auction_account())
 }
 
 #[cfg(test)]
@@ -313,7 +318,7 @@ mod tests {
             .state()
             .borrow()
             .balances
-            .balance_of(&auction_principal(), None);
+            .balance_of(auction_account());
 
         let result = canister.runAuction().unwrap();
         assert_eq!(result.cycles_collected, 6_000_000);
@@ -322,7 +327,7 @@ mod tests {
         assert_eq!(result.tokens_distributed, Tokens128::from(6_000));
 
         assert_eq!(
-            canister.state().borrow().balances.balance_of(&bob(), None),
+            canister.state().borrow().balances.balance_of(bob().into()),
             Tokens128::from(4_000)
         );
 
