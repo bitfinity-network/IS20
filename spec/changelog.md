@@ -1,6 +1,6 @@
 # IS20 changelog
 
-There have been substantial changes to the IS20 token standard.
+There has been substantial changes to the IS20 token standard.
 We have adapted the ICRC-1 token methods while retaining the IS20 standard with minimal changes.
 
 ## Changes
