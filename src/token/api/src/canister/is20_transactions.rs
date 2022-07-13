@@ -90,7 +90,7 @@ pub fn batch_transfer(
     }
 
     {
-        for x in transfers.clone() {
+        for x in &transfers {
             let value = x.amount;
             let to = Account::new(x.receiver.to, x.receiver.to_subaccount);
             charge_fee(balances, from, fee_to, fee, fee_ratio)
