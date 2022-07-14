@@ -200,7 +200,7 @@ impl TokenFactoryCanister {
     }
 
     #[query]
-    pub fn state_check(&self) -> CandidHeader {
+    pub fn state_header(&self) -> CandidHeader {
         candid_header::<StableState>()
     }
 }
