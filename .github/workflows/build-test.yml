@@ -13,7 +13,7 @@ jobs:
       skip-test: ${{ github.ref_type == 'tag' }}
       test-script: |
         ./scripts/build.sh
-        ./scripts/test.sh
+        cargo test
 
     secrets:
       gh_token: ${{ secrets.GH_PKG_TOKEN }}

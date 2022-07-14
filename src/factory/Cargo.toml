@@ -8,7 +8,7 @@ default = []
 no_api = []
 
 [dependencies]
-candid = "0.7"
+candid = "=0.7.14" # Because there is a build issue with ic_types::principal::PrincipalError 
 ic-cdk = "0.5"
 ic-cdk-macros = "0.5"
 ic-canister = { git = "https://github.com/infinity-swap/canister-sdk", package = "ic-canister", tag = "v0.3.12" }
