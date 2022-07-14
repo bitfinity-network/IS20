@@ -370,12 +370,7 @@ pub trait TokenCanisterAPI: Canister + Sized {
         amount: Tokens128,
     ) -> AsyncReturn<TxReceipt> {
         let caller = CheckedPrincipal::with_recipient(spender);
-        let fut = async move {
-            match caller {
-                Ok(caller) => approve_and_notify(self, caller, amount).await,
-                Err(e) => Err(e),
-            }
-        };
+        let fut = async move { approve_and_notify(self, caller?, amount).await };
         Box::pin(fut)
     }
 
