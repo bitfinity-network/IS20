@@ -33,6 +33,7 @@ pub struct TokenFactoryCanister {
 impl TokenFactoryCanister {
     #[pre_upgrade]
     fn pre_upgrade(&self) {
+        // Default states just to chek that the storage is writeable.
         let token_factory_state = self.state.replace(State::default());
         let base_factory_state = self.factory_state().replace(FactoryState::default());
 
@@ -158,7 +159,7 @@ impl TokenFactoryCanister {
         &mut self,
     ) -> Result<std::collections::HashMap<Principal, ic_factory::api::UpgradeResult>, FactoryError>
     {
-        FactoryCanister::upgrade::<token::state::CanisterState>(self).await
+        self.upgrade_canister::<token::state::CanisterState>().await
     }
 
     #[query]
