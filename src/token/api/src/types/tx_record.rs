@@ -1,8 +1,9 @@
-use crate::account::Account;
-use crate::types::{Operation, TransactionStatus, TxId};
 use candid::{CandidType, Deserialize, Principal};
 use ic_canister::ic_kit::ic;
 use ic_helpers::tokens::Tokens128;
+
+use crate::account::Account;
+use crate::types::{Operation, Timestamp, TransactionStatus, TxId};
 
 #[derive(Deserialize, CandidType, Debug, Clone)]
 pub struct TxRecord {
@@ -12,9 +13,10 @@ pub struct TxRecord {
     pub to: Account,
     pub amount: Tokens128,
     pub fee: Tokens128,
-    pub timestamp: u64,
+    pub timestamp: Timestamp,
     pub status: TransactionStatus,
     pub operation: Operation,
+    pub memo: Option<u64>,
 }
 
 impl TxRecord {
@@ -24,6 +26,8 @@ impl TxRecord {
         to: Account,
         amount: Tokens128,
         fee: Tokens128,
+        memo: Option<u64>,
+        created_at_time: Option<Timestamp>,
     ) -> Self {
         Self {
             caller: from.account,
@@ -32,9 +36,10 @@ impl TxRecord {
             to,
             amount,
             fee,
-            timestamp: ic::time(),
+            timestamp: created_at_time.unwrap_or(ic::time()),
             status: TransactionStatus::Succeeded,
             operation: Operation::Transfer,
+            memo,
         }
     }
 
@@ -49,6 +54,7 @@ impl TxRecord {
             timestamp: ic::time(),
             status: TransactionStatus::Succeeded,
             operation: Operation::Mint,
+            memo: None,
         }
     }
 
@@ -63,6 +69,7 @@ impl TxRecord {
             timestamp: ic::time(),
             status: TransactionStatus::Succeeded,
             operation: Operation::Burn,
+            memo: None,
         }
     }
 
@@ -77,6 +84,7 @@ impl TxRecord {
             timestamp: ic::time(),
             status: TransactionStatus::Succeeded,
             operation: Operation::Auction,
+            memo: None,
         }
     }
 

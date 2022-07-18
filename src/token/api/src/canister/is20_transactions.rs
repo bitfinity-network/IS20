@@ -3,9 +3,8 @@ use ic_helpers::tokens::Tokens128;
 
 use crate::account::Account;
 use crate::canister::erc20_transactions::{charge_fee, transfer_balance};
-
 use crate::state::CanisterState;
-use crate::types::{BatchTransferArgs, TxError, TxId, TxReceipt};
+use crate::types::{BatchTransferArgs, Timestamp, TxError, TxId, TxReceipt};
 
 use super::TokenCanisterAPI;
 
@@ -19,6 +18,8 @@ pub fn icrc1_transfer_include_fee(
     from: Account,
     to: Account,
     amount: Tokens128,
+    memo: Option<u64>,
+    created_at_time: Option<Timestamp>,
 ) -> TxReceipt {
     let state = canister.state();
     let mut state = state.borrow_mut();
@@ -50,7 +51,7 @@ pub fn icrc1_transfer_include_fee(
     )
     .expect("never fails due to checks above");
 
-    let id = ledger.transfer(from, to, amount, fee);
+    let id = ledger.transfer(from, to, amount, fee, memo, created_at_time);
     Ok(id)
 }
 
@@ -126,17 +127,19 @@ mod tests {
         MockContext::new().with_caller(alice()).inject();
 
         let canister = TokenCanisterMock::init_instance();
-        canister.init(Metadata {
-            logo: "".to_string(),
-            name: "".to_string(),
-            symbol: "".to_string(),
-            decimals: 8,
-            totalSupply: Tokens128::from(1000),
-            owner: alice(),
-            fee: Tokens128::from(0),
-            feeTo: alice(),
-            isTestToken: None,
-        });
+        canister.init(
+            Metadata {
+                logo: "".to_string(),
+                name: "".to_string(),
+                symbol: "".to_string(),
+                decimals: 8,
+                owner: alice(),
+                fee: Tokens128::from(0),
+                feeTo: alice(),
+                isTestToken: None,
+            },
+            Tokens128::from(1000),
+        );
 
         // This is to make tests that don't rely on auction state
         // pass, because since we are running auction state on each
@@ -150,7 +153,10 @@ mod tests {
     #[test]
     fn batch_transfer_without_fee() {
         let canister = test_canister();
-        assert_eq!(Tokens128::from(1000), canister.balanceOf(alice(), None));
+        assert_eq!(
+            Tokens128::from(1000),
+            canister.icrc1_balance_of(alice(), None)
+        );
         let transfer1 = BatchTransferArgs {
             receiver: BatchAccount {
                 to: bob(),
@@ -169,9 +175,15 @@ mod tests {
             .batchTransfer(None, vec![transfer1, transfer2])
             .unwrap();
         assert_eq!(receipt.len(), 2);
-        assert_eq!(canister.balanceOf(alice(), None), Tokens128::from(700));
-        assert_eq!(canister.balanceOf(bob(), None), Tokens128::from(100));
-        assert_eq!(canister.balanceOf(john(), None), Tokens128::from(200));
+        assert_eq!(
+            canister.icrc1_balance_of(alice(), None),
+            Tokens128::from(700)
+        );
+        assert_eq!(canister.icrc1_balance_of(bob(), None), Tokens128::from(100));
+        assert_eq!(
+            canister.icrc1_balance_of(john(), None),
+            Tokens128::from(200)
+        );
     }
 
     #[test]
@@ -181,7 +193,10 @@ mod tests {
         state.stats.fee = Tokens128::from(50);
         state.stats.fee_to = john();
         drop(state);
-        assert_eq!(Tokens128::from(1000), canister.balanceOf(alice(), None));
+        assert_eq!(
+            Tokens128::from(1000),
+            canister.icrc1_balance_of(alice(), None)
+        );
         let transfer1 = BatchTransferArgs {
             receiver: BatchAccount {
                 to: bob(),
@@ -200,10 +215,16 @@ mod tests {
             .batchTransfer(None, vec![transfer1, transfer2])
             .unwrap();
         assert_eq!(receipt.len(), 2);
-        assert_eq!(canister.balanceOf(alice(), None), Tokens128::from(600));
-        assert_eq!(canister.balanceOf(bob(), None), Tokens128::from(100));
-        assert_eq!(canister.balanceOf(xtc(), None), Tokens128::from(200));
-        assert_eq!(canister.balanceOf(john(), None), Tokens128::from(100));
+        assert_eq!(
+            canister.icrc1_balance_of(alice(), None),
+            Tokens128::from(600)
+        );
+        assert_eq!(canister.icrc1_balance_of(bob(), None), Tokens128::from(100));
+        assert_eq!(canister.icrc1_balance_of(xtc(), None), Tokens128::from(200));
+        assert_eq!(
+            canister.icrc1_balance_of(john(), None),
+            Tokens128::from(100)
+        );
     }
 
     #[test]
@@ -227,28 +248,37 @@ mod tests {
         let receipt = canister.batchTransfer(None, vec![transfer1, transfer2]);
         assert!(receipt.is_err());
         assert_eq!(receipt.unwrap_err(), TxError::InsufficientBalance);
-        assert_eq!(canister.balanceOf(alice(), None), Tokens128::from(1000));
-        assert_eq!(canister.balanceOf(bob(), None), Tokens128::from(0));
-        assert_eq!(canister.balanceOf(john(), None), Tokens128::from(0));
+        assert_eq!(
+            canister.icrc1_balance_of(alice(), None),
+            Tokens128::from(1000)
+        );
+        assert_eq!(canister.icrc1_balance_of(bob(), None), Tokens128::from(0));
+        assert_eq!(canister.icrc1_balance_of(john(), None), Tokens128::from(0));
     }
 
     #[test]
     fn transfer_without_fee() {
         let canister = test_canister();
         let bob_sub = gen_subaccount();
-        assert_eq!(Tokens128::from(1000), canister.balanceOf(alice(), None));
+        assert_eq!(
+            Tokens128::from(1000),
+            canister.icrc1_balance_of(alice(), None)
+        );
 
         assert!(canister
-            .icrc1_transferIncludeFee(None, bob(), None, Tokens128::from(100))
+            .icrc1_transferIncludeFee(None, bob(), None, Tokens128::from(100), None, None)
             .is_ok());
-        assert_eq!(canister.balanceOf(bob(), None), Tokens128::from(100));
-        assert_eq!(canister.balanceOf(alice(), None), Tokens128::from(900));
+        assert_eq!(canister.icrc1_balance_of(bob(), None), Tokens128::from(100));
+        assert_eq!(
+            canister.icrc1_balance_of(alice(), None),
+            Tokens128::from(900)
+        );
 
         assert!(canister
-            .icrc1_transferIncludeFee(None, bob(), Some(bob_sub), Tokens128::from(100))
+            .icrc1_transferIncludeFee(None, bob(), Some(bob_sub), Tokens128::from(100), None, None)
             .is_ok());
         assert_eq!(
-            canister.balanceOf(bob(), Some(bob_sub)),
+            canister.icrc1_balance_of(bob(), Some(bob_sub)),
             Tokens128::from(100)
         );
     }
@@ -263,17 +293,23 @@ mod tests {
         drop(state);
 
         assert!(canister
-            .icrc1_transferIncludeFee(None, bob(), None, Tokens128::from(200))
+            .icrc1_transferIncludeFee(None, bob(), None, Tokens128::from(200), None, None)
             .is_ok());
-        assert_eq!(canister.balanceOf(bob(), None), Tokens128::from(100));
-        assert_eq!(canister.balanceOf(alice(), None), Tokens128::from(800));
-        assert_eq!(canister.balanceOf(john(), None), Tokens128::from(100));
+        assert_eq!(canister.icrc1_balance_of(bob(), None), Tokens128::from(100));
+        assert_eq!(
+            canister.icrc1_balance_of(alice(), None),
+            Tokens128::from(800)
+        );
+        assert_eq!(
+            canister.icrc1_balance_of(john(), None),
+            Tokens128::from(100)
+        );
 
         assert!(canister
-            .icrc1_transferIncludeFee(None, bob(), Some(bob_sub), Tokens128::from(150))
+            .icrc1_transferIncludeFee(None, bob(), Some(bob_sub), Tokens128::from(150), None, None)
             .is_ok());
         assert_eq!(
-            canister.balanceOf(bob(), Some(bob_sub)),
+            canister.icrc1_balance_of(bob(), Some(bob_sub)),
             Tokens128::from(50)
         );
     }
@@ -282,10 +318,13 @@ mod tests {
     fn transfer_insufficient_balance() {
         let canister = test_canister();
         assert_eq!(
-            canister.icrc1_transferIncludeFee(None, bob(), None, Tokens128::from(1001)),
+            canister.icrc1_transferIncludeFee(None, bob(), None, Tokens128::from(1001), None, None),
             Err(TxError::InsufficientBalance)
         );
-        assert_eq!(canister.balanceOf(alice(), None), Tokens128::from(1000));
-        assert_eq!(canister.balanceOf(bob(), None), Tokens128::from(0));
+        assert_eq!(
+            canister.icrc1_balance_of(alice(), None),
+            Tokens128::from(1000)
+        );
+        assert_eq!(canister.icrc1_balance_of(bob(), None), Tokens128::from(0));
     }
 }

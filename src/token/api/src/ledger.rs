@@ -1,7 +1,10 @@
-use crate::account::Account;
-use crate::types::{BatchTransferArgs, PaginatedResult, PendingNotifications, TxId, TxRecord};
 use candid::{CandidType, Deserialize, Principal};
 use ic_helpers::tokens::Tokens128;
+
+use crate::account::Account;
+use crate::types::{
+    BatchTransferArgs, PaginatedResult, PendingNotifications, Timestamp, TxId, TxRecord,
+};
 
 const MAX_HISTORY_LENGTH: usize = 1_000_000;
 const HISTORY_REMOVAL_BATCH_SIZE: usize = 10_000;
@@ -81,9 +84,19 @@ impl Ledger {
         to: Account,
         amount: Tokens128,
         fee: Tokens128,
+        memo: Option<u64>,
+        created_at_time: Option<Timestamp>,
     ) -> TxId {
         let id = self.next_id();
-        self.push(TxRecord::transfer(id, from, to, amount, fee));
+        self.push(TxRecord::transfer(
+            id,
+            from,
+            to,
+            amount,
+            fee,
+            memo,
+            created_at_time,
+        ));
 
         id
     }
@@ -102,6 +115,8 @@ impl Ledger {
                     Account::new(x.receiver.to, x.receiver.to_subaccount),
                     x.amount,
                     fee,
+                    None,
+                    None,
                 )
             })
             .collect()

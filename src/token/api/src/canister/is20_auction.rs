@@ -231,17 +231,19 @@ mod tests {
         let context = MockContext::new().with_caller(alice()).inject();
 
         let canister = TokenCanisterMock::init_instance();
-        canister.init(Metadata {
-            logo: "".to_string(),
-            name: "".to_string(),
-            symbol: "".to_string(),
-            decimals: 8,
-            totalSupply: Tokens128::from(1000),
-            owner: alice(),
-            fee: Tokens128::from(0),
-            feeTo: alice(),
-            isTestToken: None,
-        });
+        canister.init(
+            Metadata {
+                logo: "".to_string(),
+                name: "".to_string(),
+                symbol: "".to_string(),
+                decimals: 8,
+                owner: alice(),
+                fee: Tokens128::from(0),
+                feeTo: alice(),
+                isTestToken: None,
+            },
+            Tokens128::from(1000),
+        );
 
         (context, canister)
     }

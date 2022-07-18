@@ -1,10 +1,11 @@
 use std::cell::RefCell;
+use std::collections::HashMap;
 use std::rc::Rc;
 
 use ic_canister::generate_exports;
 use ic_canister::Canister;
 use ic_canister::MethodType;
-use ic_canister::{query, update, AsyncReturn};
+use ic_canister::{query, update};
 use ic_cdk::export::candid::Principal;
 use ic_helpers::ledger::{AccountIdentifier, Subaccount};
 use ic_helpers::tokens::Tokens128;
@@ -20,11 +21,12 @@ use crate::canister::erc20_transactions::{
 use crate::canister::is20_auction::{
     auction_info, bid_cycles, bidding_info, run_auction, AuctionError, BiddingInfo,
 };
-use crate::canister::is20_notify::{consume_notification, notify};
 use crate::canister::is20_transactions::icrc1_transfer_include_fee;
 use crate::principal::{CheckedPrincipal, Owner};
 use crate::state::CanisterState;
 use crate::types::BatchTransferArgs;
+use crate::types::TransferArgs;
+use crate::types::Value;
 use crate::types::{
     AuctionInfo, Metadata, PaginatedResult, StatsData, Timestamp, TokenInfo, TxError, TxId,
     TxReceipt, TxRecord,
@@ -37,7 +39,6 @@ mod inspect;
 pub mod erc20_transactions;
 
 pub mod is20_auction;
-pub mod is20_notify;
 pub mod is20_transactions;
 
 pub(crate) const MAX_TRANSACTION_QUERY_LEN: usize = 1000;
@@ -84,12 +85,12 @@ pub trait TokenCanisterAPI: Canister + Sized {
     }
 
     #[query(trait = true)]
-    fn name(&self) -> String {
+    fn icrc1_name(&self) -> String {
         self.state().borrow().stats.name.clone()
     }
 
     #[query(trait = true)]
-    fn symbol(&self) -> String {
+    fn icrc1_symbol(&self) -> String {
         self.state().borrow().stats.symbol.clone()
     }
 
@@ -104,8 +105,8 @@ pub trait TokenCanisterAPI: Canister + Sized {
     }
 
     #[query(trait = true)]
-    fn totalSupply(&self) -> Tokens128 {
-        self.state().borrow().stats.total_supply
+    fn icrc1_total_supply(&self) -> Tokens128 {
+        self.state().borrow().balances.total_supply()
     }
 
     #[query(trait = true)]
@@ -114,8 +115,8 @@ pub trait TokenCanisterAPI: Canister + Sized {
     }
 
     #[query(trait = true)]
-    fn getMetadata(&self) -> Metadata {
-        self.state().borrow().get_metadata()
+    fn icrc1_metadata(&self) -> HashMap<String, Value> {
+        self.state().borrow().icrc1_metadata()
     }
 
     #[query(trait = true)]
@@ -141,9 +142,18 @@ pub trait TokenCanisterAPI: Canister + Sized {
     }
 
     #[query(trait = true)]
-    fn balanceOf(&self, holder: Principal, holder_subaccount: Option<Subaccount>) -> Tokens128 {
+    fn icrc1_balance_of(
+        &self,
+        holder: Principal,
+        holder_subaccount: Option<Subaccount>,
+    ) -> Tokens128 {
         let account = Account::new(holder, holder_subaccount);
         self.state().borrow().balances.balance_of(account)
+    }
+
+    #[query(trait = true)]
+    fn getClaim(&self, subaccount: Option<Subaccount>) -> Result<Tokens128, TxError> {
+        self.state().borrow().get_claim(subaccount)
     }
 
     #[query(trait = true)]
@@ -203,19 +213,10 @@ pub trait TokenCanisterAPI: Canister + Sized {
 
     /********************** TRANSFERS ***********************/
     #[cfg_attr(feature = "transfer", update(trait = true))]
-    fn icrc1_transfer(
-        &self,
-        from_subaccount: Option<Subaccount>,
-        to: Principal,
-        to_subaccount: Option<Subaccount>,
-        amount: Tokens128,
-        fee_limit: Option<Tokens128>,
-    ) -> TxReceipt {
-        let caller = CheckedPrincipal::with_recipient(to)?;
+    fn icrc1_transfer(&self, transfer: TransferArgs) -> TxReceipt {
+        let caller = CheckedPrincipal::with_recipient(transfer.to)?;
 
-        let from = Account::new(caller.inner(), from_subaccount);
-        let to = Account::new(caller.recipient(), to_subaccount);
-        icrc1_transfer(self, from, to, amount, fee_limit)
+        icrc1_transfer(self, caller, transfer)
     }
 
     /// Transfers `value` amount to the `to` principal, applying American style fee. This means, that
@@ -230,11 +231,13 @@ pub trait TokenCanisterAPI: Canister + Sized {
         to: Principal,
         to_subaccount: Option<Subaccount>,
         amount: Tokens128,
+        memo: Option<u64>,
+        created_at_time: Option<Timestamp>,
     ) -> TxReceipt {
         let caller = CheckedPrincipal::with_recipient(to)?;
         let from = Account::new(caller.inner(), from_subaccount);
         let to = Account::new(caller.recipient(), to_subaccount);
-        icrc1_transfer_include_fee(self, from, to, amount)
+        icrc1_transfer_include_fee(self, from, to, amount, memo, created_at_time)
     }
 
     /// Takes a list of transfers, each of which is a pair of `to` and `value` fields, it returns a `TxReceipt` which contains
@@ -253,6 +256,7 @@ pub trait TokenCanisterAPI: Canister + Sized {
         }
         batch_transfer(self, from_subaccount, transfers)
     }
+
     #[cfg_attr(feature = "mint_burn", update(trait = true))]
     fn icrc1_mint(
         &self,
@@ -385,20 +389,6 @@ pub trait TokenCanisterAPI: Canister + Sized {
         // IC timestamp is in nanoseconds, thus multiplying
         self.update_stats(caller, CanisterUpdate::AuctionPeriod(period_sec));
         Ok(())
-    }
-
-    #[update(trait = true)]
-    fn consume_notification<'a>(&'a self, transaction_id: TxId) -> AsyncReturn<TxReceipt> {
-        let fut = async move { consume_notification(self, transaction_id).await };
-
-        Box::pin(fut)
-    }
-
-    #[update(trait = true)]
-    fn notify<'a>(&'a self, transaction_id: TxId, to: Principal) -> AsyncReturn<TxReceipt> {
-        let fut = async move { notify(self, transaction_id, to).await };
-
-        Box::pin(fut)
     }
 
     /********************** Transactions ***********************/

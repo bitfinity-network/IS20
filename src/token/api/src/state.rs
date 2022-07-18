@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use candid::{CandidType, Deserialize, Principal};
+use candid::{CandidType, Deserialize, Int, Principal};
 use ic_helpers::ledger::{AccountIdentifier, Subaccount};
 use ic_helpers::tokens::Tokens128;
 use ic_storage::stable::Versioned;
@@ -8,7 +8,7 @@ use ic_storage::IcStorage;
 
 use crate::account::{Account, SUB_ACCOUNT_ZERO};
 use crate::ledger::Ledger;
-use crate::types::{AuctionInfo, Claims, Cycles, Metadata, StatsData, Timestamp};
+use crate::types::{AuctionInfo, Claims, Cycles, Metadata, StatsData, Timestamp, TxError, Value};
 
 #[derive(Debug, Default, CandidType, Deserialize, IcStorage)]
 pub struct CanisterState {
@@ -21,13 +21,29 @@ pub struct CanisterState {
 }
 
 impl CanisterState {
+    pub fn icrc1_metadata(&self) -> HashMap<String, Value> {
+        let mut metadata = HashMap::new();
+        metadata.insert(
+            "icrc1:symbol".to_string(),
+            Value::Text(self.stats.symbol.clone()),
+        );
+        metadata.insert(
+            "icrc1:name".to_string(),
+            Value::Text(self.stats.name.clone()),
+        );
+        metadata.insert(
+            "icrc1:decimals".to_string(),
+            Value::Int(Int::from(self.stats.decimals)),
+        );
+        metadata
+    }
+
     pub fn get_metadata(&self) -> Metadata {
         Metadata {
             logo: self.stats.logo.clone(),
             name: self.stats.name.clone(),
             symbol: self.stats.symbol.clone(),
             decimals: self.stats.decimals,
-            totalSupply: self.stats.total_supply,
             owner: self.stats.owner,
             fee: self.stats.fee,
             feeTo: self.stats.fee_to,
@@ -40,6 +56,14 @@ impl CanisterState {
             .get(&account)
             .copied()
             .unwrap_or(Tokens128::ZERO)
+    }
+
+    pub fn get_claim(&self, subaccount: Option<Subaccount>) -> Result<Tokens128, TxError> {
+        let acc = AccountIdentifier::new(ic_canister::ic_kit::ic::caller().into(), subaccount);
+        self.claims
+            .get(&acc)
+            .ok_or(TxError::AccountNotFound)
+            .copied()
     }
 }
 
@@ -127,6 +151,13 @@ impl Balances {
         self.0
             .get_mut(&account.account)
             .map(|subaccounts| subaccounts.insert(account.subaccount, token));
+    }
+
+    pub fn total_supply(&self) -> Tokens128 {
+        self.0
+            .iter()
+            .flat_map(|(_, subaccounts)| subaccounts.values())
+            .fold(Tokens128::ZERO, |a, b| (a + b).unwrap_or(Tokens128::ZERO))
     }
 }
 

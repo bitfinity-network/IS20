@@ -4,7 +4,10 @@ use ic_canister::{init, query, Canister, PreUpdate};
 #[cfg(not(feature = "no_api"))]
 use ic_cdk_macros::inspect_message;
 
-use ic_helpers::candid_header::{candid_header, CandidHeader};
+use ic_helpers::{
+    candid_header::{candid_header, CandidHeader},
+    tokens::Tokens128,
+};
 use std::{cell::RefCell, rc::Rc};
 use token_api::{
     account::Account,
@@ -23,16 +26,16 @@ pub struct TokenCanister {
 
 impl TokenCanister {
     #[init]
-    pub fn init(&self, metadata: Metadata) {
+    pub fn init(&self, metadata: Metadata, amount: Tokens128) {
         self.state
             .borrow_mut()
             .balances
-            .insert(metadata.owner, None, metadata.totalSupply);
+            .insert(metadata.owner, None, amount);
 
         self.state.borrow_mut().ledger.mint(
             Account::from(metadata.owner),
             Account::from(metadata.owner),
-            metadata.totalSupply,
+            amount,
         );
 
         self.state.borrow_mut().stats = metadata.into();

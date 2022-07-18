@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use candid::{CandidType, Deserialize, Principal};
+use candid::{CandidType, Deserialize, Int, Nat, Principal};
 use ic_helpers::ledger::Subaccount;
 use ic_helpers::{ledger::AccountIdentifier, tokens::Tokens128};
 
@@ -17,11 +17,18 @@ pub struct Metadata {
     pub name: String,
     pub symbol: String,
     pub decimals: u8,
-    pub totalSupply: Tokens128,
     pub owner: Principal,
     pub fee: Tokens128,
     pub feeTo: Principal,
     pub isTestToken: Option<bool>,
+}
+
+// Variant type for the metadata endpoint
+#[derive(Deserialize, CandidType, Clone, Debug, PartialEq)]
+pub enum Value {
+    Nat(Nat),
+    Int(Int),
+    Text(String),
 }
 
 #[derive(Deserialize, CandidType, Clone, Debug)]
@@ -30,7 +37,7 @@ pub struct StatsData {
     pub name: String,
     pub symbol: String,
     pub decimals: u8,
-    pub total_supply: Tokens128,
+
     pub owner: Principal,
     pub fee: Tokens128,
     pub fee_to: Principal,
@@ -56,7 +63,7 @@ impl From<Metadata> for StatsData {
             name: md.name,
             symbol: md.symbol,
             decimals: md.decimals,
-            total_supply: md.totalSupply,
+
             owner: md.owner,
             fee: md.fee,
             fee_to: md.feeTo,
@@ -85,7 +92,6 @@ impl Default for StatsData {
             name: "".to_string(),
             symbol: "".to_string(),
             decimals: 0u8,
-            total_supply: Tokens128::from(0u128),
             owner: Principal::anonymous(),
             fee: Tokens128::from(0u128),
             fee_to: Principal::anonymous(),
@@ -106,10 +112,7 @@ pub enum TxError {
     Unauthorized,
     AmountTooSmall,
     FeeExceededLimit,
-    ApproveSucceededButNotifyFailed { tx_error: Box<TxError> },
-    NotificationFailed { transaction_id: u64 },
     AlreadyActioned,
-    NotificationDoesNotExist,
     TransactionDoesNotExist,
     BadFee { expected_fee: Tokens128 },
     InsufficientFunds { balance: Tokens128 },
@@ -120,6 +123,7 @@ pub enum TxError {
     AmountOverflow,
     AccountNotFound,
     ClaimNotAllowed,
+    GenericError { text: String },
 }
 
 pub type TxReceipt = Result<u64, TxError>;
@@ -178,4 +182,15 @@ pub struct BatchTransferArgs {
 pub struct BatchAccount {
     pub to: Principal,
     pub to_subaccount: Option<Subaccount>,
+}
+
+#[derive(Debug, Clone, CandidType, Deserialize)]
+pub struct TransferArgs {
+    pub from_subaccount: Option<Subaccount>,
+    pub to: Principal,
+    pub to_subaccount: Option<Subaccount>,
+    pub amount: Tokens128,
+    pub fee: Option<Tokens128>,
+    pub memo: Option<u64>,
+    pub created_at_time: Option<Timestamp>,
 }
