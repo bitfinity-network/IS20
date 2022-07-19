@@ -37,7 +37,6 @@ pub struct StatsData {
     pub name: String,
     pub symbol: String,
     pub decimals: u8,
-
     pub owner: Principal,
     pub fee: Tokens128,
     pub fee_to: Principal,
@@ -113,7 +112,6 @@ pub enum TxError {
     AmountTooSmall,
     FeeExceededLimit,
     AlreadyActioned,
-    TransactionDoesNotExist,
     BadFee { expected_fee: Tokens128 },
     InsufficientFunds { balance: Tokens128 },
     TxTooOld { allowed_window_nanos: u64 },
@@ -189,6 +187,7 @@ pub struct TransferArgs {
     pub from_subaccount: Option<Subaccount>,
     pub to: Principal,
     pub to_subaccount: Option<Subaccount>,
+    #[serde(serialize_with = "serialize_tokens128")]
     pub amount: Tokens128,
     pub fee: Option<Tokens128>,
     pub memo: Option<u64>,

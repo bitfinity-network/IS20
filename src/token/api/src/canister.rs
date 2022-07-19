@@ -28,8 +28,8 @@ use crate::types::BatchTransferArgs;
 use crate::types::TransferArgs;
 use crate::types::Value;
 use crate::types::{
-    AuctionInfo, Metadata, PaginatedResult, StatsData, Timestamp, TokenInfo, TxError, TxId,
-    TxReceipt, TxRecord,
+    AuctionInfo, PaginatedResult, StatsData, Timestamp, TokenInfo, TxError, TxId, TxReceipt,
+    TxRecord,
 };
 
 use self::is20_transactions::batch_transfer;

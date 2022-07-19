@@ -36,7 +36,7 @@ impl TxRecord {
             to,
             amount,
             fee,
-            timestamp: created_at_time.unwrap_or(ic::time()),
+            timestamp: created_at_time.unwrap_or_else(ic::time),
             status: TransactionStatus::Succeeded,
             operation: Operation::Transfer,
             memo,
