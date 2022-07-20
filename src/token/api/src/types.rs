@@ -130,20 +130,10 @@ impl std::fmt::Display for TxError {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
             TxError::InsufficientBalance => write!(f, "Insufficient balance"),
-            TxError::InsufficientAllowance => write!(f, "Insufficient allowance"),
-            TxError::NoAllowance => write!(f, "No allowance"),
             TxError::Unauthorized => write!(f, "Unauthorized"),
             TxError::AmountTooSmall => write!(f, "Amount too small"),
             TxError::FeeExceededLimit => write!(f, "Fee exceeded limit"),
-            TxError::ApproveSucceededButNotifyFailed { tx_error } => {
-                write!(f, "Approve succeeded but notify failed: {}", tx_error)
-            }
-            TxError::NotificationFailed { transaction_id } => {
-                write!(f, "Notification failed for transaction {}", transaction_id)
-            }
             TxError::AlreadyActioned => write!(f, "Already actioned"),
-            TxError::NotificationDoesNotExist => write!(f, "Notification does not exist"),
-            TxError::TransactionDoesNotExist => write!(f, "Transaction does not exist"),
             TxError::BadFee { expected_fee } => write!(f, "Bad fee: {}", expected_fee),
             TxError::InsufficientFunds { balance } => write!(f, "Insufficient funds: {}", balance),
             TxError::TxTooOld {
@@ -155,6 +145,9 @@ impl std::fmt::Display for TxError {
             }
             TxError::SelfTransfer => write!(f, "Self transfer"),
             TxError::AmountOverflow => write!(f, "Amount overflow"),
+            TxError::AccountNotFound => write!(f, "Account not found"),
+            TxError::ClaimNotAllowed => write!(f, "Claim not allowed"),
+            TxError::GenericError { text } => write!(f, "{}", text),
         }
     }
 }
