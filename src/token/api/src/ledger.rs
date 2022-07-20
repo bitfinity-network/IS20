@@ -1,4 +1,5 @@
 use candid::{CandidType, Deserialize, Principal};
+use ic_canister::ic_kit::ic;
 use ic_helpers::tokens::Tokens128;
 
 use crate::account::Account;
@@ -85,7 +86,7 @@ impl Ledger {
         amount: Tokens128,
         fee: Tokens128,
         memo: Option<u64>,
-        created_at_time: Option<Timestamp>,
+        created_at_time: Timestamp,
     ) -> TxId {
         let id = self.next_id();
         self.push(TxRecord::transfer(
@@ -116,7 +117,7 @@ impl Ledger {
                     x.amount,
                     fee,
                     None,
-                    None,
+                    ic::time(),
                 )
             })
             .collect()

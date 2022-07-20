@@ -23,7 +23,7 @@ pub struct Metadata {
     pub isTestToken: Option<bool>,
 }
 
-// Variant type for the metadata endpoint
+/// Variant type for the metadata endpoint
 #[derive(Deserialize, CandidType, Clone, Debug, PartialEq)]
 pub enum Value {
     Nat(Nat),
@@ -182,6 +182,7 @@ pub struct BatchAccount {
     pub to_subaccount: Option<Subaccount>,
 }
 
+/// These are the arguments which are taken in the `icrc1_transfer`
 #[derive(Debug, Clone, CandidType, Deserialize)]
 pub struct TransferArgs {
     pub from_subaccount: Option<Subaccount>,
@@ -192,4 +193,19 @@ pub struct TransferArgs {
     pub fee: Option<Tokens128>,
     pub memo: Option<u64>,
     pub created_at_time: Option<Timestamp>,
+}
+
+#[derive(Debug, Clone, CandidType, Deserialize)]
+pub struct BalanceArgs {
+    pub of: Principal,
+    pub subaccount: Option<Subaccount>,
+}
+
+impl From<(Principal, Option<Subaccount>)> for BalanceArgs {
+    fn from(from: (Principal, Option<Subaccount>)) -> Self {
+        BalanceArgs {
+            of: from.0,
+            subaccount: from.1,
+        }
+    }
 }

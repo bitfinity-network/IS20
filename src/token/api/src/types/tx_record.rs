@@ -27,7 +27,7 @@ impl TxRecord {
         amount: Tokens128,
         fee: Tokens128,
         memo: Option<u64>,
-        created_at_time: Option<Timestamp>,
+        created_at_time: Timestamp,
     ) -> Self {
         Self {
             caller: from.account,
@@ -36,7 +36,7 @@ impl TxRecord {
             to,
             amount,
             fee,
-            timestamp: created_at_time.unwrap_or_else(ic::time),
+            timestamp: created_at_time,
             status: TransactionStatus::Succeeded,
             operation: Operation::Transfer,
             memo,

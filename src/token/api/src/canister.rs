@@ -24,6 +24,7 @@ use crate::canister::is20_auction::{
 use crate::canister::is20_transactions::icrc1_transfer_include_fee;
 use crate::principal::{CheckedPrincipal, Owner};
 use crate::state::CanisterState;
+use crate::types::BalanceArgs;
 use crate::types::BatchTransferArgs;
 use crate::types::TransferArgs;
 use crate::types::Value;
@@ -142,12 +143,8 @@ pub trait TokenCanisterAPI: Canister + Sized {
     }
 
     #[query(trait = true)]
-    fn icrc1_balance_of(
-        &self,
-        holder: Principal,
-        holder_subaccount: Option<Subaccount>,
-    ) -> Tokens128 {
-        let account = Account::new(holder, holder_subaccount);
+    fn icrc1_balance_of(&self, balance_arg: BalanceArgs) -> Tokens128 {
+        let account = Account::new(balance_arg.of, balance_arg.subaccount);
         self.state().borrow().balances.balance_of(account)
     }
 

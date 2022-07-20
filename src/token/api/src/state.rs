@@ -35,6 +35,14 @@ impl CanisterState {
             "icrc1:decimals".to_string(),
             Value::Int(Int::from(self.stats.decimals)),
         );
+        metadata.insert(
+            "icrc1:owner".to_string(),
+            Value::Text(self.stats.owner.to_string()),
+        );
+        metadata.insert(
+            "icrc1:fee_to".to_string(),
+            Value::Text(self.stats.fee_to.to_string()),
+        );
         metadata
     }
 
