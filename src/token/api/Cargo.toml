@@ -15,7 +15,7 @@ transfer = []
 
 [dependencies]
 assert-panic = "1.0"
-candid = "0.7"
+candid = "=0.7.14"
 ic-cdk = "0.5"
 ic-cdk-macros = "0.5"
 num-traits = "0.2"
