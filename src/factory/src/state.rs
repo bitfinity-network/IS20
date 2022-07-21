@@ -19,18 +19,26 @@ pub struct StableState {
 }
 
 impl Versioned for StableState {
+    type Previous = StableStateV1;
+
+    fn upgrade(prev_state: Self::Previous) -> Self {
+        Self {
+            base_factory_state: FactoryState::upgrade(prev_state.base_factory_state),
+            token_factory_state: prev_state.token_factory_state,
+        }
+    }
+}
+
+#[derive(CandidType, Deserialize, Default)]
+pub struct StableStateV1 {
+    pub token_factory_state: State,
+    pub base_factory_state: ic_factory::v1::FactoryStateV1,
+}
+
+impl Versioned for StableStateV1 {
     type Previous = ();
 
     fn upgrade(_: Self::Previous) -> Self {
         Self::default()
     }
-}
-
-#[cfg(target_arch = "wasm32")]
-pub fn _get_token_bytecode() -> Vec<u8> {
-    State::get()
-        .borrow()
-        .token_wasm
-        .clone()
-        .expect("the token bytecode should be set before accessing it")
 }
