@@ -10,9 +10,6 @@ pub enum TokenFactoryError {
     #[error("a token with the same name is already registered")]
     AlreadyExists,
 
-    #[error("failed to create token canister: {0}")]
-    CanisterCreateFailed(String),
-
     #[error(transparent)]
     FactoryError(#[from] FactoryError),
 }
