@@ -6,13 +6,13 @@ use ic_canister::Canister;
 use ic_canister::MethodType;
 use ic_canister::{query, update};
 use ic_cdk::export::candid::Principal;
-use ic_helpers::ledger::{AccountIdentifier, Subaccount};
+use ic_helpers::ledger::AccountIdentifier;
 use ic_helpers::tokens::Tokens128;
 use ic_storage::IcStorage;
 
 pub use inspect::AcceptReason;
 
-use crate::account::Account;
+use crate::account::{Account, Subaccount};
 use crate::canister::erc20_transactions::{
     burn_as_owner, burn_own_tokens, claim, icrc1_transfer, mint_as_owner, mint_test_token,
     mint_to_accountid,
@@ -210,7 +210,7 @@ pub trait TokenCanisterAPI: Canister + Sized {
     /********************** TRANSFERS ***********************/
     #[cfg_attr(feature = "transfer", update(trait = true))]
     fn icrc1_transfer(&self, transfer: TransferArgs) -> TxReceipt {
-        let caller = CheckedPrincipal::with_recipient(transfer.to)?;
+        let caller = CheckedPrincipal::with_recipient(transfer.to_principal)?;
 
         icrc1_transfer(self, caller, transfer)
     }

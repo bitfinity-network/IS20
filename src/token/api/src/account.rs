@@ -1,10 +1,9 @@
 use std::fmt::{Display, Formatter};
 
 use candid::{CandidType, Principal};
-use ic_helpers::ledger::Subaccount;
 use serde::{Deserialize, Serialize};
 
-pub static SUB_ACCOUNT_ZERO: Subaccount = Subaccount([0; 32]);
+pub static SUB_ACCOUNT_ZERO: Subaccount = [0u8; 32];
 
 #[derive(Debug, Clone, CandidType, Deserialize, Copy, PartialEq, Eq, Serialize)]
 pub struct Account {
@@ -32,3 +31,5 @@ impl Display for Account {
         write!(f, "{}", self.account)
     }
 }
+
+pub type Subaccount = [u8; 32];

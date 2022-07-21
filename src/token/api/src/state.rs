@@ -1,12 +1,13 @@
 use std::collections::HashMap;
 
 use candid::{CandidType, Deserialize, Int, Principal};
-use ic_helpers::ledger::{AccountIdentifier, Subaccount};
+use ic_helpers::ledger::AccountIdentifier;
+use ic_helpers::ledger::Subaccount as SubaccountIdentifier;
 use ic_helpers::tokens::Tokens128;
 use ic_storage::stable::Versioned;
 use ic_storage::IcStorage;
 
-use crate::account::{Account, SUB_ACCOUNT_ZERO};
+use crate::account::{Account, Subaccount, SUB_ACCOUNT_ZERO};
 use crate::ledger::Ledger;
 use crate::types::{AuctionInfo, Claims, Cycles, Metadata, StatsData, Timestamp, TxError, Value};
 
@@ -67,7 +68,10 @@ impl CanisterState {
     }
 
     pub fn get_claim(&self, subaccount: Option<Subaccount>) -> Result<Tokens128, TxError> {
-        let acc = AccountIdentifier::new(ic_canister::ic_kit::ic::caller().into(), subaccount);
+        let acc = AccountIdentifier::new(
+            ic_canister::ic_kit::ic::caller().into(),
+            Some(SubaccountIdentifier(subaccount.unwrap_or(SUB_ACCOUNT_ZERO))),
+        );
         self.claims
             .get(&acc)
             .ok_or(TxError::AccountNotFound)

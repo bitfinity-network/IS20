@@ -3,10 +3,11 @@ use std::error::Error;
 use std::fmt::Formatter;
 
 use candid::{CandidType, Deserialize, Int, Nat, Principal};
-use ic_helpers::ledger::Subaccount;
 use ic_helpers::{ledger::AccountIdentifier, tokens::Tokens128};
 
 pub use tx_record::*;
+
+use crate::account::Subaccount;
 
 mod tx_record;
 
@@ -116,9 +117,9 @@ pub enum TxError {
     AlreadyActioned,
     BadFee { expected_fee: Tokens128 },
     InsufficientFunds { balance: Tokens128 },
-    TxTooOld { allowed_window_nanos: u64 },
-    TxCreatedInFuture,
-    TxDuplicate { duplicate_of: u64 },
+    TooOld { allowed_window_nanos: u64 },
+    CreatedInFuture,
+    Duplicate { duplicate_of: u64 },
     SelfTransfer,
     AmountOverflow,
     AccountNotFound,
@@ -136,11 +137,11 @@ impl std::fmt::Display for TxError {
             TxError::AlreadyActioned => write!(f, "Already actioned"),
             TxError::BadFee { expected_fee } => write!(f, "Bad fee: {}", expected_fee),
             TxError::InsufficientFunds { balance } => write!(f, "Insufficient funds: {}", balance),
-            TxError::TxTooOld {
+            TxError::TooOld {
                 allowed_window_nanos,
             } => write!(f, "Transaction is too old: {}", allowed_window_nanos),
-            TxError::TxCreatedInFuture => write!(f, "Transaction created in future"),
-            TxError::TxDuplicate { duplicate_of } => {
+            TxError::CreatedInFuture => write!(f, "Transaction created in future"),
+            TxError::Duplicate { duplicate_of } => {
                 write!(f, "Transaction is a duplicate of {}", duplicate_of)
             }
             TxError::SelfTransfer => write!(f, "Self transfer"),
@@ -216,15 +217,15 @@ pub struct BatchAccount {
 #[derive(Debug, Clone, CandidType, Deserialize)]
 pub struct TransferArgs {
     pub from_subaccount: Option<Subaccount>,
-    pub to: Principal,
+    pub to_principal: Principal,
     pub to_subaccount: Option<Subaccount>,
-    #[serde(serialize_with = "serialize_tokens128")]
     pub amount: Tokens128,
     pub fee: Option<Tokens128>,
     pub memo: Option<u64>,
     pub created_at_time: Option<Timestamp>,
 }
 
+/// `BalanceArgs` struct are the arguments which are taken in the `icrc1_balance_of`
 #[derive(Debug, Clone, CandidType, Deserialize)]
 pub struct BalanceArgs {
     pub of: Principal,

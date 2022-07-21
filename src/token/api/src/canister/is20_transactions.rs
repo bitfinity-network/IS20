@@ -1,7 +1,6 @@
-use ic_helpers::ledger::Subaccount;
 use ic_helpers::tokens::Tokens128;
 
-use crate::account::Account;
+use crate::account::{Account, Subaccount};
 use crate::canister::erc20_transactions::{charge_fee, transfer_balance};
 use crate::state::CanisterState;
 use crate::types::{BatchTransferArgs, Timestamp, TxError, TxId, TxReceipt};
@@ -134,8 +133,8 @@ mod tests {
     // Method for generating random Subaccount.
     fn gen_subaccount() -> Subaccount {
         // generate a random subaccount
-        let mut subaccount = Subaccount([0u8; 32]);
-        thread_rng().fill(&mut subaccount.0);
+        let mut subaccount = [0u8; 32];
+        thread_rng().fill(&mut subaccount);
         subaccount
     }
 

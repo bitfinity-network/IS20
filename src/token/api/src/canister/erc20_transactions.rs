@@ -1,9 +1,10 @@
 use ic_canister::ic_kit::ic;
 use ic_cdk::export::Principal;
-use ic_helpers::ledger::{AccountIdentifier, Subaccount};
+use ic_helpers::ledger::AccountIdentifier;
+use ic_helpers::ledger::Subaccount as SubaccountIdentifier;
 use ic_helpers::tokens::Tokens128;
 
-use crate::account::Account;
+use crate::account::{Account, Subaccount};
 use crate::canister::is20_auction::auction_principal;
 use crate::principal::{CheckedPrincipal, Owner, TestNet, WithRecipient};
 use crate::state::{Balances, CanisterState};
@@ -188,7 +189,12 @@ pub fn claim(
     let caller = ic_canister::ic_kit::ic::caller();
     let amount = state.claim_amount(account);
 
-    if account != AccountIdentifier::new(caller.into(), subaccount) {
+    if account
+        != AccountIdentifier::new(
+            caller.into(),
+            Some(SubaccountIdentifier(subaccount.unwrap_or_default())),
+        )
+    {
         return Err(TxError::ClaimNotAllowed);
     }
     let to = Account::new(caller, subaccount);
@@ -277,8 +283,8 @@ mod tests {
 
     // Method for generating random Subaccount.
     fn gen_subaccount() -> Subaccount {
-        let mut subaccount = Subaccount([0u8; 32]);
-        thread_rng().fill(&mut subaccount.0);
+        let mut subaccount = [0u8; 32];
+        thread_rng().fill(&mut subaccount);
         subaccount
     }
 
@@ -328,7 +334,7 @@ mod tests {
 
         let transfer1 = TransferArgs {
             from_subaccount: None,
-            to: bob(),
+            to_principal: bob(),
             to_subaccount: None,
             amount: Tokens128::from(100),
             fee: None,
@@ -352,7 +358,7 @@ mod tests {
 
         let transfer2 = TransferArgs {
             from_subaccount: Some(alice_sub),
-            to: bob(),
+            to_principal: bob(),
             to_subaccount: Some(bob_sub),
             amount: Tokens128::from(50),
             fee: None,
@@ -381,7 +387,7 @@ mod tests {
 
         let transfer1 = TransferArgs {
             from_subaccount: None,
-            to: bob(),
+            to_principal: bob(),
             to_subaccount: None,
             amount: Tokens128::from(200),
             fee: None,
@@ -409,7 +415,7 @@ mod tests {
 
         let transfer2 = TransferArgs {
             from_subaccount: Some(alice_sub),
-            to: bob(),
+            to_principal: bob(),
             to_subaccount: Some(bob_sub),
             amount: Tokens128::from(500),
             fee: None,
@@ -436,7 +442,7 @@ mod tests {
 
         let transfer1 = TransferArgs {
             from_subaccount: None,
-            to: bob(),
+            to_principal: bob(),
             to_subaccount: None,
             amount: Tokens128::from(200),
             fee: Some(Tokens128::from(100)),
@@ -448,7 +454,7 @@ mod tests {
 
         let transfer2 = TransferArgs {
             from_subaccount: None,
-            to: bob(),
+            to_principal: bob(),
             to_subaccount: None,
             amount: Tokens128::from(200),
             fee: Some(Tokens128::from(50)),
@@ -462,7 +468,7 @@ mod tests {
 
         let transfer3 = TransferArgs {
             from_subaccount: None,
-            to: bob(),
+            to_principal: bob(),
             to_subaccount: Some(gen_subaccount()),
             amount: Tokens128::from(200),
             fee: Some(Tokens128::from(50)),
@@ -485,7 +491,7 @@ mod tests {
 
         let transfer1 = TransferArgs {
             from_subaccount: None,
-            to: bob(),
+            to_principal: bob(),
             to_subaccount: None,
             amount: Tokens128::from(100),
             fee: None,
@@ -518,7 +524,7 @@ mod tests {
 
         let transfer1 = TransferArgs {
             from_subaccount: None,
-            to: bob(),
+            to_principal: bob(),
             to_subaccount: None,
             amount: Tokens128::from(1001),
             fee: None,
@@ -547,7 +553,7 @@ mod tests {
 
         let transfer1 = TransferArgs {
             from_subaccount: None,
-            to: bob(),
+            to_principal: bob(),
             to_subaccount: None,
             amount: Tokens128::from(950),
             fee: None,
@@ -575,7 +581,7 @@ mod tests {
         MockContext::new().with_caller(bob()).inject();
         let transfer1 = TransferArgs {
             from_subaccount: None,
-            to: bob(),
+            to_principal: bob(),
             to_subaccount: None,
             amount: Tokens128::from(100),
             fee: None,
@@ -607,7 +613,7 @@ mod tests {
         canister.state().borrow_mut().stats.fee = Tokens128::from(10);
         let transfer1 = TransferArgs {
             from_subaccount: None,
-            to: bob(),
+            to_principal: bob(),
             to_subaccount: None,
             amount: Tokens128::from(1001),
             fee: None,
@@ -623,7 +629,7 @@ mod tests {
         for i in 0..COUNT {
             let transfer1 = TransferArgs {
                 from_subaccount: None,
-                to: bob(),
+                to_principal: bob(),
                 to_subaccount: None,
                 amount: Tokens128::from(100 + i as u128),
                 fee: None,
@@ -880,7 +886,7 @@ mod tests {
         let canister = test_canister();
         let transfer1 = TransferArgs {
             from_subaccount: None,
-            to: bob(),
+            to_principal: bob(),
             to_subaccount: None,
             amount: Tokens128::from(10),
             fee: None,
@@ -893,7 +899,7 @@ mod tests {
         }
         let transfer2 = TransferArgs {
             from_subaccount: None,
-            to: bob(),
+            to_principal: bob(),
             to_subaccount: None,
             amount: Tokens128::from(10),
             fee: None,
@@ -903,7 +909,7 @@ mod tests {
         canister.icrc1_transfer(transfer2).unwrap();
         let transfer3 = TransferArgs {
             from_subaccount: None,
-            to: xtc(),
+            to_principal: xtc(),
             to_subaccount: None,
             amount: Tokens128::from(10),
             fee: None,
@@ -913,7 +919,7 @@ mod tests {
         canister.icrc1_transfer(transfer3).unwrap();
         let transfer4 = TransferArgs {
             from_subaccount: None,
-            to: john(),
+            to_principal: john(),
             to_subaccount: None,
             amount: Tokens128::from(10),
             fee: None,
@@ -948,7 +954,7 @@ mod tests {
 
         let transfer5 = TransferArgs {
             from_subaccount: None,
-            to: bob(),
+            to_principal: bob(),
             to_subaccount: None,
             amount: Tokens128::from(10),
             fee: None,
@@ -988,7 +994,7 @@ mod tests {
         const COUNT: usize = 10;
         let transfer1 = TransferArgs {
             from_subaccount: None,
-            to: bob(),
+            to_principal: bob(),
             to_subaccount: None,
             amount: Tokens128::from(10),
             fee: None,
@@ -1004,7 +1010,8 @@ mod tests {
     #[test]
     fn mint_to_account_id() {
         let subaccount = gen_subaccount();
-        let alice_aid = AccountIdentifier::new(alice().into(), Some(subaccount));
+        let alice_aid =
+            AccountIdentifier::new(alice().into(), Some(SubaccountIdentifier(subaccount)));
 
         let canister = test_canister();
         assert!(canister
@@ -1024,8 +1031,9 @@ mod tests {
         let bob_sub = gen_subaccount();
         let alice_sub = gen_subaccount();
 
-        let alice_aid = AccountIdentifier::new(alice().into(), Some(alice_sub));
-        let bob_aid = AccountIdentifier::new(bob().into(), Some(bob_sub));
+        let alice_aid =
+            AccountIdentifier::new(alice().into(), Some(SubaccountIdentifier(alice_sub)));
+        let bob_aid = AccountIdentifier::new(bob().into(), Some(SubaccountIdentifier(bob_sub)));
 
         let canister = test_canister();
 
@@ -1057,7 +1065,7 @@ mod tests {
 
         let transfer = TransferArgs {
             from_subaccount: None,
-            to: bob(),
+            to_principal: bob(),
             to_subaccount: None,
             amount: Tokens128::from(10),
             fee: None,
@@ -1078,7 +1086,7 @@ mod tests {
 
         let transfer = TransferArgs {
             from_subaccount: None,
-            to: bob(),
+            to_principal: bob(),
             to_subaccount: None,
             amount: Tokens128::from(10),
             fee: None,
@@ -1089,7 +1097,7 @@ mod tests {
 
         let transfer = TransferArgs {
             from_subaccount: None,
-            to: bob(),
+            to_principal: bob(),
             to_subaccount: None,
             amount: Tokens128::from(10),
             fee: None,
@@ -1296,7 +1304,7 @@ mod proptests {
                         let amount_with_fee = (amount + fee).unwrap();
                         let transfer1 = TransferArgs {
                             from_subaccount: None,
-                            to,
+                            to_principal:to,
                             to_subaccount: None,
                             amount,
                             fee: fee_limit,
