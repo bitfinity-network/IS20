@@ -1,5 +1,4 @@
 use std::cell::RefCell;
-use std::collections::HashMap;
 use std::rc::Rc;
 
 use ic_canister::generate_exports;
@@ -116,7 +115,7 @@ pub trait TokenCanisterAPI: Canister + Sized {
     }
 
     #[query(trait = true)]
-    fn icrc1_metadata(&self) -> HashMap<String, Value> {
+    fn icrc1_metadata(&self) -> Vec<(String, Value)> {
         self.state().borrow().icrc1_metadata()
     }
 

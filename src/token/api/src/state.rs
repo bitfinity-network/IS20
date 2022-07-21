@@ -21,28 +21,28 @@ pub struct CanisterState {
 }
 
 impl CanisterState {
-    pub fn icrc1_metadata(&self) -> HashMap<String, Value> {
-        let mut metadata = HashMap::new();
-        metadata.insert(
+    pub fn icrc1_metadata(&self) -> Vec<(String, Value)> {
+        let mut metadata = Vec::new();
+        metadata.push((
             "icrc1:symbol".to_string(),
             Value::Text(self.stats.symbol.clone()),
-        );
-        metadata.insert(
+        ));
+        metadata.push((
             "icrc1:name".to_string(),
             Value::Text(self.stats.name.clone()),
-        );
-        metadata.insert(
+        ));
+        metadata.push((
             "icrc1:decimals".to_string(),
             Value::Int(Int::from(self.stats.decimals)),
-        );
-        metadata.insert(
+        ));
+        metadata.push((
             "icrc1:owner".to_string(),
             Value::Text(self.stats.owner.to_string()),
-        );
-        metadata.insert(
+        ));
+        metadata.push((
             "icrc1:fee_to".to_string(),
             Value::Text(self.stats.fee_to.to_string()),
-        );
+        ));
         metadata
     }
 
