@@ -1,6 +1,8 @@
 use candid::{CandidType, Deserialize, Principal};
 use ic_helpers::tokens::Tokens128;
 use std::collections::HashMap;
+use std::error::Error;
+use std::fmt::Formatter;
 
 mod tx_record;
 pub use tx_record::*;
@@ -118,6 +120,41 @@ pub enum TxError {
     SelfTransfer,
     AmountOverflow,
 }
+
+impl std::fmt::Display for TxError {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            TxError::InsufficientBalance => write!(f, "Insufficient balance"),
+            TxError::InsufficientAllowance => write!(f, "Insufficient allowance"),
+            TxError::NoAllowance => write!(f, "No allowance"),
+            TxError::Unauthorized => write!(f, "Unauthorized"),
+            TxError::AmountTooSmall => write!(f, "Amount too small"),
+            TxError::FeeExceededLimit => write!(f, "Fee exceeded limit"),
+            TxError::ApproveSucceededButNotifyFailed { tx_error } => {
+                write!(f, "Approve succeeded but notify failed: {}", tx_error)
+            }
+            TxError::NotificationFailed { transaction_id } => {
+                write!(f, "Notification failed for transaction {}", transaction_id)
+            }
+            TxError::AlreadyActioned => write!(f, "Already actioned"),
+            TxError::NotificationDoesNotExist => write!(f, "Notification does not exist"),
+            TxError::TransactionDoesNotExist => write!(f, "Transaction does not exist"),
+            TxError::BadFee { expected_fee } => write!(f, "Bad fee: {}", expected_fee),
+            TxError::InsufficientFunds { balance } => write!(f, "Insufficient funds: {}", balance),
+            TxError::TxTooOld {
+                allowed_window_nanos,
+            } => write!(f, "Transaction is too old: {}", allowed_window_nanos),
+            TxError::TxCreatedInFuture => write!(f, "Transaction created in future"),
+            TxError::TxDuplicate { duplicate_of } => {
+                write!(f, "Transaction is a duplicate of {}", duplicate_of)
+            }
+            TxError::SelfTransfer => write!(f, "Self transfer"),
+            TxError::AmountOverflow => write!(f, "Amount overflow"),
+        }
+    }
+}
+
+impl Error for TxError {}
 
 pub type TxReceipt = Result<u64, TxError>;
 
