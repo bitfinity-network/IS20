@@ -67,7 +67,7 @@ pub fn icrc1_transfer_include_fee(
     .expect("never fails due to checks above");
 
     let id = ledger.transfer(from, to, amount, fee, memo, created_at_time);
-    Ok(id)
+    Ok(id.into())
 }
 
 pub fn batch_transfer(

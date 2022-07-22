@@ -25,6 +25,7 @@ use crate::principal::{CheckedPrincipal, Owner};
 use crate::state::CanisterState;
 use crate::types::BalanceArgs;
 use crate::types::BatchTransferArgs;
+use crate::types::StandardRecord;
 use crate::types::TransferArgs;
 use crate::types::Value;
 use crate::types::{
@@ -117,6 +118,11 @@ pub trait TokenCanisterAPI: Canister + Sized {
     #[query(trait = true)]
     fn icrc1_metadata(&self) -> Vec<(String, Value)> {
         self.state().borrow().icrc1_metadata()
+    }
+
+    #[query(trait = true)]
+    fn icrc1_supported_standards(&self) -> Vec<StandardRecord> {
+        self.state().borrow().stats.supported_standards()
     }
 
     #[query(trait = true)]

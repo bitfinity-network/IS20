@@ -75,7 +75,7 @@ pub(crate) fn icrc1_transfer(
     let id = state
         .ledger
         .transfer(from, to, amount, fee, memo, created_at_time);
-    Ok(id)
+    Ok(id.into())
 }
 
 fn mint(state: &mut CanisterState, caller: Principal, to: Account, amount: Tokens128) -> TxReceipt {
@@ -88,7 +88,7 @@ fn mint(state: &mut CanisterState, caller: Principal, to: Account, amount: Token
 
     let id = state.ledger.mint(caller.into(), to, amount);
 
-    Ok(id)
+    Ok(id.into())
 }
 
 pub fn mint_test_token(
@@ -142,7 +142,7 @@ pub fn burn(
     }
 
     let id = state.ledger.burn(caller.into(), from, amount);
-    Ok(id)
+    Ok(id.into())
 }
 
 pub fn burn_own_tokens(
@@ -274,6 +274,7 @@ mod tests {
     use ic_canister::ic_kit::mock_principals::{alice, bob, john, xtc};
     use ic_canister::ic_kit::MockContext;
     use ic_canister::Canister;
+    use num_traits::ToPrimitive;
     use rand::prelude::*;
 
     use crate::mock::*;
@@ -639,7 +640,7 @@ mod tests {
             ctx.add_time(10);
             let id = canister.icrc1_transfer(transfer1).unwrap();
             assert_eq!(canister.historySize(), 2 + i);
-            let tx = canister.getTransaction(id);
+            let tx = canister.getTransaction(id as u64);
             assert_eq!(tx.amount, Tokens128::from(100 + i as u128));
             assert_eq!(tx.fee, Tokens128::from(10));
             assert_eq!(tx.operation, Operation::Transfer);
@@ -744,7 +745,7 @@ mod tests {
                 .icrc1_mint(bob(), None, Tokens128::from(100 + i as u128))
                 .unwrap();
             assert_eq!(canister.historySize(), 2 + i);
-            let tx = canister.getTransaction(id);
+            let tx = canister.getTransaction(id as u64);
             assert_eq!(tx.amount, Tokens128::from(100 + i as u128));
             assert_eq!(tx.fee, Tokens128::from(0));
             assert_eq!(tx.operation, Operation::Mint);
@@ -868,7 +869,7 @@ mod tests {
                 .icrc1_burn(None, None, Tokens128::from(100 + i as u128))
                 .unwrap();
             assert_eq!(canister.historySize(), 2 + i);
-            let tx = canister.getTransaction(id);
+            let tx = canister.getTransaction(id as u64);
             assert_eq!(tx.amount, Tokens128::from(100 + i as u128));
             assert_eq!(tx.fee, Tokens128::from(0));
             assert_eq!(tx.operation, Operation::Burn);

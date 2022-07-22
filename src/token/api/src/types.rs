@@ -48,9 +48,34 @@ pub struct StatsData {
     pub is_test_token: bool,
 }
 
+#[derive(Debug, CandidType, Deserialize, Clone)]
+pub struct StandardRecord {
+    pub name: String,
+    pub url: String,
+}
+
+impl StandardRecord {
+    pub fn new(name: String, url: String) -> Self {
+        Self { name, url }
+    }
+}
+
 impl StatsData {
     pub fn fee_info(&self) -> (Tokens128, Principal) {
         (self.fee, self.fee_to)
+    }
+
+    pub fn supported_standards(&self) -> Vec<StandardRecord> {
+        vec![
+            StandardRecord::new(
+                "ICRC-1".to_string(),
+                "https://github.com/dfinity/ICRC-1".to_string(),
+            ),
+            StandardRecord::new(
+                "IS-20".to_string(),
+                "https://github.com/infinity-swap/is20".to_string(),
+            ),
+        ]
     }
 }
 
@@ -104,6 +129,7 @@ impl Default for StatsData {
     }
 }
 
+///
 pub type Claims = HashMap<AccountIdentifier, Tokens128>;
 
 // TODO: a wrapper over `ic_helpers::TxError`, this is a most likely
@@ -155,10 +181,7 @@ impl std::fmt::Display for TxError {
 
 impl Error for TxError {}
 
-pub type TxReceipt = Result<u64, TxError>;
-
-// Notification receiver not set if None
-pub type PendingNotifications = HashMap<u64, Option<Principal>>;
+pub type TxReceipt = Result<u128, TxError>;
 
 #[derive(CandidType, Debug, Clone, Copy, Deserialize, PartialEq)]
 pub enum TransactionStatus {

@@ -3,9 +3,7 @@ use ic_canister::ic_kit::ic;
 use ic_helpers::tokens::Tokens128;
 
 use crate::account::Account;
-use crate::types::{
-    BatchTransferArgs, PaginatedResult, PendingNotifications, Timestamp, TxId, TxRecord,
-};
+use crate::types::{BatchTransferArgs, PaginatedResult, Timestamp, TxId, TxRecord};
 
 const MAX_HISTORY_LENGTH: usize = 1_000_000;
 const HISTORY_REMOVAL_BATCH_SIZE: usize = 10_000;
@@ -14,7 +12,6 @@ const HISTORY_REMOVAL_BATCH_SIZE: usize = 10_000;
 pub struct Ledger {
     history: Vec<TxRecord>,
     vec_offset: u64,
-    pub notifications: PendingNotifications,
 }
 
 impl Ledger {
@@ -143,17 +140,14 @@ impl Ledger {
     }
 
     fn push(&mut self, record: TxRecord) {
-        self.history.push(record.clone());
-        self.notifications.insert(record.index, None);
+        self.history.push(record);
 
         if self.history.len() > MAX_HISTORY_LENGTH + HISTORY_REMOVAL_BATCH_SIZE {
             // We remove first `HISTORY_REMOVAL_BATCH_SIZE` from the history at one go, to prevent
             // often relocation of the history vec.
             // This removal code can later be changed to moving old history records into another
             // storage.
-            for record in &self.history[..HISTORY_REMOVAL_BATCH_SIZE] {
-                self.notifications.remove(&record.index);
-            }
+
             self.history = self.history[HISTORY_REMOVAL_BATCH_SIZE..].into();
             self.vec_offset += HISTORY_REMOVAL_BATCH_SIZE as u64;
         }
