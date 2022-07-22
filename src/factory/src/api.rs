@@ -31,6 +31,11 @@ pub struct TokenFactoryCanister {
 
 #[allow(dead_code)]
 impl TokenFactoryCanister {
+    #[query]
+    fn pkg_version(&self) -> &'static str {
+        env!("CARGO_PKG_VERSION")
+    }
+
     #[pre_upgrade]
     fn pre_upgrade(&self) {
         // Default states just to chek that the storage is writeable.
