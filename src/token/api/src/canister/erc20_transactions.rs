@@ -274,7 +274,6 @@ mod tests {
     use ic_canister::ic_kit::mock_principals::{alice, bob, john, xtc};
     use ic_canister::ic_kit::MockContext;
     use ic_canister::Canister;
-    use num_traits::ToPrimitive;
     use rand::prelude::*;
 
     use crate::mock::*;

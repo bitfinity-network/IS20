@@ -3,7 +3,7 @@ use std::fmt::{Display, Formatter};
 use candid::{CandidType, Principal};
 use serde::{Deserialize, Serialize};
 
-pub static SUB_ACCOUNT_ZERO: Subaccount = [0u8; 32];
+pub static DEFAULT_SUBACCOUNT: Subaccount = [0u8; 32];
 
 #[derive(Debug, Clone, CandidType, Deserialize, Copy, PartialEq, Eq, Serialize)]
 pub struct Account {
@@ -15,7 +15,7 @@ impl Account {
     pub fn new(account: Principal, subaccount: Option<Subaccount>) -> Self {
         Self {
             account,
-            subaccount: subaccount.unwrap_or(SUB_ACCOUNT_ZERO),
+            subaccount: subaccount.unwrap_or(DEFAULT_SUBACCOUNT),
         }
     }
 }

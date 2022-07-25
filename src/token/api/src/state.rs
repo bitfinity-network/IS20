@@ -7,7 +7,7 @@ use ic_helpers::tokens::Tokens128;
 use ic_storage::stable::Versioned;
 use ic_storage::IcStorage;
 
-use crate::account::{Account, Subaccount, SUB_ACCOUNT_ZERO};
+use crate::account::{Account, Subaccount, DEFAULT_SUBACCOUNT};
 use crate::ledger::Ledger;
 use crate::types::{AuctionInfo, Claims, Cycles, Metadata, StatsData, Timestamp, TxError, Value};
 
@@ -70,7 +70,9 @@ impl CanisterState {
     pub fn get_claim(&self, subaccount: Option<Subaccount>) -> Result<Tokens128, TxError> {
         let acc = AccountIdentifier::new(
             ic_canister::ic_kit::ic::caller().into(),
-            Some(SubaccountIdentifier(subaccount.unwrap_or(SUB_ACCOUNT_ZERO))),
+            Some(SubaccountIdentifier(
+                subaccount.unwrap_or(DEFAULT_SUBACCOUNT),
+            )),
         );
         self.claims
             .get(&acc)
@@ -100,7 +102,7 @@ impl Balances {
         self.0
             .entry(principal)
             .or_default()
-            .insert(subaccount.unwrap_or(SUB_ACCOUNT_ZERO), token);
+            .insert(subaccount.unwrap_or(DEFAULT_SUBACCOUNT), token);
     }
 
     pub fn get_mut(&mut self, account: Account) -> Option<&mut Tokens128> {
