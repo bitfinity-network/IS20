@@ -8,12 +8,12 @@ fn main() {
         Ok(o) if o.status.success() => {
             let tag = String::from_utf8_lossy(&o.stdout).trim().to_string();
             println!("cargo:warning=GIT tag extracted: {}", tag);
-            println!("cargo:rustc-env=CARGO_PKG_VERSION={}", tag);
+            println!("cargo:rustc-env=GIT_TAG={}", tag);
         }
         Ok(o) => println!(
             "cargo:warning=Git command exited with error: {}",
             String::from_utf8_lossy(&o.stderr).to_string()
         ),
         Err(e) => println!("cargo:warning=Can not extract git tag: {}", e),
-    }```
+    }
 }

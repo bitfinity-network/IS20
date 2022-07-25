@@ -1,8 +1,7 @@
 [package]
 edition = "2021"
 name = "token-factory"
-# Just a fallback value. Valid version will be extracted during build.
-version = "0.0.0-SNAPSHOT"
+version = "0.24.0"
 
 [features]
 default = []

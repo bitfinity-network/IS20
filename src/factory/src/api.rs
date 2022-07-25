@@ -32,8 +32,8 @@ pub struct TokenFactoryCanister {
 #[allow(dead_code)]
 impl TokenFactoryCanister {
     #[query]
-    fn pkg_version(&self) -> &'static str {
-        env!("CARGO_PKG_VERSION")
+    fn git_tag(&self) -> &'static str {
+        env!("GIT_TAG")
     }
 
     #[pre_upgrade]
