@@ -11,7 +11,6 @@ jobs:
     uses: infinity-swap/ci-wf/.github/workflows/build-n-test.yml@main
     with:
       skip-test: ${{ github.ref_type == 'tag' }}
-      git-fetch-depth: '0'
       test-script: |
         ./scripts/build.sh
         cargo test
