@@ -5,7 +5,7 @@ use ic_storage::{stable::Versioned, IcStorage};
 use serde::Deserialize;
 use std::collections::HashMap;
 
-#[derive(CandidType, Deserialize, IcStorage, Default)]
+#[derive(CandidType, Deserialize, IcStorage, Default, Debug)]
 pub struct State {
     pub token_wasm: Option<Vec<u8>>,
     /// Associated list of token name and its principal

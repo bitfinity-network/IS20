@@ -27,9 +27,6 @@ pub struct TokenFactoryCanister {
 
     #[state]
     pub state: Rc<RefCell<State>>,
-
-    #[state(stable_store = false)]
-    pub base_factory_state: Rc<RefCell<FactoryState>>,
 }
 
 #[allow(dead_code)]
@@ -41,9 +38,12 @@ impl TokenFactoryCanister {
 
     #[pre_upgrade]
     fn pre_upgrade(&self) {
-        // Default states just to chek that the storage is writeable.
-        let token_factory_state = self.state.replace(State::default());
-        let base_factory_state = self.factory_state().replace(FactoryState::default());
+        let token_factory_state = Rc::<RefCell<State>>::try_unwrap(self.state.clone())
+            .expect("Someone has the token factory state borrowed. This is a program bug because state lock was bypassed.")
+            .into_inner();
+        let base_factory_state = Rc::<RefCell<FactoryState>>::try_unwrap(self.factory_state())
+            .expect("Someone has the base factory state borrowed. This is a program bug because state lock was bypassed.")
+            .into_inner();
 
         ic_storage::stable::write(&StableState {
             token_factory_state,
@@ -181,6 +181,7 @@ impl TokenFactoryCanister {
 impl PreUpdate for TokenFactoryCanister {}
 impl FactoryCanister for TokenFactoryCanister {
     fn factory_state(&self) -> Rc<RefCell<FactoryState>> {
-        self.base_factory_state.clone()
+        use ic_storage::IcStorage;
+        FactoryState::get()
     }
 }
