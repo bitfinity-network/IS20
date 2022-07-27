@@ -34,6 +34,11 @@ pub struct TokenFactoryCanister {
 
 #[allow(dead_code)]
 impl TokenFactoryCanister {
+    #[query]
+    fn git_tag(&self) -> &'static str {
+        env!("GIT_TAG")
+    }
+
     #[pre_upgrade]
     fn pre_upgrade(&self) {
         // Default states just to chek that the storage is writeable.
