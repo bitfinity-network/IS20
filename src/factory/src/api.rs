@@ -32,8 +32,8 @@ pub struct TokenFactoryCanister {
 #[allow(dead_code)]
 impl TokenFactoryCanister {
     #[query]
-    fn git_tag(&self) -> Option<String> {
-        std::env::var("GIT_TAG").ok()
+    fn git_tag(&self) -> &'static str {
+        option_env!("GIT_TAG").unwrap_or("NOT_FOUND")
     }
 
     #[pre_upgrade]
