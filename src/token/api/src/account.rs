@@ -7,14 +7,14 @@ pub static DEFAULT_SUBACCOUNT: Subaccount = [0u8; 32];
 
 #[derive(Debug, Clone, CandidType, Deserialize, Copy, PartialEq, Eq, Serialize)]
 pub struct Account {
-    pub account: Principal,
+    pub of: Principal,
     pub subaccount: Subaccount,
 }
 
 impl Account {
-    pub fn new(account: Principal, subaccount: Option<Subaccount>) -> Self {
+    pub fn new(of: Principal, subaccount: Option<Subaccount>) -> Self {
         Self {
-            account,
+            of,
             subaccount: subaccount.unwrap_or(DEFAULT_SUBACCOUNT),
         }
     }
@@ -28,7 +28,7 @@ impl From<Principal> for Account {
 
 impl Display for Account {
     fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
-        write!(f, "{}", self.account)
+        write!(f, "{}", self.of)
     }
 }
 

@@ -142,6 +142,7 @@ pub trait TokenCanisterAPI: Canister + Sized {
         }
     }
 
+    /// This method retreieves holders of `Account` and their amounts.
     #[query(trait = true)]
     fn getHolders(&self, start: usize, limit: usize) -> Vec<(Account, Tokens128)> {
         self.state().borrow().balances.get_holders(start, limit)
@@ -152,7 +153,7 @@ pub trait TokenCanisterAPI: Canister + Sized {
         let account = Account::new(balance_arg.of, balance_arg.subaccount);
         self.state().borrow().balances.balance_of(account)
     }
-
+    /// This method returns the pending `claim` for the `Account`.
     #[query(trait = true)]
     fn getClaim(&self, subaccount: Option<Subaccount>) -> Result<Tokens128, TxError> {
         self.state().borrow().get_claim(subaccount)
@@ -237,8 +238,10 @@ pub trait TokenCanisterAPI: Canister + Sized {
         created_at_time: Option<Timestamp>,
     ) -> TxReceipt {
         let caller = CheckedPrincipal::with_recipient(to)?;
+
         let from = Account::new(caller.inner(), from_subaccount);
         let to = Account::new(caller.recipient(), to_subaccount);
+
         icrc1_transfer_include_fee(self, from, to, amount, memo, created_at_time)
     }
 
@@ -316,12 +319,15 @@ pub trait TokenCanisterAPI: Canister + Sized {
         }
     }
 
+    /// This function mints to `AccountIdentifier`, this is different from `Account`, this adds support for minting to `AccountIdentifier`
+    ///
     #[cfg_attr(feature = "mint_burn", update(trait = true))]
     fn mintToAccountId(&self, to: AccountIdentifier, amount: Tokens128) -> Result<(), TxError> {
         let _ = CheckedPrincipal::owner(&self.state().borrow().stats)?;
         mint_to_accountid(&mut *self.state().borrow_mut(), to, amount)
     }
 
+    /// When we mint to `AccountIdentifier`, Only the user who has been minted can claim the amount that has been minted to `AccountIdentifier`, if another user claims the `claim`, it fails with Error `ClaimNotAllowed`.
     #[update(trait = true)]
     fn claim(&self, account: AccountIdentifier, subaccount: Option<Subaccount>) -> TxReceipt {
         claim(&mut *self.state().borrow_mut(), account, subaccount)

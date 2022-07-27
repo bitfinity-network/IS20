@@ -33,6 +33,9 @@ pub fn icrc1_transfer_include_fee(
 
     let now = ic_canister::ic_kit::ic::time();
 
+    // We check if the `created_at_time` is within the ONE MINUTE WINDOW TIME,
+    // if it is less than or greater than ONE MINUTE WINDOW, we reject the
+    // transaction.
     let created_at_time = match created_at_time {
         Some(created_at_time) => {
             if now.abs_diff(created_at_time) > ONE_MIN_IN_NANOS {

@@ -129,7 +129,7 @@ impl Default for StatsData {
     }
 }
 
-///
+/// This data structure is used for supporting minting to `AccountIdentifier`, after a claim is saved, We use the `claim` functions to claim the amount and is minted to `Account`.
 pub type Claims = HashMap<AccountIdentifier, Tokens128>;
 
 // TODO: a wrapper over `ic_helpers::TxError`, this is a most likely

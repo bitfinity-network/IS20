@@ -89,6 +89,7 @@ impl Versioned for CanisterState {
     }
 }
 
+/// We are saving the `Balances` in this format, as we want to support `Principal` supporting `Subaccount`.
 #[derive(Debug, Default, CandidType, Deserialize)]
 pub struct Balances(pub HashMap<Principal, HashMap<Subaccount, Tokens128>>);
 
@@ -107,13 +108,13 @@ impl Balances {
 
     pub fn get_mut(&mut self, account: Account) -> Option<&mut Tokens128> {
         self.0
-            .get_mut(&account.account)
+            .get_mut(&account.of)
             .and_then(|subaccounts| subaccounts.get_mut(&account.subaccount))
     }
 
     pub fn get_mut_or_insert_default(&mut self, account: Account) -> &mut Tokens128 {
         self.0
-            .entry(account.account)
+            .entry(account.of)
             .or_default()
             .entry(account.subaccount)
             .or_default()
@@ -121,7 +122,7 @@ impl Balances {
 
     pub fn balance_of(&self, account: Account) -> Tokens128 {
         self.0
-            .get(&account.account)
+            .get(&account.of)
             .and_then(|subaccounts| subaccounts.get(&account.subaccount))
             .copied()
             .unwrap_or_default()
@@ -147,23 +148,23 @@ impl Balances {
     }
 
     pub fn remove(&mut self, account: Account) {
-        if let Some(subaccounts) = self.0.get_mut(&account.account) {
+        if let Some(subaccounts) = self.0.get_mut(&account.of) {
             subaccounts.remove(&account.subaccount);
         }
 
         if self
             .0
-            .get(&account.account)
+            .get(&account.of)
             .map(|subaccounts| subaccounts.is_empty())
             .unwrap_or(true)
         {
-            self.0.remove(&account.account);
+            self.0.remove(&account.of);
         }
     }
 
     pub fn set_balance(&mut self, account: Account, token: Tokens128) {
         self.0
-            .get_mut(&account.account)
+            .get_mut(&account.of)
             .map(|subaccounts| subaccounts.insert(account.subaccount, token));
     }
 
