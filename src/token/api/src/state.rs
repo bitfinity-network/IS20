@@ -44,6 +44,8 @@ impl CanisterState {
             "icrc1:fee_to".to_string(),
             Value::Text(self.stats.fee_to.to_string()),
         ));
+
+        metadata.push(("icrc1:fee".to_string(), Value::Nat(self.stats.fee)));
         metadata
     }
 

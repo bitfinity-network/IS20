@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::error::Error;
 use std::fmt::Formatter;
 
-use candid::{CandidType, Deserialize, Int, Nat, Principal};
+use candid::{CandidType, Deserialize, Int, Principal};
 use ic_helpers::{ledger::AccountIdentifier, tokens::Tokens128};
 
 pub use tx_record::*;
@@ -29,7 +29,7 @@ pub struct Metadata {
 /// Variant type for the metadata endpoint
 #[derive(Deserialize, CandidType, Clone, Debug, PartialEq)]
 pub enum Value {
-    Nat(Nat),
+    Nat(Tokens128),
     Int(Int),
     Text(String),
 }

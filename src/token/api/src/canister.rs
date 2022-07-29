@@ -115,7 +115,11 @@ pub trait TokenCanisterAPI: Canister + Sized {
     fn owner(&self) -> Principal {
         self.state().borrow().stats.owner
     }
-
+    /// Returns the default transfer fee.
+    #[query(trait = true)]
+    fn icrc1_fee(&self) -> Tokens128 {
+        self.state().borrow().stats.fee
+    }
     #[query(trait = true)]
     fn icrc1_metadata(&self) -> Vec<(String, Value)> {
         self.state().borrow().icrc1_metadata()
