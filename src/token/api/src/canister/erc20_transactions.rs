@@ -4,9 +4,9 @@ use ic_helpers::ledger::AccountIdentifier;
 use ic_helpers::ledger::Subaccount as SubaccountIdentifier;
 use ic_helpers::tokens::Tokens128;
 
-use crate::account::{Account, Subaccount};
+use crate::account::{Account, CheckedAccount, Subaccount, WithRecipient};
 use crate::canister::is20_auction::auction_principal;
-use crate::principal::{CheckedPrincipal, Owner, TestNet, WithRecipient};
+use crate::principal::{CheckedPrincipal, Owner, TestNet};
 use crate::state::{Balances, CanisterState};
 use crate::types::{TransferArgs, TxError, TxReceipt};
 
@@ -16,12 +16,10 @@ pub static ONE_MIN_IN_NANOS: u64 = 60_000_000_000;
 
 pub(crate) fn icrc1_transfer(
     canister: &impl TokenCanisterAPI,
-    caller: CheckedPrincipal<WithRecipient>,
+    caller: CheckedAccount<WithRecipient>,
     transfer: TransferArgs,
 ) -> TxReceipt {
     let TransferArgs {
-        from_subaccount,
-        to_subaccount,
         amount,
         memo,
         created_at_time,
@@ -46,8 +44,8 @@ pub(crate) fn icrc1_transfer(
         None => now,
     };
 
-    let from = Account::new(caller.inner(), from_subaccount);
-    let to = Account::new(caller.recipient(), to_subaccount);
+    let from = caller.inner();
+    let to = caller.recipient();
 
     let state = canister.state();
     let mut state = state.borrow_mut();
@@ -1108,6 +1106,104 @@ mod tests {
             created_at_time: Some(system_time as u64 + ONE_MIN_IN_NANOS * 2),
         };
         assert!(canister.icrc1_transfer(transfer).is_err());
+    }
+
+    #[test]
+    fn test_invalid_self_account_transfer() {
+        let canister = test_canister();
+        assert_eq!(
+            canister.icrc1_balance_of((alice(), None).into()),
+            Tokens128::from(1000)
+        );
+        let transfer = TransferArgs {
+            from_subaccount: None,
+            to_principal: alice(),
+            to_subaccount: None,
+            amount: Tokens128::from(100),
+            fee: None,
+            memo: None,
+            created_at_time: None,
+        };
+        assert!(canister.icrc1_transfer(transfer).is_err());
+
+        assert_eq!(
+            canister.icrc1_balance_of((alice(), None).into()),
+            Tokens128::from(1000)
+        );
+
+        let alice_sub = gen_subaccount();
+
+        let transfer = TransferArgs {
+            from_subaccount: Some(alice_sub),
+            to_principal: alice(),
+            to_subaccount: Some(alice_sub),
+            amount: Tokens128::from(100),
+            fee: None,
+            memo: None,
+            created_at_time: None,
+        };
+
+        assert!(canister.icrc1_transfer(transfer.clone()).is_err());
+
+        assert_eq!(
+            canister.icrc1_balance_of((alice(), Some(alice_sub)).into()),
+            Tokens128::from(0)
+        );
+
+        assert_eq!(
+            canister.icrc1_transfer(transfer),
+            Err(TxError::SelfTransfer)
+        );
+    }
+
+    #[test]
+    fn test_valid_self_subaccount_transfer() {
+        let canister = test_canister();
+        let alice_sub1 = gen_subaccount();
+        assert_eq!(
+            canister.icrc1_balance_of((alice(), None).into()),
+            Tokens128::from(1000)
+        );
+        let transfer = TransferArgs {
+            from_subaccount: None,
+            to_principal: alice(),
+            to_subaccount: Some(alice_sub1),
+            amount: Tokens128::from(100),
+            fee: None,
+            memo: None,
+            created_at_time: None,
+        };
+        assert!(canister.icrc1_transfer(transfer).is_ok());
+
+        assert_eq!(
+            canister.icrc1_balance_of((alice(), None).into()),
+            Tokens128::from(900)
+        );
+        assert_eq!(
+            canister.icrc1_balance_of((alice(), Some(alice_sub1)).into()),
+            Tokens128::from(100)
+        );
+
+        let alice_sub2 = gen_subaccount();
+
+        let transfer = TransferArgs {
+            from_subaccount: Some(alice_sub1),
+            to_principal: alice(),
+            to_subaccount: Some(alice_sub2),
+            amount: Tokens128::from(10),
+            fee: None,
+            memo: None,
+            created_at_time: None,
+        };
+        assert!(canister.icrc1_transfer(transfer).is_ok());
+        assert_eq!(
+            canister.icrc1_balance_of((alice(), Some(alice_sub2)).into()),
+            Tokens128::from(10)
+        );
+        assert_eq!(
+            canister.icrc1_balance_of((alice(), Some(alice_sub1)).into()),
+            Tokens128::from(90)
+        );
     }
 }
 

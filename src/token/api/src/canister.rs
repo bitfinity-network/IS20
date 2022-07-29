@@ -12,6 +12,7 @@ use ic_storage::IcStorage;
 
 pub use inspect::AcceptReason;
 
+use crate::account::CheckedAccount;
 use crate::account::{Account, Subaccount};
 use crate::canister::erc20_transactions::{
     burn_as_owner, burn_own_tokens, claim, icrc1_transfer, mint_as_owner, mint_test_token,
@@ -217,9 +218,11 @@ pub trait TokenCanisterAPI: Canister + Sized {
     /********************** TRANSFERS ***********************/
     #[cfg_attr(feature = "transfer", update(trait = true))]
     fn icrc1_transfer(&self, transfer: TransferArgs) -> TxReceipt {
-        let caller = CheckedPrincipal::with_recipient(transfer.to_principal)?;
+        let recipient = Account::new(transfer.to_principal, transfer.to_subaccount);
 
-        icrc1_transfer(self, caller, transfer)
+        let account = CheckedAccount::with_recipient(recipient, transfer.from_subaccount)?;
+
+        icrc1_transfer(self, account, transfer)
     }
 
     /// Transfers `value` amount to the `to` principal, applying American style fee. This means, that
@@ -237,12 +240,18 @@ pub trait TokenCanisterAPI: Canister + Sized {
         memo: Option<u64>,
         created_at_time: Option<Timestamp>,
     ) -> TxReceipt {
-        let caller = CheckedPrincipal::with_recipient(to)?;
+        let recipient = Account::new(to, to_subaccount);
 
-        let from = Account::new(caller.inner(), from_subaccount);
-        let to = Account::new(caller.recipient(), to_subaccount);
+        let account = CheckedAccount::with_recipient(recipient, from_subaccount)?;
 
-        icrc1_transfer_include_fee(self, from, to, amount, memo, created_at_time)
+        icrc1_transfer_include_fee(
+            self,
+            account.inner(),
+            account.recipient(),
+            amount,
+            memo,
+            created_at_time,
+        )
     }
 
     /// Takes a list of transfers, each of which is a pair of `to` and `value` fields, it returns a `TxReceipt` which contains
@@ -257,7 +266,8 @@ pub trait TokenCanisterAPI: Canister + Sized {
         transfers: Vec<BatchTransferArgs>,
     ) -> Result<Vec<TxId>, TxError> {
         for x in &transfers {
-            CheckedPrincipal::with_recipient(x.receiver.to)?;
+            let recipient = Account::new(x.receiver.to, x.receiver.to_subaccount);
+            CheckedAccount::with_recipient(recipient, from_subaccount)?;
         }
         batch_transfer(self, from_subaccount, transfers)
     }
