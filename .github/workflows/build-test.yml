@@ -8,8 +8,9 @@ on:
 
 jobs:
   build-test:
-    uses: infinity-swap/ci-wf/.github/workflows/build-n-test.yml@main
+    uses: infinity-swap/ci-wf/.github/workflows/build-n-test.yml@with-image
     with:
+      container-image: ghcr.io/infinity-swap/ic-dev-full:rust1.62-dfx0.9
       skip-test: ${{ github.ref_type == 'tag' }}
       git-fetch-depth: '0'
       test-script: |
