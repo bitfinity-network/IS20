@@ -158,6 +158,7 @@ pub trait TokenCanisterAPI: Canister + Sized {
         let account = Account::new(balance_arg.of, balance_arg.subaccount);
         self.state().borrow().balances.balance_of(account)
     }
+
     /// This method returns the pending `claim` for the `Account`.
     #[query(trait = true)]
     fn getClaim(&self, subaccount: Option<Subaccount>) -> Result<Tokens128, TxError> {
@@ -222,7 +223,7 @@ pub trait TokenCanisterAPI: Canister + Sized {
     /********************** TRANSFERS ***********************/
     #[cfg_attr(feature = "transfer", update(trait = true))]
     fn icrc1_transfer(&self, transfer: TransferArgs) -> TxReceipt {
-        let recipient = Account::new(transfer.to_principal, transfer.to_subaccount);
+        let recipient = Account::new(transfer.to.principal, transfer.to.subaccount);
 
         let account = CheckedAccount::with_recipient(recipient, transfer.from_subaccount)?;
 
@@ -270,7 +271,7 @@ pub trait TokenCanisterAPI: Canister + Sized {
         transfers: Vec<BatchTransferArgs>,
     ) -> Result<Vec<TxId>, TxError> {
         for x in &transfers {
-            let recipient = Account::new(x.receiver.to, x.receiver.to_subaccount);
+            let recipient = Account::new(x.receiver.principal, x.receiver.subaccount);
             CheckedAccount::with_recipient(recipient, from_subaccount)?;
         }
         batch_transfer(self, from_subaccount, transfers)

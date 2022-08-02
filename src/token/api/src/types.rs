@@ -7,7 +7,7 @@ use ic_helpers::{ledger::AccountIdentifier, tokens::Tokens128};
 
 pub use tx_record::*;
 
-use crate::account::Subaccount;
+use crate::account::{Account, Subaccount};
 
 mod tx_record;
 
@@ -136,7 +136,6 @@ pub type Claims = HashMap<AccountIdentifier, Tokens128>;
 // place to make tests fail in amm.
 #[derive(CandidType, Debug, PartialEq, Deserialize)]
 pub enum TxError {
-    InsufficientBalance,
     Unauthorized,
     AmountTooSmall,
     FeeExceededLimit,
@@ -150,13 +149,12 @@ pub enum TxError {
     AmountOverflow,
     AccountNotFound,
     ClaimNotAllowed,
-    GenericError { text: String },
+    GenericError { message: String },
 }
 
 impl std::fmt::Display for TxError {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
-            TxError::InsufficientBalance => write!(f, "Insufficient balance"),
             TxError::Unauthorized => write!(f, "Unauthorized"),
             TxError::AmountTooSmall => write!(f, "Amount too small"),
             TxError::FeeExceededLimit => write!(f, "Fee exceeded limit"),
@@ -174,7 +172,7 @@ impl std::fmt::Display for TxError {
             TxError::AmountOverflow => write!(f, "Amount overflow"),
             TxError::AccountNotFound => write!(f, "Account not found"),
             TxError::ClaimNotAllowed => write!(f, "Claim not allowed"),
-            TxError::GenericError { text } => write!(f, "{}", text),
+            TxError::GenericError { message } => write!(f, "{}", message),
         }
     }
 }
@@ -226,22 +224,15 @@ pub type Cycles = u64;
 // Batch transfer arguments.
 #[derive(Debug, Clone, CandidType, Deserialize)]
 pub struct BatchTransferArgs {
-    pub receiver: BatchAccount,
+    pub receiver: Account,
     pub amount: Tokens128,
-}
-
-#[derive(Debug, Clone, CandidType, Deserialize)]
-pub struct BatchAccount {
-    pub to: Principal,
-    pub to_subaccount: Option<Subaccount>,
 }
 
 /// These are the arguments which are taken in the `icrc1_transfer`
 #[derive(Debug, Clone, CandidType, Deserialize)]
 pub struct TransferArgs {
     pub from_subaccount: Option<Subaccount>,
-    pub to_principal: Principal,
-    pub to_subaccount: Option<Subaccount>,
+    pub to: Account,
     pub amount: Tokens128,
     pub fee: Option<Tokens128>,
     pub memo: Option<u64>,

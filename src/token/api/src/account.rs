@@ -9,15 +9,15 @@ pub static DEFAULT_SUBACCOUNT: Subaccount = [0u8; 32];
 
 #[derive(Debug, Clone, CandidType, Deserialize, Copy, PartialEq, Eq, Serialize)]
 pub struct Account {
-    pub of: Principal,
-    pub subaccount: Subaccount,
+    pub principal: Principal,
+    pub subaccount: Option<Subaccount>,
 }
 
 impl Account {
-    pub fn new(of: Principal, subaccount: Option<Subaccount>) -> Self {
+    pub fn new(principal: Principal, subaccount: Option<Subaccount>) -> Self {
         Self {
-            of,
-            subaccount: subaccount.unwrap_or(DEFAULT_SUBACCOUNT),
+            principal,
+            subaccount,
         }
     }
 }
@@ -30,7 +30,7 @@ impl From<Principal> for Account {
 
 impl Display for Account {
     fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
-        write!(f, "{}", self.of)
+        write!(f, "{}", self.principal)
     }
 }
 
@@ -43,12 +43,12 @@ impl<T> CheckedAccount<T> {
         self.0
     }
 
-    pub fn of(&self) -> Principal {
-        self.0.of
+    pub fn principal(&self) -> Principal {
+        self.0.principal
     }
 
     pub fn subaccount(&self) -> Subaccount {
-        self.0.subaccount
+        self.0.subaccount.unwrap_or(DEFAULT_SUBACCOUNT)
     }
 }
 

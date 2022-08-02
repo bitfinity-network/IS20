@@ -30,7 +30,7 @@ impl TxRecord {
         created_at_time: Timestamp,
     ) -> Self {
         Self {
-            caller: from.of,
+            caller: from.principal,
             index,
             from,
             to,
@@ -45,7 +45,7 @@ impl TxRecord {
 
     pub fn mint(index: TxId, from: Account, to: Account, amount: Tokens128) -> Self {
         Self {
-            caller: from.of,
+            caller: from.principal,
             index,
             from,
             to,
@@ -60,7 +60,7 @@ impl TxRecord {
 
     pub fn burn(index: TxId, caller: Account, from: Account, amount: Tokens128) -> Self {
         Self {
-            caller: caller.of,
+            caller: caller.principal,
             index,
             from,
             to: from,
@@ -75,7 +75,7 @@ impl TxRecord {
 
     pub fn auction(index: TxId, to: Account, amount: Tokens128) -> Self {
         Self {
-            caller: to.of,
+            caller: to.principal,
             index,
             from: to,
             to,
@@ -90,6 +90,6 @@ impl TxRecord {
 
     // This is a helper funntion to compare the principal of a transaction record.
     pub fn contains(&self, pid: Principal) -> bool {
-        self.caller == pid || self.from.of == pid || self.to.of == pid
+        self.caller == pid || self.from.principal == pid || self.to.principal == pid
     }
 }

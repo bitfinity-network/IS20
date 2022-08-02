@@ -23,30 +23,29 @@ pub struct CanisterState {
 
 impl CanisterState {
     pub fn icrc1_metadata(&self) -> Vec<(String, Value)> {
-        let mut metadata = Vec::new();
-        metadata.push((
-            "icrc1:symbol".to_string(),
-            Value::Text(self.stats.symbol.clone()),
-        ));
-        metadata.push((
-            "icrc1:name".to_string(),
-            Value::Text(self.stats.name.clone()),
-        ));
-        metadata.push((
-            "icrc1:decimals".to_string(),
-            Value::Int(Int::from(self.stats.decimals)),
-        ));
-        metadata.push((
-            "icrc1:owner".to_string(),
-            Value::Text(self.stats.owner.to_string()),
-        ));
-        metadata.push((
-            "icrc1:fee_to".to_string(),
-            Value::Text(self.stats.fee_to.to_string()),
-        ));
-
-        metadata.push(("icrc1:fee".to_string(), Value::Nat(self.stats.fee)));
-        metadata
+        vec![
+            (
+                "icrc1:symbol".to_string(),
+                Value::Text(self.stats.symbol.clone()),
+            ),
+            (
+                "icrc1:name".to_string(),
+                Value::Text(self.stats.name.clone()),
+            ),
+            (
+                "icrc1:decimals".to_string(),
+                Value::Int(Int::from(self.stats.decimals)),
+            ),
+            (
+                "icrc1:owner".to_string(),
+                Value::Text(self.stats.owner.to_string()),
+            ),
+            ("icrc1:fee".to_string(), Value::Nat(self.stats.fee)),
+            (
+                "icrc1:fee_to".to_string(),
+                Value::Text(self.stats.fee_to.to_string()),
+            ),
+        ]
     }
 
     pub fn get_metadata(&self) -> Metadata {
@@ -109,23 +108,25 @@ impl Balances {
     }
 
     pub fn get_mut(&mut self, account: Account) -> Option<&mut Tokens128> {
-        self.0
-            .get_mut(&account.of)
-            .and_then(|subaccounts| subaccounts.get_mut(&account.subaccount))
+        self.0.get_mut(&account.principal).and_then(|subaccounts| {
+            subaccounts.get_mut(&account.subaccount.unwrap_or(DEFAULT_SUBACCOUNT))
+        })
     }
 
     pub fn get_mut_or_insert_default(&mut self, account: Account) -> &mut Tokens128 {
         self.0
-            .entry(account.of)
+            .entry(account.principal)
             .or_default()
-            .entry(account.subaccount)
+            .entry(account.subaccount.unwrap_or(DEFAULT_SUBACCOUNT))
             .or_default()
     }
 
     pub fn balance_of(&self, account: Account) -> Tokens128 {
         self.0
-            .get(&account.of)
-            .and_then(|subaccounts| subaccounts.get(&account.subaccount))
+            .get(&account.principal)
+            .and_then(|subaccounts| {
+                subaccounts.get(&account.subaccount.unwrap_or(DEFAULT_SUBACCOUNT))
+            })
             .copied()
             .unwrap_or_default()
     }
@@ -150,24 +151,24 @@ impl Balances {
     }
 
     pub fn remove(&mut self, account: Account) {
-        if let Some(subaccounts) = self.0.get_mut(&account.of) {
-            subaccounts.remove(&account.subaccount);
+        if let Some(subaccounts) = self.0.get_mut(&account.principal) {
+            subaccounts.remove(&account.subaccount.unwrap_or(DEFAULT_SUBACCOUNT));
         }
 
         if self
             .0
-            .get(&account.of)
+            .get(&account.principal)
             .map(|subaccounts| subaccounts.is_empty())
             .unwrap_or(true)
         {
-            self.0.remove(&account.of);
+            self.0.remove(&account.principal);
         }
     }
 
     pub fn set_balance(&mut self, account: Account, token: Tokens128) {
-        self.0
-            .get_mut(&account.of)
-            .map(|subaccounts| subaccounts.insert(account.subaccount, token));
+        self.0.get_mut(&account.principal).map(|subaccounts| {
+            subaccounts.insert(account.subaccount.unwrap_or(DEFAULT_SUBACCOUNT), token)
+        });
     }
 
     pub fn total_supply(&self) -> Tokens128 {

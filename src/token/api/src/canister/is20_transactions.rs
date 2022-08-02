@@ -40,7 +40,7 @@ pub fn icrc1_transfer_include_fee(
         Some(created_at_time) => {
             if now.abs_diff(created_at_time) > ONE_MIN_IN_NANOS {
                 return Err(TxError::GenericError {
-                    text: "Created time is too far in the past or future".to_string(),
+                    message: "Created time is too far in the past or future".to_string(),
                 });
             }
             created_at_time
@@ -56,8 +56,10 @@ pub fn icrc1_transfer_include_fee(
         return Err(TxError::AmountTooSmall);
     }
 
-    if balances.balance_of(from) < amount {
-        return Err(TxError::InsufficientBalance);
+    let balance = balances.balance_of(from);
+
+    if balance < amount {
+        return Err(TxError::InsufficientFunds { balance });
     }
 
     charge_fee(balances, from, fee_to, fee, fee_ratio).expect("never fails due to checks above");
@@ -103,14 +105,16 @@ pub fn batch_transfer(
         .to_tokens128()
         .ok_or(TxError::AmountOverflow)?;
 
-    if balances.balance_of(from) < (total_value + total_fee).ok_or(TxError::AmountOverflow)? {
-        return Err(TxError::InsufficientBalance);
+    let balance = balances.balance_of(from);
+
+    if balance < (total_value + total_fee).ok_or(TxError::AmountOverflow)? {
+        return Err(TxError::InsufficientFunds { balance });
     }
 
     {
         for x in &transfers {
             let value = x.amount;
-            let to = Account::new(x.receiver.to, x.receiver.to_subaccount);
+            let to = Account::new(x.receiver.principal, x.receiver.subaccount);
             charge_fee(balances, from, fee_to, fee, fee_ratio)
                 .expect("never fails due to checks above");
             transfer_balance(balances, from, to, value).expect("never fails due to checks above");
@@ -129,7 +133,7 @@ mod tests {
     use rand::{thread_rng, Rng};
 
     use crate::mock::TokenCanisterMock;
-    use crate::types::{BatchAccount, Metadata};
+    use crate::types::Metadata;
 
     use super::*;
 
@@ -176,16 +180,16 @@ mod tests {
             canister.icrc1_balance_of((alice(), None).into())
         );
         let transfer1 = BatchTransferArgs {
-            receiver: BatchAccount {
-                to: bob(),
-                to_subaccount: None,
+            receiver: Account {
+                principal: bob(),
+                subaccount: None,
             },
             amount: Tokens128::from(100),
         };
         let transfer2 = BatchTransferArgs {
-            receiver: BatchAccount {
-                to: john(),
-                to_subaccount: None,
+            receiver: Account {
+                principal: john(),
+                subaccount: None,
             },
             amount: Tokens128::from(200),
         };
@@ -219,16 +223,16 @@ mod tests {
             canister.icrc1_balance_of((alice(), None).into())
         );
         let transfer1 = BatchTransferArgs {
-            receiver: BatchAccount {
-                to: bob(),
-                to_subaccount: None,
+            receiver: Account {
+                principal: bob(),
+                subaccount: None,
             },
             amount: Tokens128::from(100),
         };
         let transfer2 = BatchTransferArgs {
-            receiver: BatchAccount {
-                to: xtc(),
-                to_subaccount: None,
+            receiver: Account {
+                principal: xtc(),
+                subaccount: None,
             },
             amount: Tokens128::from(200),
         };
@@ -259,22 +263,23 @@ mod tests {
         let canister = test_canister();
 
         let transfer1 = BatchTransferArgs {
-            receiver: BatchAccount {
-                to: bob(),
-                to_subaccount: None,
+            receiver: Account {
+                principal: bob(),
+                subaccount: None,
             },
             amount: Tokens128::from(500),
         };
         let transfer2 = BatchTransferArgs {
-            receiver: BatchAccount {
-                to: john(),
-                to_subaccount: None,
+            receiver: Account {
+                principal: john(),
+                subaccount: None,
             },
             amount: Tokens128::from(600),
         };
         let receipt = canister.batchTransfer(None, vec![transfer1, transfer2]);
         assert!(receipt.is_err());
-        assert_eq!(receipt.unwrap_err(), TxError::InsufficientBalance);
+        let balance = canister.icrc1_balance_of((alice(), None).into());
+        assert_eq!(receipt.unwrap_err(), TxError::InsufficientFunds { balance });
         assert_eq!(
             canister.icrc1_balance_of((alice(), None).into()),
             Tokens128::from(1000)
@@ -356,9 +361,13 @@ mod tests {
     #[test]
     fn transfer_insufficient_balance() {
         let canister = test_canister();
+        let balance = canister.icrc1_balance_of((alice(), None).into());
+        assert!(canister
+            .icrc1_transferIncludeFee(None, bob(), None, Tokens128::from(1001), None, None)
+            .is_err());
         assert_eq!(
             canister.icrc1_transferIncludeFee(None, bob(), None, Tokens128::from(1001), None, None),
-            Err(TxError::InsufficientBalance)
+            Err(TxError::InsufficientFunds { balance })
         );
         assert_eq!(
             canister.icrc1_balance_of((alice(), None).into()),

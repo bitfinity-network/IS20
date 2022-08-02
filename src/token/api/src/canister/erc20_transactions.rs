@@ -35,7 +35,7 @@ pub(crate) fn icrc1_transfer(
         Some(created_at_time) => {
             if now.abs_diff(created_at_time) > ONE_MIN_IN_NANOS {
                 return Err(TxError::GenericError {
-                    text: "Created time is too far in the past or future".to_string(),
+                    message: "Created time is too far in the past or future".to_string(),
                 });
             }
             created_at_time
@@ -65,8 +65,10 @@ pub(crate) fn icrc1_transfer(
         }
     }
 
-    if balances.balance_of(from) < (amount + fee).ok_or(TxError::AmountOverflow)? {
-        return Err(TxError::InsufficientBalance);
+    let balance = balances.balance_of(from);
+
+    if balance < (amount + fee).ok_or(TxError::AmountOverflow)? {
+        return Err(TxError::InsufficientFunds { balance });
     }
 
     charge_fee(balances, from, fee_to, fee, fee_ratio).expect("never fails due to checks above");
@@ -131,10 +133,10 @@ pub fn burn(
     let balance = state.balances.balance_of(from);
 
     if !amount.is_zero() && balance == Tokens128::ZERO {
-        return Err(TxError::InsufficientBalance);
+        return Err(TxError::InsufficientFunds { balance });
     }
 
-    let new_balance = (balance - amount).ok_or(TxError::InsufficientBalance)?;
+    let new_balance = (balance - amount).ok_or(TxError::InsufficientFunds { balance })?;
 
     if new_balance == Tokens128::ZERO {
         state.balances.remove(from)
@@ -217,9 +219,13 @@ pub fn transfer_balance(
         return Ok(());
     }
 
-    let from_balance = balances.get_mut(from).ok_or(TxError::InsufficientBalance)?;
+    let from_balance = balances.get_mut(from).ok_or(TxError::InsufficientFunds {
+        balance: Tokens128::ZERO,
+    })?;
 
-    *from_balance = (*from_balance - amount).ok_or(TxError::InsufficientBalance)?;
+    *from_balance = (*from_balance - amount).ok_or(TxError::InsufficientFunds {
+        balance: *from_balance,
+    })?;
 
     let to_balance = balances.get_mut_or_insert_default(to);
 
@@ -335,8 +341,7 @@ mod tests {
 
         let transfer1 = TransferArgs {
             from_subaccount: None,
-            to_principal: bob(),
-            to_subaccount: None,
+            to: Account::from(bob()),
             amount: Tokens128::from(100),
             fee: None,
             memo: None,
@@ -359,8 +364,7 @@ mod tests {
 
         let transfer2 = TransferArgs {
             from_subaccount: Some(alice_sub),
-            to_principal: bob(),
-            to_subaccount: Some(bob_sub),
+            to: Account::new(bob(), Some(bob_sub)),
             amount: Tokens128::from(50),
             fee: None,
             memo: None,
@@ -388,8 +392,7 @@ mod tests {
 
         let transfer1 = TransferArgs {
             from_subaccount: None,
-            to_principal: bob(),
-            to_subaccount: None,
+            to: Account::from(bob()),
             amount: Tokens128::from(200),
             fee: None,
             memo: None,
@@ -416,8 +419,8 @@ mod tests {
 
         let transfer2 = TransferArgs {
             from_subaccount: Some(alice_sub),
-            to_principal: bob(),
-            to_subaccount: Some(bob_sub),
+            to: Account::new(bob(), Some(bob_sub)),
+
             amount: Tokens128::from(500),
             fee: None,
             memo: None,
@@ -443,8 +446,7 @@ mod tests {
 
         let transfer1 = TransferArgs {
             from_subaccount: None,
-            to_principal: bob(),
-            to_subaccount: None,
+            to: Account::from(bob()),
             amount: Tokens128::from(200),
             fee: Some(Tokens128::from(100)),
             memo: None,
@@ -455,8 +457,7 @@ mod tests {
 
         let transfer2 = TransferArgs {
             from_subaccount: None,
-            to_principal: bob(),
-            to_subaccount: None,
+            to: Account::from(bob()),
             amount: Tokens128::from(200),
             fee: Some(Tokens128::from(50)),
             memo: None,
@@ -469,8 +470,7 @@ mod tests {
 
         let transfer3 = TransferArgs {
             from_subaccount: None,
-            to_principal: bob(),
-            to_subaccount: Some(gen_subaccount()),
+            to: Account::new(bob(), Some(gen_subaccount())),
             amount: Tokens128::from(200),
             fee: Some(Tokens128::from(50)),
             memo: None,
@@ -492,8 +492,7 @@ mod tests {
 
         let transfer1 = TransferArgs {
             from_subaccount: None,
-            to_principal: bob(),
-            to_subaccount: None,
+            to: Account::from(bob()),
             amount: Tokens128::from(100),
             fee: None,
             memo: None,
@@ -525,16 +524,16 @@ mod tests {
 
         let transfer1 = TransferArgs {
             from_subaccount: None,
-            to_principal: bob(),
-            to_subaccount: None,
+            to: Account::from(bob()),
             amount: Tokens128::from(1001),
             fee: None,
             memo: None,
             created_at_time: None,
         };
+        let balance = canister.icrc1_balance_of((alice(), None).into());
         assert_eq!(
             canister.icrc1_transfer(transfer1),
-            Err(TxError::InsufficientBalance)
+            Err(TxError::InsufficientFunds { balance })
         );
         assert_eq!(
             canister.icrc1_balance_of((alice(), None).into()),
@@ -554,17 +553,18 @@ mod tests {
 
         let transfer1 = TransferArgs {
             from_subaccount: None,
-            to_principal: bob(),
-            to_subaccount: None,
+            to: Account::from(bob()),
             amount: Tokens128::from(950),
             fee: None,
             memo: None,
             created_at_time: None,
         };
 
+        let balance = canister.icrc1_balance_of((alice(), None).into());
+
         assert_eq!(
             canister.icrc1_transfer(transfer1),
-            Err(TxError::InsufficientBalance)
+            Err(TxError::InsufficientFunds { balance })
         );
         assert_eq!(
             canister.icrc1_balance_of((alice(), None).into()),
@@ -582,8 +582,7 @@ mod tests {
         MockContext::new().with_caller(bob()).inject();
         let transfer1 = TransferArgs {
             from_subaccount: None,
-            to_principal: bob(),
-            to_subaccount: None,
+            to: Account::from(bob()),
             amount: Tokens128::from(100),
             fee: None,
             memo: None,
@@ -614,8 +613,7 @@ mod tests {
         canister.state().borrow_mut().stats.fee = Tokens128::from(10);
         let transfer1 = TransferArgs {
             from_subaccount: None,
-            to_principal: bob(),
-            to_subaccount: None,
+            to: Account::from(bob()),
             amount: Tokens128::from(1001),
             fee: None,
             memo: None,
@@ -630,8 +628,7 @@ mod tests {
         for i in 0..COUNT {
             let transfer1 = TransferArgs {
                 from_subaccount: None,
-                to_principal: bob(),
-                to_subaccount: None,
+                to: Account::from(bob()),
                 amount: Tokens128::from(100 + i as u128),
                 fee: None,
                 memo: None,
@@ -775,9 +772,10 @@ mod tests {
     #[test]
     fn burn_too_much() {
         let canister = test_canister();
+        let balance = canister.icrc1_balance_of((alice(), None).into());
         assert_eq!(
             canister.icrc1_burn(None, None, Tokens128::from(1001)),
-            Err(TxError::InsufficientBalance)
+            Err(TxError::InsufficientFunds { balance })
         );
         assert_eq!(
             canister.icrc1_balance_of((alice(), None).into()),
@@ -791,9 +789,10 @@ mod tests {
         let canister = test_canister();
         let context = MockContext::new().with_caller(bob()).inject();
         context.update_caller(bob());
+        let balance = canister.icrc1_balance_of((bob(), None).into());
         assert_eq!(
             canister.icrc1_burn(None, None, Tokens128::from(100)),
-            Err(TxError::InsufficientBalance)
+            Err(TxError::InsufficientFunds { balance })
         );
         assert_eq!(
             canister.icrc1_balance_of((alice(), None).into()),
@@ -887,8 +886,7 @@ mod tests {
         let canister = test_canister();
         let transfer1 = TransferArgs {
             from_subaccount: None,
-            to_principal: bob(),
-            to_subaccount: None,
+            to: Account::from(bob()),
             amount: Tokens128::from(10),
             fee: None,
             memo: None,
@@ -900,8 +898,8 @@ mod tests {
         }
         let transfer2 = TransferArgs {
             from_subaccount: None,
-            to_principal: bob(),
-            to_subaccount: None,
+            to: Account::from(bob()),
+
             amount: Tokens128::from(10),
             fee: None,
             memo: None,
@@ -910,8 +908,7 @@ mod tests {
         canister.icrc1_transfer(transfer2).unwrap();
         let transfer3 = TransferArgs {
             from_subaccount: None,
-            to_principal: xtc(),
-            to_subaccount: None,
+            to: Account::from(xtc()),
             amount: Tokens128::from(10),
             fee: None,
             memo: None,
@@ -920,8 +917,7 @@ mod tests {
         canister.icrc1_transfer(transfer3).unwrap();
         let transfer4 = TransferArgs {
             from_subaccount: None,
-            to_principal: john(),
-            to_subaccount: None,
+            to: Account::from(john()),
             amount: Tokens128::from(10),
             fee: None,
             memo: None,
@@ -955,8 +951,7 @@ mod tests {
 
         let transfer5 = TransferArgs {
             from_subaccount: None,
-            to_principal: bob(),
-            to_subaccount: None,
+            to: Account::from(bob()),
             amount: Tokens128::from(10),
             fee: None,
             memo: None,
@@ -995,8 +990,8 @@ mod tests {
         const COUNT: usize = 10;
         let transfer1 = TransferArgs {
             from_subaccount: None,
-            to_principal: bob(),
-            to_subaccount: None,
+            to: Account::from(bob()),
+
             amount: Tokens128::from(10),
             fee: None,
             memo: None,
@@ -1024,7 +1019,7 @@ mod tests {
             Tokens128::from(100)
         );
         assert_eq!(canister.icrc1_total_supply(), Tokens128::from(1100));
-        assert_eq!(canister.state().borrow_mut().claims.len(), 0);
+        assert_eq!(canister.state().borrow().claims.len(), 0);
     }
 
     #[test]
@@ -1066,8 +1061,8 @@ mod tests {
 
         let transfer = TransferArgs {
             from_subaccount: None,
-            to_principal: bob(),
-            to_subaccount: None,
+
+            to: Account::from(bob()),
             amount: Tokens128::from(10),
             fee: None,
             memo: None,
@@ -1087,8 +1082,7 @@ mod tests {
 
         let transfer = TransferArgs {
             from_subaccount: None,
-            to_principal: bob(),
-            to_subaccount: None,
+            to: Account::from(bob()),
             amount: Tokens128::from(10),
             fee: None,
             memo: None,
@@ -1098,8 +1092,7 @@ mod tests {
 
         let transfer = TransferArgs {
             from_subaccount: None,
-            to_principal: bob(),
-            to_subaccount: None,
+            to: Account::from(bob()),
             amount: Tokens128::from(10),
             fee: None,
             memo: None,
@@ -1117,8 +1110,7 @@ mod tests {
         );
         let transfer = TransferArgs {
             from_subaccount: None,
-            to_principal: alice(),
-            to_subaccount: None,
+            to: Account::from(alice()),
             amount: Tokens128::from(100),
             fee: None,
             memo: None,
@@ -1135,8 +1127,7 @@ mod tests {
 
         let transfer = TransferArgs {
             from_subaccount: Some(alice_sub),
-            to_principal: alice(),
-            to_subaccount: Some(alice_sub),
+            to: Account::new(alice(), Some(alice_sub)),
             amount: Tokens128::from(100),
             fee: None,
             memo: None,
@@ -1166,8 +1157,8 @@ mod tests {
         );
         let transfer = TransferArgs {
             from_subaccount: None,
-            to_principal: alice(),
-            to_subaccount: Some(alice_sub1),
+            to: Account::new(alice(), Some(alice_sub1)),
+
             amount: Tokens128::from(100),
             fee: None,
             memo: None,
@@ -1188,8 +1179,7 @@ mod tests {
 
         let transfer = TransferArgs {
             from_subaccount: Some(alice_sub1),
-            to_principal: alice(),
-            to_subaccount: Some(alice_sub2),
+            to: Account::new(alice(), Some(alice_sub2)),
             amount: Tokens128::from(10),
             fee: None,
             memo: None,
@@ -1386,7 +1376,7 @@ mod proptests {
                         let balance = canister.icrc1_balance_of((burner,None).into());
                         let res = canister.icrc1_burn(Some(burner), None, amount);
                         if balance < amount {
-                            prop_assert_eq!(res, Err(TxError::InsufficientBalance));
+                            prop_assert_eq!(res, Err(TxError::InsufficientFunds { balance }));
                             prop_assert_eq!(original, canister.icrc1_total_supply());
                         } else {
                             prop_assert!(matches!(res, Ok(_)), "Burn error: {:?}. Balance: {}, amount: {}", res, balance, amount);
@@ -1403,8 +1393,7 @@ mod proptests {
                         let amount_with_fee = (amount + fee).unwrap();
                         let transfer1 = TransferArgs {
                             from_subaccount: None,
-                            to_principal:to,
-                            to_subaccount: None,
+                            to:Account::new(to, None),
                             amount,
                             fee: fee_limit,
                             memo: None,
@@ -1425,7 +1414,7 @@ mod proptests {
                         }
 
                         if from_balance < amount_with_fee {
-                            prop_assert_eq!(res, Err(TxError::InsufficientBalance));
+                            prop_assert_eq!(res, Err(TxError::InsufficientFunds { balance:from_balance }));
                             return Ok(())
                         }
 
@@ -1463,7 +1452,7 @@ mod proptests {
                             return Ok(());
                         }
                         if from_balance < amount {
-                            prop_assert_eq!(res, Err(TxError::InsufficientBalance));
+                            prop_assert_eq!(res, Err(TxError::InsufficientFunds { balance: from_balance }));
                             return Ok(());
                         }
 
