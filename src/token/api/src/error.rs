@@ -16,8 +16,8 @@ pub enum TxError {
     Unauthorized,
     #[error("Amount too small")]
     AmountTooSmall,
-    #[error("Fee exceeded limit")]
-    FeeExceededLimit,
+    #[error("Fee exceeded limit {fee_limit}")]
+    FeeExceededLimit { fee_limit: Tokens128 },
     #[error("Approve succeeded but notify failed : {tx_error}")]
     ApproveSucceededButNotifyFailed { tx_error: Box<TxError> },
     #[error("Notification failed for transaction : {transaction_id}")]

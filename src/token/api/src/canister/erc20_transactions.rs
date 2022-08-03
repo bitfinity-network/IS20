@@ -22,7 +22,7 @@ pub fn transfer(
 
     if let Some(fee_limit) = fee_limit {
         if fee > fee_limit {
-            return Err(TxError::FeeExceededLimit);
+            return Err(TxError::FeeExceededLimit { fee_limit });
         }
     }
 
@@ -363,7 +363,9 @@ mod tests {
             .is_ok());
         assert_eq!(
             canister.transfer(bob(), Tokens128::from(200), Some(Tokens128::from(50))),
-            Err(TxError::FeeExceededLimit)
+            Err(TxError::FeeExceededLimit {
+                fee_limit: Tokens128::from(50),
+            })
         );
     }
 
@@ -1110,7 +1112,7 @@ mod proptests {
 
                         if let Some(fee_limit) = fee_limit {
                             if fee_limit < fee {
-                                prop_assert_eq!(res, Err(TxError::FeeExceededLimit));
+                                prop_assert_eq!(res, Err(TxError::FeeExceededLimit { fee_limit}));
                                 return Ok(())
                             }
                         }
