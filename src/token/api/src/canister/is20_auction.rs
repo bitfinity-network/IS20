@@ -220,8 +220,9 @@ mod tests {
     use ic_canister::Canister;
     use test_case::test_case;
 
+    use crate::error::TxError;
     use crate::mock::*;
-    use crate::types::{Metadata, TxError};
+    use crate::types::Metadata;
 
     use super::*;
 

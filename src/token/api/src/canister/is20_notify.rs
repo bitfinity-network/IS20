@@ -4,10 +4,10 @@ use candid::Principal;
 use ic_canister::virtual_canister_notify;
 use ic_helpers::tokens::Tokens128;
 
-use crate::principal::{CheckedPrincipal, WithRecipient};
-use crate::types::{TxError, TxId, TxReceipt};
-
 use super::TokenCanisterAPI;
+use crate::error::TxError;
+use crate::principal::{CheckedPrincipal, WithRecipient};
+use crate::types::{TxId, TxReceipt};
 
 pub(crate) async fn approve_and_notify(
     canister: &impl TokenCanisterAPI,

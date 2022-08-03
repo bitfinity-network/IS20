@@ -2,9 +2,10 @@ use candid::Principal;
 use ic_helpers::tokens::Tokens128;
 
 use crate::canister::erc20_transactions::{charge_fee, transfer_balance};
+use crate::error::TxError;
 use crate::principal::{CheckedPrincipal, WithRecipient};
 use crate::state::CanisterState;
-use crate::types::{TxError, TxId, TxReceipt};
+use crate::types::{TxId, TxReceipt};
 
 use super::TokenCanisterAPI;
 

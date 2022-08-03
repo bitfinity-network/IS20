@@ -1,12 +1,12 @@
 use ic_cdk::export::Principal;
 use ic_helpers::tokens::Tokens128;
 
+use super::TokenCanisterAPI;
 use crate::canister::is20_auction::auction_principal;
+use crate::error::TxError;
 use crate::principal::{CheckedPrincipal, Owner, SenderRecipient, TestNet, WithRecipient};
 use crate::state::{Balances, CanisterState};
-use crate::types::{TxError, TxReceipt};
-
-use super::TokenCanisterAPI;
+use crate::types::TxReceipt;
 
 pub fn transfer(
     canister: &impl TokenCanisterAPI,

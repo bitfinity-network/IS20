@@ -21,10 +21,11 @@ use crate::canister::is20_auction::{
 };
 use crate::canister::is20_notify::{approve_and_notify, consume_notification, notify};
 use crate::canister::is20_transactions::{batch_transfer, transfer_include_fee};
+use crate::error::TxError;
 use crate::principal::{CheckedPrincipal, Owner};
 use crate::types::{
-    AuctionInfo, Metadata, PaginatedResult, StatsData, Timestamp, TokenInfo, TxError, TxId,
-    TxReceipt, TxRecord,
+    AuctionInfo, Metadata, PaginatedResult, StatsData, Timestamp, TokenInfo, TxId, TxReceipt,
+    TxRecord,
 };
 
 pub use inspect::AcceptReason;
