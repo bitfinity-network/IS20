@@ -36,6 +36,7 @@ static OWNER_METHODS: &[&str] = &[
     "setLogo",
     "setMinCycles",
     "setName",
+    "setSymbol",
     "setOwner",
     "toggleTest",
 ];

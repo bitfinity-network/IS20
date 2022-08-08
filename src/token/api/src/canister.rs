@@ -51,6 +51,7 @@ pub fn pre_update(canister: &impl TokenCanisterAPI, method_name: &str, _method_t
 
 pub enum CanisterUpdate {
     Name(String),
+    Symbol(String),
     Logo(String),
     Fee(Tokens128),
     FeeTo(Principal),
@@ -166,6 +167,7 @@ pub trait TokenCanisterAPI: Canister + Sized {
         use CanisterUpdate::*;
         match update {
             Name(name) => self.state().borrow_mut().stats.name = name,
+            Symbol(symbol) => self.state().borrow_mut().stats.symbol = symbol,
             Logo(logo) => self.state().borrow_mut().stats.logo = logo,
             Fee(fee) => self.state().borrow_mut().stats.fee = fee,
             FeeTo(fee_to) => self.state().borrow_mut().stats.fee_to = fee_to,
@@ -181,6 +183,13 @@ pub trait TokenCanisterAPI: Canister + Sized {
     fn setName(&self, name: String) -> Result<(), TxError> {
         let caller = CheckedPrincipal::owner(&self.state().borrow_mut().stats)?;
         self.update_stats(caller, CanisterUpdate::Name(name));
+        Ok(())
+    }
+
+    #[update(trait = true)]
+    fn setSymbol(&self, symbol: String) -> Result<(), TxError> {
+        let caller = CheckedPrincipal::owner(&self.state().borrow_mut().stats)?;
+        self.update_stats(caller, CanisterUpdate::Symbol(symbol));
         Ok(())
     }
 
