@@ -150,6 +150,7 @@ pub enum TxError {
     AccountNotFound,
     ClaimNotAllowed,
     GenericError { message: String },
+    TemporarilyUnavailable,
 }
 
 impl std::fmt::Display for TxError {
@@ -173,6 +174,7 @@ impl std::fmt::Display for TxError {
             TxError::AccountNotFound => write!(f, "Account not found"),
             TxError::ClaimNotAllowed => write!(f, "Claim not allowed"),
             TxError::GenericError { message } => write!(f, "{}", message),
+            TxError::TemporarilyUnavailable => write!(f, "Temporarily unavailable"),
         }
     }
 }

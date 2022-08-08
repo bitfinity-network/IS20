@@ -131,6 +131,11 @@ pub trait TokenCanisterAPI: Canister + Sized {
     }
 
     #[query(trait = true)]
+    fn icrc1_minting_account(&self) -> Account {
+        self.state().borrow().stats.owner.into()
+    }
+
+    #[query(trait = true)]
     fn getTokenInfo(&self) -> TokenInfo {
         let StatsData {
             fee_to,
