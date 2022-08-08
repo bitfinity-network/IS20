@@ -42,4 +42,10 @@ pub enum TxError {
     SelfTransfer,
     #[error("Amount overflow")]
     AmountOverflow,
+    #[error("Account is not found")]
+    AccountNotFound,
+    #[error("{message}")]
+    GenericError { message: String },
+    #[error("Claim not Allowed")]
+    ClaimNotAllowed,
 }

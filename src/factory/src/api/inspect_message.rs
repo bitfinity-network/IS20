@@ -13,6 +13,12 @@ fn inspect_message() {
         && factory.controller() == ic_canister::ic_kit::ic::caller()
     {
         return ic_cdk::api::call::accept_message();
+    } else {
+        ic_cdk::api::call::reject(&format!(
+            "the caller {} is not a factory controller {}",
+            ic_canister::ic_kit::ic::caller(),
+            factory.controller()
+        ));
     }
 
     match state.token_wasm {

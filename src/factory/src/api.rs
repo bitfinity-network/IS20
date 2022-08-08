@@ -84,11 +84,8 @@ impl TokenFactoryCanister {
     }
 
     #[update]
-    pub async fn set_token_bytecode(
-        &self,
-        bytecode: Vec<u8>,
-        state_header: CandidHeader,
-    ) -> Result<u32, FactoryError> {
+    pub async fn set_token_bytecode(&self, bytecode: Vec<u8>) -> Result<u32, FactoryError> {
+        let state_header = candid_header::<token::state::CanisterState>();
         self.set_canister_code::<token::state::CanisterState>(bytecode, state_header)
     }
 
