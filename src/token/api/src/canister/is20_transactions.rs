@@ -114,7 +114,7 @@ pub fn batch_transfer(
     {
         for x in &transfers {
             let value = x.amount;
-            let to = Account::new(x.receiver.principal, x.receiver.subaccount);
+            let to = Account::new(x.receiver.owner, x.receiver.subaccount);
             charge_fee(balances, from, fee_to, fee, fee_ratio)
                 .expect("never fails due to checks above");
             transfer_balance(balances, from, to, value).expect("never fails due to checks above");
@@ -181,14 +181,14 @@ mod tests {
         );
         let transfer1 = BatchTransferArgs {
             receiver: Account {
-                principal: bob(),
+                owner: bob(),
                 subaccount: None,
             },
             amount: Tokens128::from(100),
         };
         let transfer2 = BatchTransferArgs {
             receiver: Account {
-                principal: john(),
+                owner: john(),
                 subaccount: None,
             },
             amount: Tokens128::from(200),
@@ -224,14 +224,14 @@ mod tests {
         );
         let transfer1 = BatchTransferArgs {
             receiver: Account {
-                principal: bob(),
+                owner: bob(),
                 subaccount: None,
             },
             amount: Tokens128::from(100),
         };
         let transfer2 = BatchTransferArgs {
             receiver: Account {
-                principal: xtc(),
+                owner: xtc(),
                 subaccount: None,
             },
             amount: Tokens128::from(200),
@@ -264,14 +264,14 @@ mod tests {
 
         let transfer1 = BatchTransferArgs {
             receiver: Account {
-                principal: bob(),
+                owner: bob(),
                 subaccount: None,
             },
             amount: Tokens128::from(500),
         };
         let transfer2 = BatchTransferArgs {
             receiver: Account {
-                principal: john(),
+                owner: john(),
                 subaccount: None,
             },
             amount: Tokens128::from(600),

@@ -110,7 +110,7 @@ impl Ledger {
             .map(|x| {
                 self.transfer(
                     from,
-                    Account::new(x.receiver.principal, x.receiver.subaccount),
+                    Account::new(x.receiver.owner, x.receiver.subaccount),
                     x.amount,
                     fee,
                     None,
