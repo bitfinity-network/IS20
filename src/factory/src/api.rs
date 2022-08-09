@@ -16,8 +16,8 @@ use token::types::Metadata;
 const DEFAULT_LEDGER_PRINCIPAL: &str = "ryjl3-tyaaa-aaaaa-aaaba-cai";
 const DEFAULT_ICP_FEE: u64 = 10u64.pow(8); // 1 ICP
 
-// #[cfg(not(feature = "no_api"))]
-// mod inspect_message;
+#[cfg(not(feature = "no_api"))]
+mod inspect_message;
 
 #[derive(Clone, Canister)]
 #[canister_no_upgrade_methods]
