@@ -16,8 +16,8 @@ use token::types::Metadata;
 const DEFAULT_LEDGER_PRINCIPAL: &str = "ryjl3-tyaaa-aaaaa-aaaba-cai";
 const DEFAULT_ICP_FEE: u64 = 10u64.pow(8); // 1 ICP
 
-#[cfg(not(feature = "no_api"))]
-mod inspect_message;
+// #[cfg(not(feature = "no_api"))]
+// mod inspect_message;
 
 #[derive(Clone, Canister)]
 #[canister_no_upgrade_methods]
@@ -86,6 +86,7 @@ impl TokenFactoryCanister {
     #[update]
     pub async fn set_token_bytecode(&self, bytecode: Vec<u8>) -> Result<u32, FactoryError> {
         let state_header = candid_header::<token::state::CanisterState>();
+        self.state.borrow_mut().token_wasm = Some(bytecode.clone());
         self.set_canister_code::<token::state::CanisterState>(bytecode, state_header)
     }
 
