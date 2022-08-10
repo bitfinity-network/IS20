@@ -25,6 +25,7 @@ ic-helpers = { git = "https://github.com/infinity-swap/canister-sdk", package = 
 ic-storage = { git = "https://github.com/infinity-swap/canister-sdk", package = "ic-storage", tag = "v0.3.16" }
 ic-certified-map = "0.3"
 serde_cbor = "0.11"
+thiserror = "1.0"
 hex = { version = "0.4.2", features = ["serde"] }
 digest = "0.10.3"
 sha2 = "0.10.2"

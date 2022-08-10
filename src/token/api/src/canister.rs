@@ -22,6 +22,7 @@ use crate::canister::erc20_transactions::{
     mint_to_accountid,
 };
 use crate::canister::is20_transactions::icrc1_transfer_include_fee;
+use crate::error::TxError;
 use crate::principal::{CheckedPrincipal, Owner};
 use crate::state::CanisterState;
 use crate::types::BalanceArgs;

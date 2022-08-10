@@ -84,6 +84,7 @@ mod tests {
     use ic_canister::Canister;
     use ic_helpers::metrics::Interval;
 
+    use crate::error::TxError;
     use crate::mock::*;
     use crate::types::Metadata;
 
