@@ -2,8 +2,6 @@ use candid::{CandidType, Deserialize};
 use ic_helpers::tokens::Tokens128;
 use thiserror::Error;
 
-// TODO: a wrapper over `ic_helpers::TxError`, this is a most likely
-// place to make tests fail in amm.
 #[derive(CandidType, Debug, PartialEq, Deserialize, Error)]
 pub enum TxError {
     #[error("Insufficient balance")]
