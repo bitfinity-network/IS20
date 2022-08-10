@@ -51,10 +51,12 @@ pub(crate) fn icrc1_transfer(
     let mut state = state.borrow_mut();
     let CanisterState {
         ref mut balances,
-        ref bidding_state,
         ref stats,
         ..
     } = &mut *state;
+
+    let auction_state = canister.auction_state();
+    let bidding_state = &mut auction_state.borrow_mut().bidding_state;
 
     let (fee, fee_to) = stats.fee_info();
     let fee_ratio = bidding_state.fee_ratio;
@@ -278,6 +280,7 @@ pub(crate) fn charge_fee(
 mod tests {
     use std::time::UNIX_EPOCH;
 
+    use ic_auction::api::Auction;
     use ic_canister::ic_kit::mock_principals::{alice, bob, john, xtc};
     use ic_canister::ic_kit::MockContext;
     use ic_canister::Canister;
@@ -309,7 +312,7 @@ mod tests {
                 owner: alice(),
                 fee: Tokens128::from(0),
                 feeTo: alice(),
-                isTestToken: None,
+                is_test_token: None,
             },
             Tokens128::from(1000),
         );
@@ -488,7 +491,11 @@ mod tests {
         canister.state().borrow_mut().stats.fee = Tokens128::from(50);
         canister.state().borrow_mut().stats.fee_to = john();
         canister.state().borrow_mut().stats.min_cycles = crate::types::DEFAULT_MIN_CYCLES;
-        canister.state().borrow_mut().bidding_state.fee_ratio = 0.5;
+        canister
+            .auction_state()
+            .borrow_mut()
+            .bidding_state
+            .fee_ratio = 0.5;
 
         let transfer1 = TransferArgs {
             from_subaccount: None,
@@ -621,7 +628,7 @@ mod tests {
         };
 
         canister.icrc1_transfer(transfer1).unwrap_err();
-        assert_eq!(canister.historySize(), 1);
+        assert_eq!(canister.history_size(), 1);
 
         const COUNT: u64 = 5;
         let mut ts = ic_canister::ic_kit::ic::time();
@@ -636,8 +643,8 @@ mod tests {
             };
             ctx.add_time(10);
             let id = canister.icrc1_transfer(transfer1).unwrap();
-            assert_eq!(canister.historySize(), 2 + i);
-            let tx = canister.getTransaction(id as u64);
+            assert_eq!(canister.history_size(), 2 + i);
+            let tx = canister.get_transaction(id as u64);
             assert_eq!(tx.amount, Tokens128::from(100 + i as u128));
             assert_eq!(tx.fee, Tokens128::from(10));
             assert_eq!(tx.operation, Operation::Transfer);
@@ -732,7 +739,7 @@ mod tests {
         let (ctx, canister) = test_context();
         canister.state().borrow_mut().stats.fee = Tokens128::from(10);
 
-        assert_eq!(canister.historySize(), 1);
+        assert_eq!(canister.history_size(), 1);
 
         const COUNT: u64 = 5;
         let mut ts = ic_canister::ic_kit::ic::time();
@@ -741,8 +748,8 @@ mod tests {
             let id = canister
                 .icrc1_mint(bob(), None, Tokens128::from(100 + i as u128))
                 .unwrap();
-            assert_eq!(canister.historySize(), 2 + i);
-            let tx = canister.getTransaction(id as u64);
+            assert_eq!(canister.history_size(), 2 + i);
+            let tx = canister.get_transaction(id as u64);
             assert_eq!(tx.amount, Tokens128::from(100 + i as u128));
             assert_eq!(tx.fee, Tokens128::from(0));
             assert_eq!(tx.operation, Operation::Mint);
@@ -858,7 +865,7 @@ mod tests {
         canister
             .icrc1_burn(None, None, Tokens128::from(1001))
             .unwrap_err();
-        assert_eq!(canister.historySize(), 1);
+        assert_eq!(canister.history_size(), 1);
 
         const COUNT: u64 = 5;
         let mut ts = ic_canister::ic_kit::ic::time();
@@ -867,8 +874,8 @@ mod tests {
             let id = canister
                 .icrc1_burn(None, None, Tokens128::from(100 + i as u128))
                 .unwrap();
-            assert_eq!(canister.historySize(), 2 + i);
-            let tx = canister.getTransaction(id as u64);
+            assert_eq!(canister.history_size(), 2 + i);
+            let tx = canister.get_transaction(id as u64);
             assert_eq!(tx.amount, Tokens128::from(100 + i as u128));
             assert_eq!(tx.fee, Tokens128::from(0));
             assert_eq!(tx.operation, Operation::Burn);
@@ -925,29 +932,35 @@ mod tests {
         };
         canister.icrc1_transfer(transfer4).unwrap();
 
-        assert_eq!(canister.getTransactions(None, 10, None).result.len(), 9);
-        assert_eq!(canister.getTransactions(None, 10, Some(3)).result.len(), 4);
-        assert_eq!(
-            canister.getTransactions(Some(bob()), 10, None).result.len(),
-            6
-        );
-        assert_eq!(
-            canister.getTransactions(Some(xtc()), 5, None).result.len(),
-            1
-        );
+        assert_eq!(canister.get_transactions(None, 10, None).result.len(), 9);
+        assert_eq!(canister.get_transactions(None, 10, Some(3)).result.len(), 4);
         assert_eq!(
             canister
-                .getTransactions(Some(alice()), 10, Some(5))
+                .get_transactions(Some(bob()), 10, None)
                 .result
                 .len(),
             6
         );
-        assert_eq!(canister.getTransactions(None, 5, None).next, Some(3));
         assert_eq!(
-            canister.getTransactions(Some(alice()), 3, Some(5)).next,
+            canister.get_transactions(Some(xtc()), 5, None).result.len(),
+            1
+        );
+        assert_eq!(
+            canister
+                .get_transactions(Some(alice()), 10, Some(5))
+                .result
+                .len(),
+            6
+        );
+        assert_eq!(canister.get_transactions(None, 5, None).next, Some(3));
+        assert_eq!(
+            canister.get_transactions(Some(alice()), 3, Some(5)).next,
             Some(2)
         );
-        assert_eq!(canister.getTransactions(Some(bob()), 3, Some(2)).next, None);
+        assert_eq!(
+            canister.get_transactions(Some(bob()), 3, Some(2)).next,
+            None
+        );
 
         let transfer5 = TransferArgs {
             from_subaccount: None,
@@ -962,26 +975,26 @@ mod tests {
             canister.icrc1_transfer(transfer5.clone()).unwrap();
         }
 
-        let txn = canister.getTransactions(None, 5, None);
+        let txn = canister.get_transactions(None, 5, None);
         assert_eq!(txn.result[0].index, 18);
         assert_eq!(txn.result[1].index, 17);
         assert_eq!(txn.result[2].index, 16);
         assert_eq!(txn.result[3].index, 15);
         assert_eq!(txn.result[4].index, 14);
-        let txn2 = canister.getTransactions(None, 5, txn.next);
+        let txn2 = canister.get_transactions(None, 5, txn.next);
         assert_eq!(txn2.result[0].index, 13);
         assert_eq!(txn2.result[1].index, 12);
         assert_eq!(txn2.result[2].index, 11);
         assert_eq!(txn2.result[3].index, 10);
         assert_eq!(txn2.result[4].index, 9);
-        assert_eq!(canister.getTransactions(None, 5, txn.next).next, Some(8));
+        assert_eq!(canister.get_transactions(None, 5, txn.next).next, Some(8));
     }
 
     #[test]
     #[should_panic]
     fn get_transaction_not_existing() {
         let canister = test_canister();
-        canister.getTransaction(2);
+        canister.get_transaction(2);
     }
 
     #[test]
@@ -1000,7 +1013,7 @@ mod tests {
         for _ in 1..COUNT {
             canister.icrc1_transfer(transfer1.clone()).unwrap();
         }
-        assert_eq!(canister.getUserTransactionCount(alice()), COUNT);
+        assert_eq!(canister.get_user_transaction_count(alice()), COUNT);
     }
 
     #[test]
@@ -1011,7 +1024,7 @@ mod tests {
 
         let canister = test_canister();
         assert!(canister
-            .mintToAccountId(alice_aid, Tokens128::from(100))
+            .mint_to_account_id(alice_aid, Tokens128::from(100))
             .is_ok());
         assert!(canister.claim(alice_aid, Some(subaccount)).is_ok());
         assert_eq!(
@@ -1034,18 +1047,18 @@ mod tests {
         let canister = test_canister();
 
         assert!(canister
-            .mintToAccountId(alice_aid, Tokens128::from(1000))
+            .mint_to_account_id(alice_aid, Tokens128::from(1000))
             .is_ok());
         assert!(canister
-            .mintToAccountId(bob_aid, Tokens128::from(2000))
+            .mint_to_account_id(bob_aid, Tokens128::from(2000))
             .is_ok());
         assert_eq!(
-            canister.getClaim(Some(alice_sub)).unwrap(),
+            canister.get_claim(Some(alice_sub)).unwrap(),
             Tokens128::from(1000)
         );
         MockContext::new().with_caller(bob()).inject();
         assert_eq!(
-            canister.getClaim(Some(bob_sub)).unwrap(),
+            canister.get_claim(Some(bob_sub)).unwrap(),
             Tokens128::from(2000)
         );
     }
@@ -1329,7 +1342,7 @@ mod proptests {
                 owner,
                 fee,
                 feeTo: fee_to,
-                isTestToken: None,
+                is_test_token: None,
             };
             let canister = TokenCanisterMock::init_instance();
             canister.init(meta,total_supply);

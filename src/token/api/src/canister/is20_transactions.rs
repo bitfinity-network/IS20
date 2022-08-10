@@ -26,7 +26,6 @@ pub fn icrc1_transfer_include_fee(
     let CanisterState {
         ref mut balances,
         ref mut ledger,
-        ref bidding_state,
         ref stats,
         ..
     } = *state;
@@ -50,7 +49,7 @@ pub fn icrc1_transfer_include_fee(
     };
 
     let (fee, fee_to) = stats.fee_info();
-    let fee_ratio = bidding_state.fee_ratio;
+    let fee_ratio = canister.auction_state().borrow().bidding_state.fee_ratio;
 
     if amount <= fee {
         return Err(TxError::AmountTooSmall);
@@ -92,12 +91,13 @@ pub fn batch_transfer(
 
     let CanisterState {
         ref mut balances,
-        ref bidding_state,
         ref mut ledger,
         ref stats,
         ..
     } = &mut *state;
 
+    let auction_state = canister.auction_state();
+    let bidding_state = &mut auction_state.borrow_mut().bidding_state;
     let (fee, fee_to) = stats.fee_info();
     let fee_ratio = bidding_state.fee_ratio;
 
@@ -158,7 +158,7 @@ mod tests {
                 owner: alice(),
                 fee: Tokens128::from(0),
                 feeTo: alice(),
-                isTestToken: None,
+                is_test_token: None,
             },
             Tokens128::from(1000),
         );
@@ -194,7 +194,7 @@ mod tests {
             amount: Tokens128::from(200),
         };
         let receipt = canister
-            .batchTransfer(None, vec![transfer1, transfer2])
+            .batch_transfer(None, vec![transfer1, transfer2])
             .unwrap();
         assert_eq!(receipt.len(), 2);
         assert_eq!(
@@ -237,7 +237,7 @@ mod tests {
             amount: Tokens128::from(200),
         };
         let receipt = canister
-            .batchTransfer(None, vec![transfer1, transfer2])
+            .batch_transfer(None, vec![transfer1, transfer2])
             .unwrap();
         assert_eq!(receipt.len(), 2);
         assert_eq!(
@@ -276,7 +276,7 @@ mod tests {
             },
             amount: Tokens128::from(600),
         };
-        let receipt = canister.batchTransfer(None, vec![transfer1, transfer2]);
+        let receipt = canister.batch_transfer(None, vec![transfer1, transfer2]);
         assert!(receipt.is_err());
         let balance = canister.icrc1_balance_of((alice(), None).into());
         assert_eq!(receipt.unwrap_err(), TxError::InsufficientFunds { balance });

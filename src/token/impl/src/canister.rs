@@ -1,45 +1,90 @@
 use candid::Principal;
-use ic_canister::{init, query, Canister, PreUpdate};
+use ic_auction::{
+    api::Auction,
+    error::AuctionError,
+    state::{AuctionInfo, AuctionState},
+};
+use ic_canister::{init, post_upgrade, pre_upgrade, Canister, PreUpdate};
 
 #[cfg(not(feature = "no_api"))]
 use ic_cdk_macros::inspect_message;
 
+use ic_canister::query;
 use ic_helpers::{
     candid_header::{candid_header, CandidHeader},
+    metrics::Interval,
     tokens::Tokens128,
 };
+use ic_storage::IcStorage;
 use std::{cell::RefCell, rc::Rc};
 use token_api::{
     account::Account,
-    canister::{TokenCanisterAPI, DEFAULT_AUCTION_PERIOD},
-    state::CanisterState,
+    canister::{TokenCanisterAPI, DEFAULT_AUCTION_PERIOD_SECONDS},
+    state::{CanisterState, StableState},
     types::Metadata,
 };
 
 #[derive(Debug, Clone, Canister)]
+#[canister_no_upgrade_methods]
 pub struct TokenCanister {
     #[id]
     principal: Principal,
-    #[state]
-    pub(crate) state: Rc<RefCell<CanisterState>>,
 }
 
 impl TokenCanister {
     #[init]
     pub fn init(&self, metadata: Metadata, amount: Tokens128) {
-        self.state
+        self.state()
             .borrow_mut()
             .balances
             .insert(metadata.owner, None, amount);
 
-        self.state.borrow_mut().ledger.mint(
+        self.state().borrow_mut().ledger.mint(
             Account::from(metadata.owner),
             Account::from(metadata.owner),
             amount,
         );
 
-        self.state.borrow_mut().stats = metadata.into();
-        self.state.borrow_mut().bidding_state.auction_period = DEFAULT_AUCTION_PERIOD;
+        self.state().borrow_mut().stats = metadata.into();
+
+        let auction_state = self.auction_state();
+        auction_state.replace(AuctionState::new(
+            Interval::Period {
+                seconds: DEFAULT_AUCTION_PERIOD_SECONDS,
+            },
+            ic_canister::ic_kit::ic::caller(),
+        ));
+    }
+
+    #[pre_upgrade]
+    fn pre_upgrade(&self) {
+        let token_state = Rc::<RefCell<CanisterState>>::try_unwrap(self.state())
+            .expect("Someone has the token factory state borrowed.")
+            .into_inner();
+
+        let auction_state = Rc::<RefCell<AuctionState>>::try_unwrap(self.auction_state())
+            .expect("Someone has the base factory state borrowed. This is a program bug because state lock was bypassed.")
+            .into_inner();
+
+        ic_storage::stable::write(&StableState {
+            token_state,
+            auction_state,
+        })
+        .expect("failed to serialize state to the stable storage");
+    }
+
+    #[post_upgrade]
+    fn post_upgrade(&self) {
+        let stable_state = ic_storage::stable::read::<StableState>()
+            .expect("failed to read stable state from the stable storage");
+
+        let StableState {
+            token_state,
+            auction_state,
+        } = stable_state;
+
+        self.state().replace(token_state);
+        self.auction_state().replace(auction_state);
     }
 
     #[query]
@@ -79,48 +124,16 @@ impl PreUpdate for TokenCanister {
 
 impl TokenCanisterAPI for TokenCanister {
     fn state(&self) -> Rc<RefCell<CanisterState>> {
-        self.state.clone()
+        CanisterState::get()
     }
 }
 
-#[cfg(test)]
-mod test {
-    use ic_canister::ic_kit::MockContext;
-
-    use super::*;
-
-    #[test]
-    fn test_upgrade_from_previous() {
-        use ic_storage::stable::write;
-
-        MockContext::new().inject();
-
-        write(&()).unwrap();
-        let canister = TokenCanister::init_instance();
-        canister.__post_upgrade_inst();
+impl Auction for TokenCanister {
+    fn auction_state(&self) -> Rc<RefCell<AuctionState>> {
+        AuctionState::get()
     }
 
-    #[test]
-    fn test_upgrade_from_current() {
-        MockContext::new().inject();
-
-        // Set a value on the state...
-        let canister = TokenCanister::init_instance();
-        let mut state = canister.state.borrow_mut();
-        state.bidding_state.fee_ratio = 12345.0;
-        drop(state);
-        // ... write the state to stable storage
-        canister.__pre_upgrade_inst();
-
-        // Update the value without writing it to stable storage
-        let mut state = canister.state.borrow_mut();
-        state.bidding_state.fee_ratio = 0.0;
-        drop(state);
-
-        // Upgrade the canister should have the state
-        // written before pre_upgrade
-        canister.__post_upgrade_inst();
-        let state = canister.state.borrow();
-        assert_eq!(state.bidding_state.fee_ratio, 12345.0);
+    fn disburse_rewards(&self) -> Result<AuctionInfo, AuctionError> {
+        token_api::canister::is20_auction::disburse_rewards(self)
     }
 }

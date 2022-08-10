@@ -134,7 +134,7 @@ impl Ledger {
         id
     }
 
-    pub fn auction(&mut self, to: Principal, amount: Tokens128) {
+    pub fn record_auction(&mut self, to: Principal, amount: Tokens128) {
         let id = self.next_id();
         self.push(TxRecord::auction(id, to.into(), amount))
     }
