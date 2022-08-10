@@ -1,13 +1,14 @@
 use std::collections::HashMap;
-use std::error::Error;
-use std::fmt::Formatter;
 
 use candid::{CandidType, Deserialize, Int, Principal};
 use ic_helpers::{ledger::AccountIdentifier, tokens::Tokens128};
 
 pub use tx_record::*;
 
-use crate::account::{Account, Subaccount};
+use crate::{
+    account::{Account, Subaccount},
+    error::TxError,
+};
 
 mod tx_record;
 
@@ -131,55 +132,6 @@ impl Default for StatsData {
 
 /// This data structure is used for supporting minting to `AccountIdentifier`, after a claim is saved, We use the `claim` functions to claim the amount and is minted to `Account`.
 pub type Claims = HashMap<AccountIdentifier, Tokens128>;
-
-// TODO: a wrapper over `ic_helpers::TxError`, this is a most likely
-// place to make tests fail in amm.
-#[derive(CandidType, Debug, PartialEq, Deserialize)]
-pub enum TxError {
-    Unauthorized,
-    AmountTooSmall,
-    FeeExceededLimit,
-    AlreadyActioned,
-    BadFee { expected_fee: Tokens128 },
-    InsufficientFunds { balance: Tokens128 },
-    TooOld { allowed_window_nanos: u64 },
-    CreatedInFuture,
-    Duplicate { duplicate_of: u64 },
-    SelfTransfer,
-    AmountOverflow,
-    AccountNotFound,
-    ClaimNotAllowed,
-    GenericError { message: String },
-    TemporarilyUnavailable,
-}
-
-impl std::fmt::Display for TxError {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        match self {
-            TxError::Unauthorized => write!(f, "Unauthorized"),
-            TxError::AmountTooSmall => write!(f, "Amount too small"),
-            TxError::FeeExceededLimit => write!(f, "Fee exceeded limit"),
-            TxError::AlreadyActioned => write!(f, "Already actioned"),
-            TxError::BadFee { expected_fee } => write!(f, "Bad fee: {}", expected_fee),
-            TxError::InsufficientFunds { balance } => write!(f, "Insufficient funds: {}", balance),
-            TxError::TooOld {
-                allowed_window_nanos,
-            } => write!(f, "Transaction is too old: {}", allowed_window_nanos),
-            TxError::CreatedInFuture => write!(f, "Transaction created in future"),
-            TxError::Duplicate { duplicate_of } => {
-                write!(f, "Transaction is a duplicate of {}", duplicate_of)
-            }
-            TxError::SelfTransfer => write!(f, "Self transfer"),
-            TxError::AmountOverflow => write!(f, "Amount overflow"),
-            TxError::AccountNotFound => write!(f, "Account not found"),
-            TxError::ClaimNotAllowed => write!(f, "Claim not allowed"),
-            TxError::GenericError { message } => write!(f, "{}", message),
-            TxError::TemporarilyUnavailable => write!(f, "Temporarily unavailable"),
-        }
-    }
-}
-
-impl Error for TxError {}
 
 pub type TxReceipt = Result<u128, TxError>;
 

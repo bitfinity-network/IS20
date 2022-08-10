@@ -3,7 +3,7 @@ use std::fmt::{Display, Formatter};
 use candid::{CandidType, Principal};
 use serde::{Deserialize, Serialize};
 
-use crate::types::TxError;
+use crate::error::TxError;
 
 pub static DEFAULT_SUBACCOUNT: Subaccount = [0u8; 32];
 

@@ -6,9 +6,10 @@ use ic_helpers::tokens::Tokens128;
 
 use crate::account::{Account, CheckedAccount, Subaccount, WithRecipient};
 use crate::canister::is20_auction::auction_principal;
+use crate::error::TxError;
 use crate::principal::{CheckedPrincipal, Owner, TestNet};
 use crate::state::{Balances, CanisterState};
-use crate::types::{TransferArgs, TxError, TxReceipt};
+use crate::types::{TransferArgs, TxReceipt};
 
 use super::TokenCanisterAPI;
 
@@ -61,7 +62,7 @@ pub(crate) fn icrc1_transfer(
 
     if let Some(fee_limit) = transfer.fee {
         if fee > fee_limit {
-            return Err(TxError::FeeExceededLimit);
+            return Err(TxError::FeeExceededLimit { fee_limit });
         }
     }
 
@@ -465,7 +466,9 @@ mod tests {
         };
         assert_eq!(
             canister.icrc1_transfer(transfer2),
-            Err(TxError::FeeExceededLimit)
+            Err(TxError::FeeExceededLimit {
+                fee_limit: Tokens128::from(50)
+            })
         );
 
         let transfer3 = TransferArgs {
@@ -478,7 +481,9 @@ mod tests {
         };
         assert_eq!(
             canister.icrc1_transfer(transfer3),
-            Err(TxError::FeeExceededLimit)
+            Err(TxError::FeeExceededLimit {
+                fee_limit: Tokens128::from(50)
+            })
         );
     }
 
@@ -1408,7 +1413,7 @@ mod proptests {
 
                         if let Some(fee_limit) = fee_limit {
                             if fee_limit < fee {
-                                prop_assert_eq!(res, Err(TxError::FeeExceededLimit));
+                                prop_assert_eq!(res, Err(TxError::FeeExceededLimit { fee_limit}));
                                 return Ok(())
                             }
                         }
