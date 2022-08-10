@@ -13,6 +13,32 @@ mod tx_record;
 
 pub type Timestamp = u64;
 
+pub const MAX_MEMO_LENGTH: usize = 32;
+
+#[derive(Debug, Default, CandidType, Deserialize, Clone)]
+pub struct Memo(Vec<u8>);
+
+impl Memo {
+    pub fn new(data: Vec<u8>) -> Result<Self, TxError> {
+        if data.len() > MAX_MEMO_LENGTH {
+            return Err(TxError::MemoTooLarge);
+        }
+        Ok(Self(data))
+    }
+}
+
+impl From<[u8; MAX_MEMO_LENGTH]> for Memo {
+    fn from(memo: [u8; MAX_MEMO_LENGTH]) -> Self {
+        Self(memo.to_vec())
+    }
+}
+
+impl From<u64> for Memo {
+    fn from(memo: u64) -> Self {
+        Self(memo.to_be_bytes().to_vec())
+    }
+}
+
 #[allow(non_snake_case)]
 #[derive(Deserialize, CandidType, Clone, Debug)]
 pub struct Metadata {
@@ -90,7 +116,6 @@ impl From<Metadata> for StatsData {
             name: md.name,
             symbol: md.symbol,
             decimals: md.decimals,
-
             owner: md.owner,
             fee: md.fee,
             fee_to: md.feeTo,
@@ -151,6 +176,7 @@ pub enum TxError {
     ClaimNotAllowed,
     GenericError { message: String },
     TemporarilyUnavailable,
+    MemoTooLarge,
 }
 
 impl std::fmt::Display for TxError {
@@ -175,6 +201,13 @@ impl std::fmt::Display for TxError {
             TxError::ClaimNotAllowed => write!(f, "Claim not allowed"),
             TxError::GenericError { message } => write!(f, "{}", message),
             TxError::TemporarilyUnavailable => write!(f, "Temporarily unavailable"),
+            TxError::MemoTooLarge => {
+                write!(
+                    f,
+                    "Memo too large, max allowed length is  {}",
+                    MAX_MEMO_LENGTH
+                )
+            }
         }
     }
 }
@@ -194,7 +227,6 @@ pub enum Operation {
     Approve,
     Mint,
     Transfer,
-    TransferFrom,
     Burn,
     Auction,
 }
@@ -237,7 +269,7 @@ pub struct TransferArgs {
     pub to: Account,
     pub amount: Tokens128,
     pub fee: Option<Tokens128>,
-    pub memo: Option<u64>,
+    pub memo: Option<Memo>,
     pub created_at_time: Option<Timestamp>,
 }
 

@@ -26,6 +26,7 @@ use crate::principal::{CheckedPrincipal, Owner};
 use crate::state::CanisterState;
 use crate::types::BalanceArgs;
 use crate::types::BatchTransferArgs;
+use crate::types::Memo;
 use crate::types::StandardRecord;
 use crate::types::TransferArgs;
 use crate::types::Value;
@@ -256,7 +257,7 @@ pub trait TokenCanisterAPI: Canister + Sized {
         to: Principal,
         to_subaccount: Option<Subaccount>,
         amount: Tokens128,
-        memo: Option<u64>,
+        memo: Option<Memo>,
         created_at_time: Option<Timestamp>,
     ) -> TxReceipt {
         let recipient = Account::new(to, to_subaccount);

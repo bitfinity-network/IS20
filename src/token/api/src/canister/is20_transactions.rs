@@ -3,7 +3,7 @@ use ic_helpers::tokens::Tokens128;
 use crate::account::{Account, Subaccount};
 use crate::canister::erc20_transactions::{charge_fee, transfer_balance};
 use crate::state::CanisterState;
-use crate::types::{BatchTransferArgs, Timestamp, TxError, TxId, TxReceipt};
+use crate::types::{BatchTransferArgs, Memo, Timestamp, TxError, TxId, TxReceipt};
 
 use super::erc20_transactions::ONE_MIN_IN_NANOS;
 use super::TokenCanisterAPI;
@@ -18,7 +18,7 @@ pub fn icrc1_transfer_include_fee(
     from: Account,
     to: Account,
     amount: Tokens128,
-    memo: Option<u64>,
+    memo: Option<Memo>,
     created_at_time: Option<Timestamp>,
 ) -> TxReceipt {
     let state = canister.state();
