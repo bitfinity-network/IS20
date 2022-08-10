@@ -4,26 +4,14 @@ use thiserror::Error;
 
 #[derive(CandidType, Debug, PartialEq, Deserialize, Error)]
 pub enum TxError {
-    #[error("Insufficient balance")]
-    InsufficientBalance,
-    #[error("Insufficient Allowance")]
-    InsufficientAllowance,
-    #[error("No Allowance")]
-    NoAllowance,
     #[error("Unauthorized")]
     Unauthorized,
     #[error("Amount too small")]
     AmountTooSmall,
     #[error("Fee exceeded limit {fee_limit}")]
     FeeExceededLimit { fee_limit: Tokens128 },
-    #[error("Approve succeeded but notify failed : {tx_error}")]
-    ApproveSucceededButNotifyFailed { tx_error: Box<TxError> },
-    #[error("Notification failed for transaction : {transaction_id}")]
-    NotificationFailed { transaction_id: u64 },
     #[error("Already actioned")]
     AlreadyActioned,
-    #[error("Notification does not exist")]
-    NotificationDoesNotExist,
     #[error("Transaction does not exist")]
     TransactionDoesNotExist,
     #[error("Bad fee {expected_fee}")]
@@ -31,11 +19,11 @@ pub enum TxError {
     #[error("Insufficient funds : {balance}")]
     InsufficientFunds { balance: Tokens128 },
     #[error("Transaction is too old : {allowed_window_nanos}")]
-    TxTooOld { allowed_window_nanos: u64 },
-    #[error("Transaction is created in the future")]
-    TxCreatedInFuture,
+    TooOld { allowed_window_nanos: u64 },
+    #[error("Transaction is created in the future {ledger_time}")]
+    CreatedInFuture { ledger_time: u64 },
     #[error("Transaction is duplicate of {duplicate_of}")]
-    TxDuplicate { duplicate_of: u64 },
+    Duplicate { duplicate_of: u64 },
     #[error("Self transfer")]
     SelfTransfer,
     #[error("Amount overflow")]
@@ -46,4 +34,6 @@ pub enum TxError {
     GenericError { message: String },
     #[error("Claim not Allowed")]
     ClaimNotAllowed,
+    #[error("Temporary unavailable")]
+    TemporaryUnavailable,
 }
