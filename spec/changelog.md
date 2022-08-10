@@ -24,7 +24,7 @@ The following API changes have been made to the IS20 token standard :-
 
 ### The following minimal api changes have been made to the IS20 token standard :-
 
-- `getTransactions` now gets the transactions of principal and subaccounts.
+- `get_transactions` now gets the transactions of principal and subaccounts.
 - `name` function has been renamed to `icrc1_name`.
 - `symbol` function has been renamed to `icrc1_symbol`.
 - `decimals` function has been renamed to `icrc1_decimals`.
