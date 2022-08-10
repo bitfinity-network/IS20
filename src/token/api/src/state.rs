@@ -11,7 +11,7 @@ use ic_storage::IcStorage;
 use crate::account::{Account, Subaccount, DEFAULT_SUBACCOUNT};
 use crate::error::TxError;
 use crate::ledger::Ledger;
-use crate::types::{Claims, Metadata, StatsData, TxError, Value};
+use crate::types::{Claims, Metadata, StatsData, Value};
 
 #[derive(Debug, Default, CandidType, Deserialize, IcStorage)]
 pub struct CanisterState {

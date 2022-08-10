@@ -30,9 +30,7 @@ use crate::types::BatchTransferArgs;
 use crate::types::StandardRecord;
 use crate::types::TransferArgs;
 use crate::types::Value;
-use crate::types::{
-    PaginatedResult, StatsData, Timestamp, TokenInfo, TxError, TxId, TxReceipt, TxRecord,
-};
+use crate::types::{PaginatedResult, StatsData, Timestamp, TokenInfo, TxId, TxReceipt, TxRecord};
 
 use self::is20_transactions::batch_transfer;
 
