@@ -2,6 +2,7 @@ use ic_helpers::tokens::Tokens128;
 
 use crate::account::{Account, Subaccount};
 use crate::canister::erc20_transactions::{charge_fee, transfer_balance};
+use crate::error::TxError;
 use crate::state::CanisterState;
 use crate::types::{BatchTransferArgs, Memo, Timestamp, TxError, TxId, TxReceipt};
 

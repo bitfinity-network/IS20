@@ -22,6 +22,7 @@ use crate::canister::is20_auction::{
     auction_info, bid_cycles, bidding_info, run_auction, AuctionError, BiddingInfo,
 };
 use crate::canister::is20_transactions::icrc1_transfer_include_fee;
+use crate::error::TxError;
 use crate::principal::{CheckedPrincipal, Owner};
 use crate::state::CanisterState;
 use crate::types::BalanceArgs;
@@ -31,8 +32,7 @@ use crate::types::StandardRecord;
 use crate::types::TransferArgs;
 use crate::types::Value;
 use crate::types::{
-    AuctionInfo, PaginatedResult, StatsData, Timestamp, TokenInfo, TxError, TxId, TxReceipt,
-    TxRecord,
+    AuctionInfo, PaginatedResult, StatsData, Timestamp, TokenInfo, TxId, TxReceipt, TxRecord,
 };
 
 use self::is20_transactions::batch_transfer;

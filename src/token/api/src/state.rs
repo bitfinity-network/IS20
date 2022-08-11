@@ -8,8 +8,9 @@ use ic_storage::stable::Versioned;
 use ic_storage::IcStorage;
 
 use crate::account::{Account, Subaccount, DEFAULT_SUBACCOUNT};
+use crate::error::TxError;
 use crate::ledger::Ledger;
-use crate::types::{AuctionInfo, Claims, Cycles, Metadata, StatsData, Timestamp, TxError, Value};
+use crate::types::{AuctionInfo, Claims, Cycles, Metadata, StatsData, Timestamp, Value};
 
 #[derive(Debug, Default, CandidType, Deserialize, IcStorage)]
 pub struct CanisterState {
