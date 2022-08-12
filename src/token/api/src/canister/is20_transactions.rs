@@ -138,6 +138,9 @@ mod tests {
 
     use super::*;
 
+    #[cfg(coverage_nightly)]
+    use coverage_helper::test;
+
     // Method for generating random Subaccount.
     fn gen_subaccount() -> Subaccount {
         // generate a random subaccount

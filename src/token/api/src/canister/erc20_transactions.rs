@@ -289,13 +289,18 @@ mod tests {
 
     use super::*;
 
+    #[cfg(coverage_nightly)]
+    use coverage_helper::test;
+
     // Method for generating random Subaccount.
+    #[cfg_attr(coverage_nightly, no_coverage)]
     fn gen_subaccount() -> Subaccount {
         let mut subaccount = [0u8; 32];
         thread_rng().fill(&mut subaccount);
         subaccount
     }
 
+    #[cfg_attr(coverage_nightly, no_coverage)]
     fn test_context() -> (&'static MockContext, TokenCanisterMock) {
         let context = MockContext::new().with_caller(alice()).inject();
 
@@ -324,6 +329,7 @@ mod tests {
         (context, canister)
     }
 
+    #[cfg_attr(coverage_nightly, no_coverage)]
     fn test_canister() -> TokenCanisterMock {
         let (_, canister) = test_context();
         canister
@@ -1244,6 +1250,7 @@ mod proptests {
 
     }
 
+    #[cfg_attr(coverage_nightly, no_coverage)]
     fn make_action(principals: Vec<Principal>) -> impl Strategy<Value = Action> {
         prop_oneof![
             // Mint
@@ -1290,10 +1297,12 @@ mod proptests {
         ]
     }
 
+    #[cfg_attr(coverage_nightly, no_coverage)]
     fn make_option() -> impl Strategy<Value = Option<Tokens128>> {
         prop_oneof![Just(None), (make_tokens128()).prop_map(Some)]
     }
 
+    #[cfg_attr(coverage_nightly, no_coverage)]
     fn make_principal() -> BoxedStrategy<Principal> {
         (any::<[u8; 29]>().prop_map(|mut bytes| {
             // Make sure the last byte is more than four as the last byte carries special
@@ -1346,12 +1355,14 @@ mod proptests {
             (canister, principals)
         }
     }
+    #[cfg_attr(coverage_nightly, no_coverage)]
     fn canister_and_actions() -> impl Strategy<Value = (TokenCanisterMock, Vec<Action>)> {
         make_canister().prop_flat_map(|(canister, principals)| {
             let actions = vec(make_action(principals), 1..7);
             (Just(canister), actions)
         })
     }
+
     proptest! {
         #[test]
         fn generic_proptest((canister, actions) in canister_and_actions()) {

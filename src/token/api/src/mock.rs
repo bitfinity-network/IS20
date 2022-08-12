@@ -15,6 +15,7 @@ pub struct TokenCanisterMock {
 }
 
 impl TokenCanisterMock {
+    #[cfg_attr(coverage_nightly, no_coverage)]
     pub fn init(&self, metadata: Metadata, amount: Tokens128) {
         self.state
             .borrow_mut()
@@ -33,12 +34,14 @@ impl TokenCanisterMock {
 }
 
 impl PreUpdate for TokenCanisterMock {
+    #[cfg_attr(coverage_nightly, no_coverage)]
     fn pre_update(&self, method_name: &str, method_type: ic_canister::MethodType) {
         crate::canister::pre_update(self, method_name, method_type);
     }
 }
 
 impl TokenCanisterAPI for TokenCanisterMock {
+    #[cfg_attr(coverage_nightly, no_coverage)]
     fn state(&self) -> Rc<RefCell<CanisterState>> {
         self.state.clone()
     }
