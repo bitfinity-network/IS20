@@ -4,7 +4,7 @@ use crate::account::{Account, Subaccount};
 use crate::canister::erc20_transactions::{charge_fee, transfer_balance};
 use crate::error::TxError;
 use crate::state::CanisterState;
-use crate::types::{BatchTransferArgs, Memo, Timestamp, TxError, TxId, TxReceipt};
+use crate::types::{BatchTransferArgs, Memo, Timestamp, TxId, TxReceipt};
 
 use super::erc20_transactions::ONE_MIN_IN_NANOS;
 use super::TokenCanisterAPI;

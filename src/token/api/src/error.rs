@@ -2,7 +2,7 @@ use candid::{CandidType, Deserialize};
 use ic_helpers::tokens::Tokens128;
 use thiserror::Error;
 
-#[derive(CandidType, Debug, PartialEq, Deserialize, Error)]
+#[derive(CandidType, Debug, PartialEq, Eq, Deserialize, Error)]
 pub enum TxError {
     #[error("Unauthorized")]
     Unauthorized,
@@ -36,4 +36,6 @@ pub enum TxError {
     ClaimNotAllowed,
     #[error("Temporary unavailable")]
     TemporaryUnavailable,
+    #[error("Memo too large")]
+    MemoTooLarge,
 }

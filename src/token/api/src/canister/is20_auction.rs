@@ -45,7 +45,7 @@ pub struct BiddingInfo {
     accumulated_fees: Tokens128,
 }
 
-#[derive(CandidType, Debug, Clone, Deserialize, PartialEq)]
+#[derive(CandidType, Debug, Clone, Deserialize, PartialEq, Eq)]
 pub enum AuctionError {
     /// Provided cycles in the `bid_cycles` call is less then the minimum allowed amount.
     BiddingTooSmall,

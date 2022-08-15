@@ -54,7 +54,7 @@ pub struct Metadata {
 }
 
 /// Variant type for the metadata endpoint
-#[derive(Deserialize, CandidType, Clone, Debug, PartialEq)]
+#[derive(Deserialize, CandidType, Clone, Debug, PartialEq, Eq)]
 pub enum Value {
     Nat(Tokens128),
     Int(Int),
@@ -160,13 +160,13 @@ pub type Claims = HashMap<AccountIdentifier, Tokens128>;
 
 pub type TxReceipt = Result<u128, TxError>;
 
-#[derive(CandidType, Debug, Clone, Copy, Deserialize, PartialEq)]
+#[derive(CandidType, Debug, Clone, Copy, Deserialize, PartialEq, Eq)]
 pub enum TransactionStatus {
     Succeeded,
     Failed,
 }
 
-#[derive(CandidType, Debug, Clone, Copy, Deserialize, PartialEq)]
+#[derive(CandidType, Debug, Clone, Copy, Deserialize, PartialEq, Eq)]
 pub enum Operation {
     Approve,
     Mint,
