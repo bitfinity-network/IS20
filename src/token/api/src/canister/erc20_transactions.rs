@@ -82,7 +82,12 @@ pub(crate) fn icrc1_transfer(
     Ok(id.into())
 }
 
-fn mint(state: &mut CanisterState, caller: Principal, to: Account, amount: Tokens128) -> TxReceipt {
+pub fn mint(
+    state: &mut CanisterState,
+    caller: Principal,
+    to: Account,
+    amount: Tokens128,
+) -> TxReceipt {
     let balance = state.balances.get_mut_or_insert_default(to);
 
     let new_balance = (*balance + amount)
