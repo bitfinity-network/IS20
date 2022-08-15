@@ -216,19 +216,3 @@ pub struct TransferArgs {
     pub memo: Option<Memo>,
     pub created_at_time: Option<Timestamp>,
 }
-
-/// `BalanceArgs` struct are the arguments which are taken in the `icrc1_balance_of`
-#[derive(Debug, Clone, CandidType, Deserialize)]
-pub struct BalanceArgs {
-    pub of: Principal,
-    pub subaccount: Option<Subaccount>,
-}
-
-impl From<(Principal, Option<Subaccount>)> for BalanceArgs {
-    fn from(from: (Principal, Option<Subaccount>)) -> Self {
-        BalanceArgs {
-            of: from.0,
-            subaccount: from.1,
-        }
-    }
-}

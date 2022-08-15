@@ -25,7 +25,6 @@ use crate::canister::is20_transactions::icrc1_transfer_include_fee;
 use crate::error::TxError;
 use crate::principal::{CheckedPrincipal, Owner};
 use crate::state::CanisterState;
-use crate::types::BalanceArgs;
 use crate::types::BatchTransferArgs;
 use crate::types::Memo;
 use crate::types::StandardRecord;
@@ -161,9 +160,8 @@ pub trait TokenCanisterAPI: Canister + Sized {
     }
 
     #[query(trait = true)]
-    fn icrc1_balance_of(&self, balance_arg: BalanceArgs) -> Tokens128 {
-        let account = Account::new(balance_arg.of, balance_arg.subaccount);
-        self.state().borrow().balances.balance_of(account)
+    fn icrc1_balance_of(&self, acc: Account) -> Tokens128 {
+        self.state().borrow().balances.balance_of(acc)
     }
 
     /// This method returns the pending `claim` for the `Account`.

@@ -25,6 +25,12 @@ impl From<Principal> for Account {
     }
 }
 
+impl From<(Principal, Option<Subaccount>)> for Account {
+    fn from(from: (Principal, Option<Subaccount>)) -> Self {
+        Self::new(from.0, from.1)
+    }
+}
+
 impl Display for Account {
     fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
         write!(f, "{}", self.owner)
