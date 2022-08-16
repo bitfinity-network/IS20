@@ -5,6 +5,8 @@ use ic_helpers::tokens::Tokens128;
 use crate::account::Account;
 use crate::types::{Operation, Timestamp, TransactionStatus, TxId};
 
+use super::Memo;
+
 #[derive(Deserialize, CandidType, Debug, Clone)]
 pub struct TxRecord {
     pub caller: Principal,
@@ -16,7 +18,7 @@ pub struct TxRecord {
     pub timestamp: Timestamp,
     pub status: TransactionStatus,
     pub operation: Operation,
-    pub memo: Option<u64>,
+    pub memo: Option<Memo>,
 }
 
 impl TxRecord {
@@ -26,7 +28,7 @@ impl TxRecord {
         to: Account,
         amount: Tokens128,
         fee: Tokens128,
-        memo: Option<u64>,
+        memo: Option<Memo>,
         created_at_time: Timestamp,
     ) -> Self {
         Self {

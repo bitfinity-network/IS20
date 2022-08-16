@@ -113,16 +113,4 @@ mod test {
         let state = canister.state.borrow();
         assert_eq!(state.bidding_state.fee_ratio, 12345.0);
     }
-
-    #[test]
-    #[cfg_attr(coverage_nightly, no_coverage)]
-    fn test_upgrade_from_previous() {
-        MockContext::new().inject();
-
-        ic_storage::testing::StableWriter::default()
-            .write(&[])
-            .unwrap();
-        let canister = TokenCanister::init_instance();
-        canister.__post_upgrade_inst();
-    }
 }

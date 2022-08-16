@@ -14,6 +14,8 @@ mod tx_record;
 
 pub type Timestamp = u64;
 
+pub type Memo = [u8; 32];
+
 #[allow(non_snake_case)]
 #[derive(Deserialize, CandidType, Clone, Debug)]
 pub struct Metadata {
@@ -33,6 +35,7 @@ pub enum Value {
     Nat(Tokens128),
     Int(Int),
     Text(String),
+    Blob(Vec<u8>),
 }
 
 #[derive(Deserialize, CandidType, Clone, Debug)]
@@ -189,7 +192,7 @@ pub struct TransferArgs {
     pub to: Account,
     pub amount: Tokens128,
     pub fee: Option<Tokens128>,
-    pub memo: Option<u64>,
+    pub memo: Option<Memo>,
     pub created_at_time: Option<Timestamp>,
 }
 
