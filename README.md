@@ -120,6 +120,19 @@ In order to run tests:
 cargo test
 ```
 
+## Code coverage
+
+Use [cargo-llvm-cov](https://github.com/taiki-e/cargo-llvm-cov) to generate code test coverage report:
+
+```
+cargo +nightly llvm-cov --open
+```
+
+By default rust coverage tool include all code into the report, including the tests itself. This is not helpful for
+understanding the real code coverage. To mitigate this, nightly Rust has `no_coverage` attribute. To apply it to the
+test code use `#[cfg_attr(coverage_nightly, no_coverage)]` directive on any function that is run only for testing.
+(`coverage_nightly` flag is set by the `cargo-llvm-cov` when run with nightly toolchain)
+
 ## Enable pre-commit
 
 Before committing to this repo, install and activate the `pre-commit` tool.
