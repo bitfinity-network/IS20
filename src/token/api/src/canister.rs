@@ -292,7 +292,7 @@ pub trait TokenCanisterAPI: Canister + Sized {
     }
 
     #[cfg_attr(feature = "mint_burn", update(trait = true))]
-    fn icrc1_mint(
+    fn mint(
         &self,
         to: Principal,
         to_subaccount: Option<Subaccount>,
@@ -324,7 +324,7 @@ pub trait TokenCanisterAPI: Canister + Sized {
     /// If `from` is Some(_) but method called not by owner, `TxError::Unauthorized` will be returned.
     /// If owner calls this method and `from` is Some(who), then who's tokens will be burned.
     #[cfg_attr(feature = "mint_burn", update(trait = true))]
-    fn icrc1_burn(
+    fn burn(
         &self,
         from: Option<Principal>,
         from_subaccount: Option<Subaccount>,
