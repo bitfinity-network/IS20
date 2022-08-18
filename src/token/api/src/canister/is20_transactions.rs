@@ -6,7 +6,7 @@ use crate::error::TxError;
 use crate::state::CanisterState;
 use crate::types::{BatchTransferArgs, Memo, Timestamp, TxId, TxReceipt};
 
-use super::erc20_transactions::ONE_MIN_IN_NANOS;
+use super::erc20_transactions::TX_WINDOW;
 use super::TokenCanisterAPI;
 
 /// Transfers `value` amount to the `to` principal, applying American style fee. This means, that
@@ -39,7 +39,7 @@ pub fn icrc1_transfer_include_fee(
     // transaction.
     let created_at_time = match created_at_time {
         Some(created_at_time) => {
-            if now.abs_diff(created_at_time) > ONE_MIN_IN_NANOS {
+            if now.abs_diff(created_at_time) > TX_WINDOW {
                 return Err(TxError::GenericError {
                     message: "Created time is too far in the past or future".to_string(),
                 });

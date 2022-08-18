@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use candid::{CandidType, Deserialize, Int, Principal};
+use candid::{CandidType, Deserialize, Int, Nat, Principal};
 use ic_helpers::{ledger::AccountIdentifier, tokens::Tokens128};
 
 pub use tx_record::*;
@@ -32,7 +32,7 @@ pub struct Metadata {
 /// Variant type for the metadata endpoint
 #[derive(Deserialize, CandidType, Clone, Debug, PartialEq)]
 pub enum Value {
-    Nat(Tokens128),
+    Nat(Nat),
     Int(Int),
     Text(String),
     Blob(Vec<u8>),
@@ -52,7 +52,7 @@ pub struct StatsData {
     pub is_test_token: bool,
 }
 
-#[derive(Debug, CandidType, Deserialize, Clone)]
+#[derive(Debug, CandidType, Deserialize, Clone, PartialEq)]
 pub struct StandardRecord {
     pub name: String,
     pub url: String,
@@ -76,7 +76,7 @@ impl StatsData {
                 "https://github.com/dfinity/ICRC-1".to_string(),
             ),
             StandardRecord::new(
-                "IS-20".to_string(),
+                "IS20".to_string(),
                 "https://github.com/infinity-swap/is20".to_string(),
             ),
         ]
