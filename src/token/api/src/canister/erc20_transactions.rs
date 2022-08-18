@@ -1516,15 +1516,16 @@ mod proptests {
                         if from == canister.owner() {
                             prop_assert_eq!(from_balance, canister.icrc1_balance_of(Account::new(from, None)));
                             total_minted = (total_minted + amount).unwrap();
-                        } else {
+                        } else if to != canister.owner() {
                             prop_assert_eq!((from_balance - amount_with_fee).unwrap(), canister.icrc1_balance_of(Account::new(from, None)));
                         }
 
                         if to == canister.owner() {
                             total_burned  = (total_burned + amount).unwrap();
+                        } else {
+                            prop_assert_eq!((to_balance + amount).unwrap(), canister.icrc1_balance_of(Account::new(to, None)));
                         }
 
-                        prop_assert_eq!((to_balance + amount).unwrap(), canister.icrc1_balance_of(Account::new(to, None)));
                     }
                     TransferWithFee { from, to, amount } => {
                         MockContext::new().with_caller(from).inject();
