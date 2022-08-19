@@ -1467,6 +1467,12 @@ mod proptests {
                     },
 
                     TransferWithoutFee{from,to,amount,fee_limit} => {
+                        if to == canister.owner() || from == canister.owner() {
+                            // Skip these operation, becase they behave transfer to/from minting
+                            // account behaves like mint/burn, and we test them in different cases.
+                            return Ok(());
+                        }
+
                         MockContext::new().with_caller(from).inject();
                         let from_balance = canister.icrc1_balance_of(Account::new(from, None));
                         let to_balance = canister.icrc1_balance_of(Account::new(to, None));
@@ -1494,18 +1500,18 @@ mod proptests {
                             }
                         }
 
-                        if from_balance < amount_with_fee && from != canister.owner() {
+                        if from_balance < amount_with_fee {
                             prop_assert_eq!(res, Err(TransferError::InsufficientFunds { balance:from_balance }));
                             return Ok(())
                         }
 
-                        if fee_to == from && from != canister.owner() {
+                        if fee_to == from {
                             prop_assert!(matches!(res, Ok(_)));
                             prop_assert_eq!((from_balance - amount).unwrap(), canister.icrc1_balance_of(Account::new(from, None)));
                             return Ok(());
                         }
 
-                        if fee_to == to && to != canister.owner() {
+                        if fee_to == to {
                             prop_assert!(matches!(res, Ok(_)));
                             prop_assert_eq!((to_balance + amount).unwrap(), canister.icrc1_balance_of(Account::new(to, None)));
                             return Ok(());
@@ -1513,19 +1519,8 @@ mod proptests {
 
                         prop_assert!(matches!(res, Ok(_)));
 
-                        if from == canister.owner() {
-                            prop_assert_eq!(from_balance, canister.icrc1_balance_of(Account::new(from, None)));
-                            total_minted = (total_minted + amount).unwrap();
-                        } else if to != canister.owner() {
-                            prop_assert_eq!((from_balance - amount_with_fee).unwrap(), canister.icrc1_balance_of(Account::new(from, None)));
-                        }
-
-                        if to == canister.owner() {
-                            total_burned  = (total_burned + amount).unwrap();
-                        } else {
-                            prop_assert_eq!((to_balance + amount).unwrap(), canister.icrc1_balance_of(Account::new(to, None)));
-                        }
-
+                        prop_assert_eq!((from_balance - amount_with_fee).unwrap(), canister.icrc1_balance_of(Account::new(from, None)));
+                        prop_assert_eq!((to_balance + amount).unwrap(), canister.icrc1_balance_of(Account::new(to, None)));
                     }
                     TransferWithFee { from, to, amount } => {
                         MockContext::new().with_caller(from).inject();
