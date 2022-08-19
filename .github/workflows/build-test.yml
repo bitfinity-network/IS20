@@ -32,17 +32,12 @@ jobs:
       - name: Install cargo-llvm-cov
         uses: taiki-e/install-action@cargo-llvm-cov
       - name: Generate code coverage
-        run: cargo +nightly llvm-cov --workspace --html
+        run: cargo +nightly llvm-cov --workspace -v
           #       - name: Upload coverage to Codecov
           #         uses: codecov/codecov-action@v3
           #         with:
           #           files: lcov.info
           #           fail_ci_if_error: true
-      - name: Upload the test result as artifact
-        uses: actions/upload-artifact@v3
-        with:
-          name: test-coverage
-          path: target/llvm-cov/html/
 
 
   version-bump:
