@@ -3,7 +3,7 @@ use ic_canister::ic_kit::ic;
 use ic_helpers::tokens::Tokens128;
 
 use crate::account::Account;
-use crate::types::{BatchTransferArgs, PaginatedResult, Timestamp, TxId, TxRecord};
+use crate::types::{BatchTransferArgs, Memo, PaginatedResult, Timestamp, TxId, TxRecord};
 
 const MAX_HISTORY_LENGTH: usize = 1_000_000;
 const HISTORY_REMOVAL_BATCH_SIZE: usize = 10_000;
@@ -82,7 +82,7 @@ impl Ledger {
         to: Account,
         amount: Tokens128,
         fee: Tokens128,
-        memo: Option<u64>,
+        memo: Option<Memo>,
         created_at_time: Timestamp,
     ) -> TxId {
         let id = self.next_id();

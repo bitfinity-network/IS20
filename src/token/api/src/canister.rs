@@ -22,11 +22,11 @@ use crate::canister::is20_auction::{
     auction_info, bid_cycles, bidding_info, run_auction, AuctionError, BiddingInfo,
 };
 use crate::canister::is20_transactions::icrc1_transfer_include_fee;
-use crate::error::TxError;
+use crate::error::{TransferError, TxError};
 use crate::principal::{CheckedPrincipal, Owner};
 use crate::state::CanisterState;
-use crate::types::BalanceArgs;
 use crate::types::BatchTransferArgs;
+use crate::types::Memo;
 use crate::types::StandardRecord;
 use crate::types::TransferArgs;
 use crate::types::Value;
@@ -88,23 +88,8 @@ pub trait TokenCanisterAPI: Canister + Sized {
     }
 
     #[query(trait = true)]
-    fn icrc1_name(&self) -> String {
-        self.state().borrow().stats.name.clone()
-    }
-
-    #[query(trait = true)]
-    fn icrc1_symbol(&self) -> String {
-        self.state().borrow().stats.symbol.clone()
-    }
-
-    #[query(trait = true)]
     fn logo(&self) -> String {
         self.state().borrow().stats.logo.clone()
-    }
-
-    #[query(trait = true)]
-    fn decimals(&self) -> u8 {
-        self.state().borrow().stats.decimals
     }
 
     #[query(trait = true)]
@@ -116,6 +101,22 @@ pub trait TokenCanisterAPI: Canister + Sized {
     fn owner(&self) -> Principal {
         self.state().borrow().stats.owner
     }
+
+    #[query(trait = true)]
+    fn icrc1_name(&self) -> String {
+        self.state().borrow().stats.name.clone()
+    }
+
+    #[query(trait = true)]
+    fn icrc1_symbol(&self) -> String {
+        self.state().borrow().stats.symbol.clone()
+    }
+
+    #[query(trait = true)]
+    fn icrc1_decimals(&self) -> u8 {
+        self.state().borrow().stats.decimals
+    }
+
     /// Returns the default transfer fee.
     #[query(trait = true)]
     fn icrc1_fee(&self) -> Tokens128 {
@@ -132,8 +133,8 @@ pub trait TokenCanisterAPI: Canister + Sized {
     }
 
     #[query(trait = true)]
-    fn icrc1_minting_account(&self) -> Account {
-        self.state().borrow().stats.owner.into()
+    fn icrc1_minting_account(&self) -> Option<Account> {
+        Some(self.state().borrow().stats.owner.into())
     }
 
     #[query(trait = true)]
@@ -160,8 +161,7 @@ pub trait TokenCanisterAPI: Canister + Sized {
     }
 
     #[query(trait = true)]
-    fn icrc1_balance_of(&self, balance_arg: BalanceArgs) -> Tokens128 {
-        let account = Account::new(balance_arg.of, balance_arg.subaccount);
+    fn icrc1_balance_of(&self, account: Account) -> Tokens128 {
         self.state().borrow().balances.balance_of(account)
     }
 
@@ -236,12 +236,12 @@ pub trait TokenCanisterAPI: Canister + Sized {
 
     /********************** TRANSFERS ***********************/
     #[cfg_attr(feature = "transfer", update(trait = true))]
-    fn icrc1_transfer(&self, transfer: TransferArgs) -> TxReceipt {
+    fn icrc1_transfer(&self, transfer: TransferArgs) -> Result<u128, TransferError> {
         let recipient = Account::new(transfer.to.owner, transfer.to.subaccount);
 
         let account = CheckedAccount::with_recipient(recipient, transfer.from_subaccount)?;
 
-        icrc1_transfer(self, account, transfer)
+        Ok(icrc1_transfer(self, account, transfer)?)
     }
 
     /// Transfers `value` amount to the `to` principal, applying American style fee. This means, that
@@ -250,13 +250,13 @@ pub trait TokenCanisterAPI: Canister + Sized {
     /// Note, that the `value` cannot be less than the `fee` amount. If the value given is too small,
     /// transaction will fail with `TxError::AmountTooSmall` error.
     #[cfg_attr(feature = "transfer", update(trait = true))]
-    fn icrc1_transferIncludeFee(
+    fn transferIncludeFee(
         &self,
         from_subaccount: Option<Subaccount>,
         to: Principal,
         to_subaccount: Option<Subaccount>,
         amount: Tokens128,
-        memo: Option<u64>,
+        memo: Option<Memo>,
         created_at_time: Option<Timestamp>,
     ) -> TxReceipt {
         let recipient = Account::new(to, to_subaccount);
@@ -292,7 +292,7 @@ pub trait TokenCanisterAPI: Canister + Sized {
     }
 
     #[cfg_attr(feature = "mint_burn", update(trait = true))]
-    fn icrc1_mint(
+    fn mint(
         &self,
         to: Principal,
         to_subaccount: Option<Subaccount>,
@@ -324,7 +324,7 @@ pub trait TokenCanisterAPI: Canister + Sized {
     /// If `from` is Some(_) but method called not by owner, `TxError::Unauthorized` will be returned.
     /// If owner calls this method and `from` is Some(who), then who's tokens will be burned.
     #[cfg_attr(feature = "mint_burn", update(trait = true))]
-    fn icrc1_burn(
+    fn burn(
         &self,
         from: Option<Principal>,
         from_subaccount: Option<Subaccount>,

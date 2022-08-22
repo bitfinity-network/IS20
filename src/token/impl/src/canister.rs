@@ -90,17 +90,7 @@ mod test {
     use super::*;
 
     #[test]
-    fn test_upgrade_from_previous() {
-        use ic_storage::stable::write;
-
-        MockContext::new().inject();
-
-        write(&()).unwrap();
-        let canister = TokenCanister::init_instance();
-        canister.__post_upgrade_inst();
-    }
-
-    #[test]
+    #[cfg_attr(coverage_nightly, no_coverage)]
     fn test_upgrade_from_current() {
         MockContext::new().inject();
 
