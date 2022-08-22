@@ -25,7 +25,7 @@ static PUBLIC_METHODS: &[&str] = &[
 ];
 
 static OWNER_METHODS: &[&str] = &[
-    "icrc1_mint",
+    "mint",
     "setAuctionPeriod",
     "setFee",
     "setFeeTo",
@@ -37,7 +37,7 @@ static OWNER_METHODS: &[&str] = &[
     "toggleTest",
 ];
 
-static TRANSACTION_METHODS: &[&str] = &["icrc1_burn", "icrc1_transfer", "icrc1_transferIncludeFee"];
+static TRANSACTION_METHODS: &[&str] = &["burn", "icrc1_transfer", "transferIncludeFee"];
 
 /// Reason why the method may be accepted.
 #[derive(Debug, Clone, Copy)]
@@ -60,7 +60,7 @@ pub fn inspect_message(
     match method {
         // These are query methods, so no checks are needed.
         #[cfg(feature = "mint_burn")]
-        "icrc1_mint" if state.stats.is_test_token => Ok(AcceptReason::Valid),
+        "mint" if state.stats.is_test_token => Ok(AcceptReason::Valid),
         m if PUBLIC_METHODS.contains(&m) => Ok(AcceptReason::Valid),
         // Owner
         m if OWNER_METHODS.contains(&m) && caller == state.stats.owner => Ok(AcceptReason::Valid),
