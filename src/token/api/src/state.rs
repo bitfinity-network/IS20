@@ -162,10 +162,11 @@ impl Balances {
         }
     }
 
-    pub fn set_balance(&mut self, account: Account, token: Tokens128) {
-        self.0.get_mut(&account.owner).map(|subaccounts| {
-            subaccounts.insert(account.subaccount.unwrap_or(DEFAULT_SUBACCOUNT), token)
-        });
+    pub fn set_balance(&mut self, account: Account, amount: Tokens128) {
+        self.0
+            .entry(account.owner)
+            .or_default()
+            .insert(account.subaccount.unwrap_or(DEFAULT_SUBACCOUNT), amount);
     }
 
     pub fn total_supply(&self) -> Tokens128 {
@@ -174,11 +175,19 @@ impl Balances {
             .flat_map(|(_, subaccounts)| subaccounts.values())
             .fold(Tokens128::ZERO, |a, b| (a + b).unwrap_or(Tokens128::ZERO))
     }
+
+    pub(crate) fn apply_change(&mut self, change: &Balances) {
+        for (principal, subaccounts) in &change.0 {
+            for (subaccount, amount) in subaccounts {
+                self.set_balance(Account::new(*principal, Some(*subaccount)), *amount);
+            }
+        }
+    }
 }
 
 #[derive(CandidType, Default, Debug, Clone, Deserialize)]
 pub struct BiddingState {
-    pub fee_ratio: f64,
+    pub fee_ratio: FeeRatio,
     pub last_auction: Timestamp,
     pub auction_period: Timestamp,
     pub cycles_since_auction: Cycles,
@@ -195,3 +204,39 @@ impl BiddingState {
 
 #[derive(Debug, Default, CandidType, Deserialize)]
 pub struct AuctionHistory(pub Vec<AuctionInfo>);
+
+#[derive(CandidType, Default, Debug, Copy, Clone, Deserialize, PartialEq)]
+pub struct FeeRatio(f64);
+
+impl FeeRatio {
+    pub fn new(value: f64) -> Self {
+        let adj_value = if value < 0.0 {
+            0.0
+        } else if value > 1.0 {
+            1.0
+        } else {
+            value
+        };
+
+        Self(adj_value)
+    }
+
+    /// Returns the tupple (raw_fee, auction_fee). Raw fee is the fee amount to be transferred to
+    /// the canister owner, and auction_fee is the portion of the fee for the cycle auction.
+    pub(crate) fn get_value(&self, fee: Tokens128) -> (Tokens128, Tokens128) {
+        // Both auction fee and owner fee have the same purpose of providing the tokens to pay for
+        // the canister operations. As such we do not care much about rounding errors in this case.
+        // The only important thing to make sure that the sum of auction fee and the owner fee is
+        // equal to the total fee amount.
+        let auction_fee_amount = Tokens128::from((f64::from(fee) * self.0) as u128);
+        let owner_fee_amount = fee.saturating_sub(auction_fee_amount);
+
+        (owner_fee_amount, auction_fee_amount)
+    }
+}
+
+impl From<FeeRatio> for f64 {
+    fn from(v: FeeRatio) -> Self {
+        v.0
+    }
+}

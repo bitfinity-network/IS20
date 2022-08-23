@@ -86,6 +86,7 @@ impl TokenCanisterAPI for TokenCanister {
 #[cfg(test)]
 mod test {
     use ic_canister::ic_kit::MockContext;
+    use token_api::state::FeeRatio;
 
     use super::*;
 
@@ -97,20 +98,20 @@ mod test {
         // Set a value on the state...
         let canister = TokenCanister::init_instance();
         let mut state = canister.state.borrow_mut();
-        state.bidding_state.fee_ratio = 12345.0;
+        state.bidding_state.fee_ratio = FeeRatio::new(12345.0);
         drop(state);
         // ... write the state to stable storage
         canister.__pre_upgrade_inst();
 
         // Update the value without writing it to stable storage
         let mut state = canister.state.borrow_mut();
-        state.bidding_state.fee_ratio = 0.0;
+        state.bidding_state.fee_ratio = FeeRatio::new(0.0);
         drop(state);
 
         // Upgrade the canister should have the state
         // written before pre_upgrade
         canister.__post_upgrade_inst();
         let state = canister.state.borrow();
-        assert_eq!(state.bidding_state.fee_ratio, 12345.0);
+        assert_eq!(state.bidding_state.fee_ratio, FeeRatio::new(12345.0));
     }
 }

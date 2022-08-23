@@ -1,16 +1,9 @@
-use ic_canister::ic_kit::ic;
-use ic_cdk::export::Principal;
-use ic_helpers::ledger::AccountIdentifier;
-use ic_helpers::ledger::Subaccount as SubaccountIdentifier;
-use ic_helpers::tokens::Tokens128;
-
-use crate::account::{Account, CheckedAccount, Subaccount, WithRecipient};
-use crate::canister::is20_auction::auction_principal;
-use crate::error::TxError;
-use crate::principal::{CheckedPrincipal, Owner, TestNet};
-use crate::state::{Balances, CanisterState};
+use crate::account::{Account, CheckedAccount, WithRecipient};
 use crate::types::{TransferArgs, TxReceipt};
 
+use super::is20_transactions::burn;
+use super::is20_transactions::is20_transfer;
+use super::is20_transactions::mint;
 use super::TokenCanisterAPI;
 
 pub const TX_WINDOW: u64 = 60_000_000_000;
@@ -19,7 +12,7 @@ pub const PERMITTED_DRIFT: u64 = 2 * 60_000_000_000;
 pub(crate) fn icrc1_transfer(
     canister: &impl TokenCanisterAPI,
     caller: CheckedAccount<WithRecipient>,
-    transfer: TransferArgs,
+    transfer: &TransferArgs,
 ) -> TxReceipt {
     let amount = transfer.amount;
     let minter = Account::new(canister.state().borrow().stats.owner, None);
@@ -44,293 +37,6 @@ pub(crate) fn icrc1_transfer(
     is20_transfer(canister, caller, transfer)
 }
 
-pub(crate) fn is20_transfer(
-    canister: &impl TokenCanisterAPI,
-    caller: CheckedAccount<WithRecipient>,
-    transfer: TransferArgs,
-) -> TxReceipt {
-    let TransferArgs {
-        amount,
-        memo,
-        created_at_time,
-        ..
-    } = transfer;
-    let now = ic::time();
-
-    // We check if the `created_at_time` is within the ONE MINUTE WINDOW TIME,
-    // if it is less than or greater than ONE MINUTE WINDOW, we reject the
-    // transaction.
-    let created_at_time = match created_at_time {
-        Some(created_at_time) => {
-            if now.saturating_sub(created_at_time) > TX_WINDOW {
-                return Err(TxError::TooOld {
-                    allowed_window_nanos: TX_WINDOW,
-                });
-            }
-
-            if created_at_time.saturating_sub(now) > PERMITTED_DRIFT {
-                return Err(TxError::CreatedInFuture { ledger_time: now });
-            }
-
-            for tx in canister.state().borrow().ledger.iter().rev() {
-                if now.saturating_sub(tx.timestamp) > TX_WINDOW {
-                    break;
-                }
-
-                if tx.timestamp == created_at_time
-                    && tx.from == caller.inner()
-                    && tx.to == caller.recipient()
-                    && tx.memo == transfer.memo
-                    && tx.amount == transfer.amount
-                    && tx.fee == transfer.fee.unwrap_or(tx.fee)
-                {
-                    return Err(TxError::Duplicate {
-                        duplicate_of: tx.index,
-                    });
-                }
-            }
-
-            created_at_time
-        }
-
-        None => now,
-    };
-
-    let from = caller.inner();
-    let to = caller.recipient();
-
-    let state = canister.state();
-    let mut state = state.borrow_mut();
-    let CanisterState {
-        ref mut balances,
-        ref bidding_state,
-        ref stats,
-        ..
-    } = &mut *state;
-
-    let (fee, fee_to) = stats.fee_info();
-    let fee_ratio = bidding_state.fee_ratio;
-
-    if let Some(fee_limit) = transfer.fee {
-        if fee != fee_limit {
-            return Err(TxError::FeeExceededLimit { fee_limit: fee });
-        }
-    }
-
-    let balance = balances.balance_of(from);
-
-    if balance < (amount + fee).ok_or(TxError::AmountOverflow)? {
-        return Err(TxError::InsufficientFunds { balance });
-    }
-
-    charge_fee(balances, from, fee_to, fee, fee_ratio).expect("never fails due to checks above");
-
-    transfer_balance(balances, from, to, amount).expect("never fails due to checks above");
-
-    let id = state
-        .ledger
-        .transfer(from, to, amount, fee, memo, created_at_time);
-    Ok(id.into())
-}
-
-pub fn mint(
-    state: &mut CanisterState,
-    caller: Principal,
-    to: Account,
-    amount: Tokens128,
-) -> TxReceipt {
-    let balance = state.balances.get_mut_or_insert_default(to);
-
-    let new_balance = (*balance + amount)
-        .expect("balance cannot be larger than total_supply which is already checked");
-
-    *balance = new_balance;
-
-    let id = state.ledger.mint(caller.into(), to, amount);
-
-    Ok(id.into())
-}
-
-pub fn mint_test_token(
-    state: &mut CanisterState,
-    caller: CheckedPrincipal<TestNet>,
-    to: Principal,
-    to_subaccount: Option<Subaccount>,
-    amount: Tokens128,
-) -> TxReceipt {
-    mint(
-        state,
-        caller.inner(),
-        Account::new(to, to_subaccount),
-        amount,
-    )
-}
-
-pub fn mint_as_owner(
-    state: &mut CanisterState,
-    caller: CheckedPrincipal<Owner>,
-    to: Principal,
-    to_subaccount: Option<Subaccount>,
-    amount: Tokens128,
-) -> TxReceipt {
-    mint(
-        state,
-        caller.inner(),
-        Account::new(to, to_subaccount),
-        amount,
-    )
-}
-
-pub fn burn(
-    state: &mut CanisterState,
-    caller: Principal,
-    from: Account,
-    amount: Tokens128,
-) -> TxReceipt {
-    let balance = state.balances.balance_of(from);
-
-    if !amount.is_zero() && balance == Tokens128::ZERO {
-        return Err(TxError::InsufficientFunds { balance });
-    }
-
-    let new_balance = (balance - amount).ok_or(TxError::InsufficientFunds { balance })?;
-
-    if new_balance == Tokens128::ZERO {
-        state.balances.remove(from)
-    } else {
-        state.balances.set_balance(from, new_balance)
-    }
-
-    let id = state.ledger.burn(caller.into(), from, amount);
-    Ok(id.into())
-}
-
-pub fn burn_own_tokens(
-    state: &mut CanisterState,
-    from_subaccount: Option<Subaccount>,
-    amount: Tokens128,
-) -> TxReceipt {
-    let caller = ic::caller();
-    burn(state, caller, Account::new(caller, from_subaccount), amount)
-}
-
-pub fn burn_as_owner(
-    state: &mut CanisterState,
-    caller: CheckedPrincipal<Owner>,
-    from: Principal,
-    from_subaccount: Option<Subaccount>,
-    amount: Tokens128,
-) -> TxReceipt {
-    burn(
-        state,
-        caller.inner(),
-        Account::new(from, from_subaccount),
-        amount,
-    )
-}
-
-pub fn mint_to_accountid(
-    state: &mut CanisterState,
-    to: AccountIdentifier,
-    amount: Tokens128,
-) -> Result<(), TxError> {
-    let balance = state.claims.entry(to).or_default();
-    let new_balance = (*balance + amount)
-        .expect("balance cannot be larger than total_supply which is already checked");
-    *balance = new_balance;
-    Ok(())
-}
-
-pub fn claim(
-    state: &mut CanisterState,
-    account: AccountIdentifier,
-    subaccount: Option<Subaccount>,
-) -> TxReceipt {
-    let caller = ic_canister::ic_kit::ic::caller();
-    let amount = state.claim_amount(account);
-
-    if account
-        != AccountIdentifier::new(
-            caller.into(),
-            Some(SubaccountIdentifier(subaccount.unwrap_or_default())),
-        )
-    {
-        return Err(TxError::ClaimNotAllowed);
-    }
-    let to = Account::new(caller, subaccount);
-
-    let id = mint(state, caller, to, amount);
-
-    state.claims.remove(&account);
-
-    id
-}
-
-pub fn transfer_balance(
-    balances: &mut Balances,
-    from: Account,
-    to: Account,
-    amount: Tokens128,
-) -> Result<(), TxError> {
-    if amount == Tokens128::ZERO {
-        return Ok(());
-    }
-
-    let from_balance = balances.get_mut(from).ok_or(TxError::InsufficientFunds {
-        balance: Tokens128::ZERO,
-    })?;
-
-    *from_balance = (*from_balance - amount).ok_or(TxError::InsufficientFunds {
-        balance: *from_balance,
-    })?;
-
-    let to_balance = balances.get_mut_or_insert_default(to);
-
-    *to_balance = (*to_balance + amount).expect(
-        "never overflows since `from_balance + to_balance` is limited by `total_supply` amount",
-    );
-
-    if balances.balance_of(from) == Tokens128::ZERO {
-        balances.remove(from);
-    }
-
-    Ok(())
-}
-
-pub(crate) fn charge_fee(
-    balances: &mut Balances,
-    user: Account,
-    fee_to: Principal,
-    fee: Tokens128,
-    fee_ratio: f64,
-) -> Result<(), TxError> {
-    // todo: check if this is enforced
-    debug_assert!((0.0..=1.0).contains(&fee_ratio));
-
-    if fee == Tokens128::ZERO {
-        return Ok(());
-    }
-
-    // todo: test and figure out overflows
-    const INT_CONVERSION_K: u128 = 1_000_000_000_000;
-    let auction_fee_amount = (fee * Tokens128::from((fee_ratio * INT_CONVERSION_K as f64) as u128)
-        / INT_CONVERSION_K)
-        .expect("never division by 0");
-    let auction_fee_amount = auction_fee_amount
-        .to_tokens128()
-        .expect("fee is always greater");
-    let owner_fee_amount = (fee - auction_fee_amount).expect("fee is always greater");
-    transfer_balance(balances, user, fee_to.into(), owner_fee_amount)?;
-    transfer_balance(
-        balances,
-        user,
-        auction_principal().into(),
-        auction_fee_amount,
-    )?;
-
-    Ok(())
-}
-
 #[cfg(test)]
 mod tests {
     use std::time::UNIX_EPOCH;
@@ -338,10 +44,15 @@ mod tests {
     use ic_canister::ic_kit::mock_principals::{alice, bob, john, xtc};
     use ic_canister::ic_kit::MockContext;
     use ic_canister::Canister;
+    use ic_helpers::ledger::{AccountIdentifier, Subaccount as SubaccountIdentifier};
+    use ic_helpers::tokens::Tokens128;
     use rand::prelude::*;
 
-    use crate::error::TransferError;
+    use crate::account::Subaccount;
+    use crate::canister::is20_auction::auction_principal;
+    use crate::error::{TransferError, TxError};
     use crate::mock::*;
+    use crate::state::FeeRatio;
     use crate::types::{Metadata, Operation, TransactionStatus};
 
     use super::*;
@@ -563,7 +274,7 @@ mod tests {
         canister.state().borrow_mut().stats.fee = Tokens128::from(50);
         canister.state().borrow_mut().stats.fee_to = john();
         canister.state().borrow_mut().stats.min_cycles = crate::types::DEFAULT_MIN_CYCLES;
-        canister.state().borrow_mut().bidding_state.fee_ratio = 0.5;
+        canister.state().borrow_mut().bidding_state.fee_ratio = FeeRatio::new(0.5);
 
         let transfer1 = TransferArgs {
             from_subaccount: None,
@@ -1279,13 +990,15 @@ mod tests {
 
 #[cfg(test)]
 mod proptests {
+    use candid::Principal;
     use ic_canister::ic_kit::MockContext;
     use ic_canister::Canister;
+    use ic_helpers::tokens::Tokens128;
     use proptest::collection::vec;
     use proptest::prelude::*;
     use proptest::sample::Index;
 
-    use crate::error::TransferError;
+    use crate::error::{TransferError, TxError};
     use crate::mock::*;
     use crate::types::Metadata;
 

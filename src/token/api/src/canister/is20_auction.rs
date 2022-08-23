@@ -7,11 +7,11 @@ use ic_canister::ic_kit::ic;
 use ic_helpers::tokens::Tokens128;
 
 use crate::account::Account;
-use crate::canister::erc20_transactions::transfer_balance;
 use crate::ledger::Ledger;
-use crate::state::{AuctionHistory, Balances, BiddingState, CanisterState};
+use crate::state::{AuctionHistory, Balances, BiddingState, CanisterState, FeeRatio};
 use crate::types::{AuctionInfo, Cycles, StatsData, Timestamp};
 
+use super::is20_transactions::transfer_internal;
 use super::TokenCanisterAPI;
 
 // Minimum bidding amount is required, for every update call costs cycles, and we want bidding
@@ -86,7 +86,7 @@ pub(crate) fn bidding_info(canister: &impl TokenCanisterAPI) -> BiddingInfo {
     let balances = &state.balances;
 
     BiddingInfo {
-        fee_ratio: bidding_state.fee_ratio,
+        fee_ratio: bidding_state.fee_ratio.into(),
         last_auction: bidding_state.last_auction,
         auction_period: bidding_state.auction_period,
         total_cycles: bidding_state.cycles_since_auction,
@@ -153,8 +153,16 @@ fn perform_auction(
             .expect("total cycles is not 0 checked by bids existing")
             .to_tokens128()
             .expect("total cycles is smaller then single user bid cycles");
-        transfer_balance(balances, auction_account(), (*bidder).into(), amount)
-            .expect("auction principal always have enough balance");
+        transfer_internal(
+            balances,
+            auction_account(),
+            (*bidder).into(),
+            amount,
+            Tokens128::ZERO,
+            auction_account(),
+            FeeRatio::new(0.0),
+        )
+        .expect("auction principal always have enough balance");
         ledger.auction(*bidder, amount);
         transferred_amount =
             (transferred_amount + amount).expect("can never be larger than total_supply");
@@ -166,7 +174,7 @@ fn perform_auction(
         auction_time: ic::time(),
         tokens_distributed: transferred_amount,
         cycles_collected: total_cycles,
-        fee_ratio: bidding_state.fee_ratio,
+        fee_ratio: bidding_state.fee_ratio.into(),
         first_transaction_id: first_id,
         last_transaction_id: last_id,
     };
@@ -183,10 +191,10 @@ fn reset_bidding_state(stats: &StatsData, bidding_state: &mut BiddingState) {
     bidding_state.bids = HashMap::new();
 }
 
-fn get_fee_ratio(min_cycles: Cycles, current_cycles: Cycles) -> f64 {
+fn get_fee_ratio(min_cycles: Cycles, current_cycles: Cycles) -> FeeRatio {
     let min_cycles = min_cycles as f64;
     let current_cycles = current_cycles as f64;
-    if min_cycles == 0.0 {
+    let ratio = if min_cycles == 0.0 {
         // Setting min_cycles to zero effectively turns off the auction functionality, as all the
         // fees will go to the owner.
         0.0
@@ -196,7 +204,9 @@ fn get_fee_ratio(min_cycles: Cycles, current_cycles: Cycles) -> f64 {
         // If current cycles are 10 times larger, then min_cycles, half of the fees go to the auction.
         // If current cycles are 1000 times larger, 17% of the fees go to the auction.
         2f64.powf((min_cycles / current_cycles).log10())
-    }
+    };
+
+    FeeRatio::new(ratio)
 }
 
 pub fn auction_principal() -> Principal {
@@ -258,7 +268,10 @@ mod tests {
     #[test_case(1000, 1_000_000, 0.125)]
     #[cfg_attr(coverage_nightly, no_coverage)]
     fn fee_ratio_tests(min_cycles: u64, current_cycles: u64, ratio: f64) {
-        assert_eq!(get_fee_ratio(min_cycles, current_cycles), ratio);
+        assert_eq!(
+            get_fee_ratio(min_cycles, current_cycles),
+            FeeRatio::new(ratio)
+        );
     }
 
     #[test]
@@ -376,7 +389,10 @@ mod tests {
         canister.state().borrow_mut().stats.min_cycles = 1_000_000;
         canister.runAuction().unwrap_err();
 
-        assert_eq!(canister.state().borrow().bidding_state.fee_ratio, 0.125);
+        assert_eq!(
+            canister.state().borrow().bidding_state.fee_ratio,
+            FeeRatio::new(0.125)
+        );
     }
 
     #[test]

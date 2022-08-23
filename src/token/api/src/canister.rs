@@ -14,14 +14,11 @@ pub use inspect::AcceptReason;
 
 use crate::account::CheckedAccount;
 use crate::account::{Account, Subaccount};
-use crate::canister::erc20_transactions::{
-    burn_as_owner, burn_own_tokens, claim, icrc1_transfer, mint_as_owner, mint_test_token,
-    mint_to_accountid,
-};
+use crate::canister::icrc1_transfer::icrc1_transfer;
 use crate::canister::is20_auction::{
     auction_info, bid_cycles, bidding_info, run_auction, AuctionError, BiddingInfo,
 };
-use crate::canister::is20_transactions::icrc1_transfer_include_fee;
+use crate::canister::is20_transactions::transfer_include_fee;
 use crate::error::{TransferError, TxError};
 use crate::principal::{CheckedPrincipal, Owner};
 use crate::state::CanisterState;
@@ -35,10 +32,16 @@ use crate::types::{
 };
 
 use self::is20_transactions::batch_transfer;
+use self::is20_transactions::burn_as_owner;
+use self::is20_transactions::burn_own_tokens;
+use self::is20_transactions::claim;
+use self::is20_transactions::mint_as_owner;
+use self::is20_transactions::mint_test_token;
+use self::is20_transactions::mint_to_accountid;
 
 mod inspect;
 
-pub mod erc20_transactions;
+pub mod icrc1_transfer;
 
 pub mod is20_auction;
 pub mod is20_transactions;
@@ -237,11 +240,9 @@ pub trait TokenCanisterAPI: Canister + Sized {
     /********************** TRANSFERS ***********************/
     #[cfg_attr(feature = "transfer", update(trait = true))]
     fn icrc1_transfer(&self, transfer: TransferArgs) -> Result<u128, TransferError> {
-        let recipient = Account::new(transfer.to.owner, transfer.to.subaccount);
+        let account = CheckedAccount::with_recipient(transfer.to, transfer.from_subaccount)?;
 
-        let account = CheckedAccount::with_recipient(recipient, transfer.from_subaccount)?;
-
-        Ok(icrc1_transfer(self, account, transfer)?)
+        Ok(icrc1_transfer(self, account, &transfer)?)
     }
 
     /// Transfers `value` amount to the `to` principal, applying American style fee. This means, that
@@ -260,17 +261,17 @@ pub trait TokenCanisterAPI: Canister + Sized {
         created_at_time: Option<Timestamp>,
     ) -> TxReceipt {
         let recipient = Account::new(to, to_subaccount);
-
         let account = CheckedAccount::with_recipient(recipient, from_subaccount)?;
-
-        icrc1_transfer_include_fee(
-            self,
-            account.inner(),
-            account.recipient(),
+        let args = TransferArgs {
+            from_subaccount,
+            to: recipient,
             amount,
             memo,
+            fee: None,
             created_at_time,
-        )
+        };
+
+        transfer_include_fee(self, account, &args)
     }
 
     /// Takes a list of transfers, each of which is a pair of `to` and `value` fields, it returns a `TxReceipt` which contains
