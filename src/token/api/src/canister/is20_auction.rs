@@ -90,6 +90,7 @@ mod tests {
 
     use super::*;
 
+    #[cfg_attr(coverage_nightly, no_coverage)]
     fn test_context() -> (&'static mut MockContext, TokenCanisterMock) {
         let context = MockContext::new().with_caller(alice()).inject();
 
@@ -111,7 +112,19 @@ mod tests {
         (context, canister)
     }
 
+    #[test_case(0, 0, 0.0)]
+    #[test_case(0, 1000, 0.0)]
+    #[test_case(1000, 0, 1.0)]
+    #[test_case(1000, 1000, 1.0)]
+    #[test_case(1000, 10_000, 0.5)]
+    #[test_case(1000, 1_000_000, 0.125)]
+    #[cfg_attr(coverage_nightly, no_coverage)]
+    fn fee_ratio_tests(min_cycles: u64, current_cycles: u64, ratio: f64) {
+        assert_eq!(get_fee_ratio(min_cycles, current_cycles), ratio);
+    }
+
     #[test]
+    #[cfg_attr(coverage_nightly, no_coverage)]
     fn bidding_cycles() {
         let (context, canister) = test_context();
         context.update_caller(bob());
@@ -129,6 +142,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg_attr(coverage_nightly, no_coverage)]
     fn bidding_cycles_under_limit() {
         let (context, canister) = test_context();
         context.update_msg_cycles(MIN_BIDDING_AMOUNT - 1);
@@ -139,6 +153,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg_attr(coverage_nightly, no_coverage)]
     fn bidding_multiple_times() {
         let (context, canister) = test_context();
         context.update_msg_cycles(2_000_000);
@@ -151,6 +166,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg_attr(coverage_nightly, no_coverage)]
     fn auction_test() {
         let (context, canister) = test_context();
         context.update_msg_cycles(2_000_000);
@@ -189,12 +205,14 @@ mod tests {
     }
 
     #[test]
+    #[cfg_attr(coverage_nightly, no_coverage)]
     fn auction_without_bids() {
         let (_, canister) = test_context();
         assert_eq!(canister.run_auction(), Err(AuctionError::NoBids));
     }
 
     #[test]
+    #[cfg_attr(coverage_nightly, no_coverage)]
     fn auction_not_in_time() {
         let (context, canister) = test_context();
         context.update_msg_cycles(2_000_000);
@@ -220,6 +238,19 @@ mod tests {
     }
 
     #[test]
+    #[cfg_attr(coverage_nightly, no_coverage)]
+    fn fee_ratio_update() {
+        let (context, canister) = test_context();
+        context.update_balance(1_000_000_000);
+
+        canister.state().borrow_mut().stats.min_cycles = 1_000_000;
+        canister.runAuction().unwrap_err();
+
+        assert_eq!(canister.state().borrow().bidding_state.fee_ratio, 0.125);
+    }
+
+    #[test]
+    #[cfg_attr(coverage_nightly, no_coverage)]
     fn setting_min_cycles() {
         let (_, canister) = test_context();
         canister.set_min_cycles(100500).unwrap();
@@ -227,6 +258,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg_attr(coverage_nightly, no_coverage)]
     fn setting_min_cycles_not_authorized() {
         let (context, canister) = test_context();
         context.update_caller(bob());
@@ -237,6 +269,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg_attr(coverage_nightly, no_coverage)]
     fn setting_auction_period() {
         let (context, canister) = test_context();
         context.update_caller(alice());
@@ -250,6 +283,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg_attr(coverage_nightly, no_coverage)]
     fn setting_auction_period_not_authorized() {
         let (context, canister) = test_context();
         context.update_caller(bob());

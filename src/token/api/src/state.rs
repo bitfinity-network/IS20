@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
-use candid::{CandidType, Deserialize, Int, Principal};
-use ic_auction::state::AuctionState;
+use candid::Nat;
+use candid::{CandidType, Deserialize, Principal};
 use ic_helpers::ledger::AccountIdentifier;
 use ic_helpers::ledger::Subaccount as SubaccountIdentifier;
 use ic_helpers::tokens::Tokens128;
@@ -34,16 +34,11 @@ impl CanisterState {
             ),
             (
                 "icrc1:decimals".to_string(),
-                Value::Int(Int::from(self.stats.decimals)),
+                Value::Nat(Nat::from(self.stats.decimals)),
             ),
             (
-                "icrc1:owner".to_string(),
-                Value::Text(self.stats.owner.to_string()),
-            ),
-            ("icrc1:fee".to_string(), Value::Nat(self.stats.fee)),
-            (
-                "icrc1:fee_to".to_string(),
-                Value::Text(self.stats.fee_to.to_string()),
+                "icrc1:fee".to_string(),
+                Value::Nat(self.stats.fee.amount.into()),
             ),
         ]
     }

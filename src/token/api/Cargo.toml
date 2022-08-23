@@ -40,3 +40,4 @@ test-case = "1.2.1"
 tokio = { version = "1", features = ["macros", "rt"] }
 proptest = "1.0.0"
 rand = "0.8"
+coverage-helper = "0.1"

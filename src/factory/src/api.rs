@@ -11,6 +11,7 @@ use candid::Principal;
 use ic_canister::{init, post_upgrade, pre_upgrade, query, update, Canister, PreUpdate};
 use ic_factory::{api::FactoryCanister, error::FactoryError, FactoryConfiguration, FactoryState};
 use ic_helpers::candid_header::{candid_header, CandidHeader};
+use ic_helpers::tokens::Tokens128;
 use token::types::Metadata;
 
 const DEFAULT_LEDGER_PRINCIPAL: &str = "ryjl3-tyaaa-aaaaa-aaaba-cai";
@@ -121,6 +122,7 @@ impl TokenFactoryCanister {
     pub async fn create_token(
         &self,
         info: Metadata,
+        amount: Tokens128,
         controller: Option<Principal>,
     ) -> Result<Principal, TokenFactoryError> {
         if info.name.is_empty() {
@@ -144,7 +146,7 @@ impl TokenFactoryCanister {
 
         let caller = ic_canister::ic_kit::ic::caller();
         let principal = self
-            .create_canister((info,), controller, Some(caller))
+            .create_canister((info, amount), controller, Some(caller))
             .await?;
         self.state.borrow_mut().tokens.insert(key, principal);
 

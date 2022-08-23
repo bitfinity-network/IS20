@@ -1,4 +1,5 @@
 #![allow(dead_code)]
+#![cfg_attr(coverage_nightly, feature(no_coverage))]
 
 mod canister;
 

@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use candid::{CandidType, Deserialize, Int, Principal};
+use candid::{CandidType, Deserialize, Int, Nat, Principal};
 use ic_helpers::{ledger::AccountIdentifier, tokens::Tokens128};
 
 pub use tx_record::*;
@@ -13,6 +13,8 @@ use crate::{
 mod tx_record;
 
 pub type Timestamp = u64;
+
+pub type Memo = [u8; 32];
 
 #[allow(non_snake_case)]
 #[derive(Deserialize, CandidType, Clone, Debug)]
@@ -30,9 +32,10 @@ pub struct Metadata {
 /// Variant type for the metadata endpoint
 #[derive(Deserialize, CandidType, Clone, Debug, PartialEq)]
 pub enum Value {
-    Nat(Tokens128),
+    Nat(Nat),
     Int(Int),
     Text(String),
+    Blob(Vec<u8>),
 }
 
 #[derive(Deserialize, CandidType, Clone, Debug)]
@@ -49,7 +52,7 @@ pub struct StatsData {
     pub is_test_token: bool,
 }
 
-#[derive(Debug, CandidType, Deserialize, Clone)]
+#[derive(Debug, CandidType, Deserialize, Clone, PartialEq)]
 pub struct StandardRecord {
     pub name: String,
     pub url: String,
@@ -73,7 +76,7 @@ impl StatsData {
                 "https://github.com/dfinity/ICRC-1".to_string(),
             ),
             StandardRecord::new(
-                "IS-20".to_string(),
+                "IS20".to_string(),
                 "https://github.com/infinity-swap/is20".to_string(),
             ),
         ]
@@ -177,7 +180,7 @@ pub struct TransferArgs {
     pub to: Account,
     pub amount: Tokens128,
     pub fee: Option<Tokens128>,
-    pub memo: Option<u64>,
+    pub memo: Option<Memo>,
     pub created_at_time: Option<Timestamp>,
 }
 

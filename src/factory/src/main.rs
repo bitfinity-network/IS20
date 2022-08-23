@@ -12,6 +12,7 @@ fn main() {
     use ic_factory::api::FactoryCanister;
     use ic_factory::error::FactoryError;
     use ic_helpers::candid_header::CandidHeader;
+    use ic_helpers::tokens::Tokens128;
     use token::types::Metadata;
 
     let canister_idl = ic_canister::generate_idl!();
