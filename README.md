@@ -56,7 +56,6 @@ dfx canister --wallet yjeau-xiaaa-aaaaa-aabsa-cai call --with-cycles 10000000000
   name = "y";
   symbol = "y";
   decimals = 8;
-  total_supply = 1000000000;
   owner = principal "y4nw3-upugh-yyv2b-jv6jy-ppfse-4fkfd-uaqv5-woqup-u3cx3-hah2c-yae";
   fee = 0;
   fee_to = principal "y4nw3-upugh-yyv2b-jv6jy-ppfse-4fkfd-uaqv5-woqup-u3cx3-hah2c-yae"; }, null)'
