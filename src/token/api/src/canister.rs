@@ -138,7 +138,7 @@ pub trait TokenCanisterAPI: Canister + Sized + Auction {
         } = self.state().borrow().stats;
         TokenInfo {
             metadata: self.state().borrow().get_metadata(),
-            feeTo: fee_to,
+            fee_to: fee_to,
             history_size: self.state().borrow().ledger.len(),
             deployTime: deploy_time,
             holderNumber: self.state().borrow().balances.0.len(),
@@ -210,7 +210,7 @@ pub trait TokenCanisterAPI: Canister + Sized + Auction {
     }
 
     #[update(trait = true)]
-    fn set_feeTo(&self, fee_to: Principal) -> Result<(), TxError> {
+    fn set_fee_to(&self, fee_to: Principal) -> Result<(), TxError> {
         let caller = CheckedPrincipal::owner(&self.state().borrow_mut().stats)?;
         self.update_stats(caller, CanisterUpdate::FeeTo(fee_to));
         Ok(())

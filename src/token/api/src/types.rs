@@ -25,7 +25,7 @@ pub struct Metadata {
     pub decimals: u8,
     pub owner: Principal,
     pub fee: Tokens128,
-    pub feeTo: Principal,
+    pub fee_to: Principal,
     pub is_test_token: Option<bool>,
 }
 
@@ -96,7 +96,7 @@ impl From<Metadata> for StatsData {
             decimals: md.decimals,
             owner: md.owner,
             fee: md.fee,
-            fee_to: md.feeTo,
+            fee_to: md.fee_to,
             deploy_time: ic_canister::ic_kit::ic::time(),
             min_cycles: DEFAULT_MIN_CYCLES,
             is_test_token: md.is_test_token.unwrap_or(false),
@@ -108,7 +108,7 @@ impl From<Metadata> for StatsData {
 #[derive(Deserialize, CandidType, Clone, Debug)]
 pub struct TokenInfo {
     pub metadata: Metadata,
-    pub feeTo: Principal,
+    pub fee_to: Principal,
     pub history_size: u64,
     pub deployTime: Timestamp,
     pub holderNumber: usize,

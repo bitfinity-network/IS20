@@ -371,11 +371,10 @@ mod tests {
                 name: "".to_string(),
                 symbol: "".to_string(),
                 decimals: 8,
-
                 owner: john(),
                 fee: Tokens128::from(0),
-                feeTo: john(),
-                isTestToken: None,
+                fee_to: john(),
+                is_test_token: None,
             },
             Tokens128::from(1000),
         );
@@ -693,7 +692,7 @@ mod tests {
     fn transfer_saved_into_history() {
         let (ctx, canister) = test_context();
         canister.state().borrow_mut().stats.fee = Tokens128::from(10);
-        let before_history_size = canister.historySize();
+        let before_history_size = canister.history_size();
 
         let transfer1 = TransferArgs {
             from_subaccount: None,
@@ -705,7 +704,7 @@ mod tests {
         };
 
         canister.icrc1_transfer(transfer1).unwrap_err();
-        assert_eq!(canister.historySize(), before_history_size);
+        assert_eq!(canister.history_size(), before_history_size);
 
         const COUNT: u64 = 5;
         let mut ts = ic_canister::ic_kit::ic::time();
@@ -720,8 +719,8 @@ mod tests {
             };
             ctx.add_time(10);
             let id = canister.icrc1_transfer(transfer1).unwrap();
-            assert_eq!(canister.historySize() - before_history_size, 1 + i);
-            let tx = canister.getTransaction(id as u64);
+            assert_eq!(canister.history_size() - before_history_size, 1 + i);
+            let tx = canister.get_transaction(id as u64);
             assert_eq!(tx.amount, Tokens128::from(100 + i as u128));
             assert_eq!(tx.fee, Tokens128::from(10));
             assert_eq!(tx.operation, Operation::Transfer);
@@ -810,7 +809,7 @@ mod tests {
         canister.state().borrow_mut().stats.fee = Tokens128::from(10);
         ctx.update_caller(john());
 
-        assert_eq!(canister.historySize(), 2);
+        assert_eq!(canister.history_size(), 2);
 
         const COUNT: u64 = 5;
         let mut ts = ic_canister::ic_kit::ic::time();
@@ -819,8 +818,8 @@ mod tests {
             let id = canister
                 .mint(bob(), None, Tokens128::from(100 + i as u128))
                 .unwrap();
-            assert_eq!(canister.historySize(), 3 + i);
-            let tx = canister.getTransaction(id as u64);
+            assert_eq!(canister.history_size(), 3 + i);
+            let tx = canister.get_transaction(id as u64);
             assert_eq!(tx.amount, Tokens128::from(100 + i as u128));
             assert_eq!(tx.fee, Tokens128::from(0));
             assert_eq!(tx.operation, Operation::Mint);
@@ -932,13 +931,13 @@ mod tests {
     fn burn_saved_into_history() {
         let (ctx, canister) = test_context();
         canister.state().borrow_mut().stats.fee = Tokens128::from(10);
-        let history_size_before = canister.historySize();
+        let history_size_before = canister.history_size();
 
         ctx.update_caller(john());
         canister
             .burn(None, None, Tokens128::from(1001))
             .unwrap_err();
-        assert_eq!(canister.historySize(), history_size_before);
+        assert_eq!(canister.history_size(), history_size_before);
 
         const COUNT: u64 = 5;
         let mut ts = ic_canister::ic_kit::ic::time();
@@ -947,8 +946,8 @@ mod tests {
             let id = canister
                 .burn(None, None, Tokens128::from(100 + i as u128))
                 .unwrap();
-            assert_eq!(canister.historySize(), history_size_before + 1 + i);
-            let tx = canister.getTransaction(id as u64);
+            assert_eq!(canister.history_size(), history_size_before + 1 + i);
+            let tx = canister.get_transaction(id as u64);
             assert_eq!(tx.amount, Tokens128::from(100 + i as u128));
             assert_eq!(tx.fee, Tokens128::from(0));
             assert_eq!(tx.operation, Operation::Burn);
@@ -1005,8 +1004,8 @@ mod tests {
         };
         canister.icrc1_transfer(transfer4).unwrap();
 
-        assert_eq!(canister.getTransactions(None, 11, None).result.len(), 10);
-        assert_eq!(canister.getTransactions(None, 10, Some(3)).result.len(), 4);
+        assert_eq!(canister.get_transactions(None, 11, None).result.len(), 10);
+        assert_eq!(canister.get_transactions(None, 10, Some(3)).result.len(), 4);
         assert_eq!(
             canister
                 .get_transactions(Some(bob()), 10, None)
@@ -1025,7 +1024,7 @@ mod tests {
                 .len(),
             5
         );
-        assert_eq!(canister.getTransactions(None, 5, None).next, Some(4));
+        assert_eq!(canister.get_transactions(None, 5, None).next, Some(4));
         assert_eq!(
             canister.get_transactions(Some(alice()), 3, Some(5)).next,
             Some(2)
@@ -1048,19 +1047,19 @@ mod tests {
             canister.icrc1_transfer(transfer5.clone()).unwrap();
         }
 
-        let txn = canister.getTransactions(None, 5, None);
+        let txn = canister.get_transactions(None, 5, None);
         assert_eq!(txn.result[0].index, 19);
         assert_eq!(txn.result[1].index, 18);
         assert_eq!(txn.result[2].index, 17);
         assert_eq!(txn.result[3].index, 16);
         assert_eq!(txn.result[4].index, 15);
-        let txn2 = canister.getTransactions(None, 5, txn.next);
+        let txn2 = canister.get_transactions(None, 5, txn.next);
         assert_eq!(txn2.result[0].index, 14);
         assert_eq!(txn2.result[1].index, 13);
         assert_eq!(txn2.result[2].index, 12);
         assert_eq!(txn2.result[3].index, 11);
         assert_eq!(txn2.result[4].index, 10);
-        assert_eq!(canister.getTransactions(None, 5, txn.next).next, Some(9));
+        assert_eq!(canister.get_transactions(None, 5, txn.next).next, Some(9));
     }
 
     #[test]
@@ -1425,7 +1424,7 @@ mod proptests {
                 decimals,
                 owner,
                 fee,
-                feeTo: fee_to,
+                fee_to: fee_to,
                 is_test_token: None,
             };
             let canister = TokenCanisterMock::init_instance();

@@ -1,4 +1,5 @@
 #![cfg_attr(coverage_nightly, feature(no_coverage))]
+// #![feature(custom_test_frameworks)]
 
 pub mod account;
 pub mod canister;

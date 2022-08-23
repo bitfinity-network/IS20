@@ -103,24 +103,13 @@ mod tests {
                 decimals: 8,
                 owner: alice(),
                 fee: Tokens128::from(0),
-                feeTo: alice(),
+                fee_to: alice(),
                 is_test_token: None,
             },
             Tokens128::from(1000),
         );
 
         (context, canister)
-    }
-
-    #[test_case(0, 0, 0.0)]
-    #[test_case(0, 1000, 0.0)]
-    #[test_case(1000, 0, 1.0)]
-    #[test_case(1000, 1000, 1.0)]
-    #[test_case(1000, 10_000, 0.5)]
-    #[test_case(1000, 1_000_000, 0.125)]
-    #[cfg_attr(coverage_nightly, no_coverage)]
-    fn fee_ratio_tests(min_cycles: u64, current_cycles: u64, ratio: f64) {
-        assert_eq!(get_fee_ratio(min_cycles, current_cycles), ratio);
     }
 
     #[test]
@@ -235,18 +224,6 @@ mod tests {
             canister.run_auction(),
             Err(AuctionError::TooEarlyToBeginAuction(secs_remaining))
         );
-    }
-
-    #[test]
-    #[cfg_attr(coverage_nightly, no_coverage)]
-    fn fee_ratio_update() {
-        let (context, canister) = test_context();
-        context.update_balance(1_000_000_000);
-
-        canister.state().borrow_mut().stats.min_cycles = 1_000_000;
-        canister.runAuction().unwrap_err();
-
-        assert_eq!(canister.state().borrow().bidding_state.fee_ratio, 0.125);
     }
 
     #[test]

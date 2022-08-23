@@ -2,6 +2,7 @@ use std::collections::HashMap;
 
 use candid::Nat;
 use candid::{CandidType, Deserialize, Principal};
+use ic_auction::state::AuctionState;
 use ic_helpers::ledger::AccountIdentifier;
 use ic_helpers::ledger::Subaccount as SubaccountIdentifier;
 use ic_helpers::tokens::Tokens128;
@@ -51,7 +52,7 @@ impl CanisterState {
             decimals: self.stats.decimals,
             owner: self.stats.owner,
             fee: self.stats.fee,
-            feeTo: self.stats.fee_to,
+            fee_to: self.stats.fee_to,
             is_test_token: Some(self.stats.is_test_token),
         }
     }

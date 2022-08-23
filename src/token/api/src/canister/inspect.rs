@@ -26,7 +26,7 @@ static OWNER_METHODS: &[&str] = &[
     "icrc1_mint",
     "set_auction_period",
     "set_fee",
-    "set_feeTo",
+    "set_fee_to",
     "set_logo",
     "set_min_cycles",
     "set_name",

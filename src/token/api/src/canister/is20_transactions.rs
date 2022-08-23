@@ -161,7 +161,7 @@ mod tests {
                 decimals: 8,
                 owner: alice(),
                 fee: Tokens128::from(0),
-                feeTo: alice(),
+                fee_to: alice(),
                 is_test_token: None,
             },
             Tokens128::from(1000),
