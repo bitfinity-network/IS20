@@ -4,37 +4,34 @@ use ic_storage::IcStorage;
 use crate::state::CanisterState;
 
 static PUBLIC_METHODS: &[&str] = &[
-    "auctionInfo",
     "icrc1_balance_of",
-    "biddingInfo",
     "decimals",
-    "getHolders",
-    "getMetadata",
-    "getTokenInfo",
-    "getTransaction",
-    "getTransactions",
-    "getUserTransactionAmount",
-    "getUserTransactions",
-    "historySize",
+    "get_holders",
+    "get_metadata",
+    "get_token_info",
+    "get_transaction",
+    "get_transactions",
+    "get_user_transaction_amount",
+    "get_user_transactions",
+    "history_size",
     "logo",
     "icrc1_name",
     "owner",
     "icrc1_symbol",
     "icrc1_total_supply",
-    "isTestToken",
+    "is_test_token",
 ];
 
 static OWNER_METHODS: &[&str] = &[
-    "mint",
-    "setAuctionPeriod",
-    "setFee",
-    "setFeeTo",
-    "setLogo",
-    "setMinCycles",
-    "setName",
-    "setSymbol",
-    "setOwner",
-    "toggleTest",
+    "icrc1_mint",
+    "set_auction_period",
+    "set_fee",
+    "set_fee_to",
+    "set_logo",
+    "set_min_cycles",
+    "set_name",
+    "set_symbol",
+    "set_owner",
 ];
 
 static TRANSACTION_METHODS: &[&str] = &["burn", "icrc1_transfer", "transferIncludeFee"];
@@ -90,20 +87,6 @@ pub fn inspect_message(
             }
 
             Ok(AcceptReason::Valid)
-        }
-
-        "runAuction" => {
-            // We allow running auction only to the owner or any of the cycle bidders.
-            let state = CanisterState::get();
-            let state = state.borrow();
-            let bidding_state = &state.bidding_state;
-            if bidding_state.is_auction_due()
-                && (bidding_state.bids.contains_key(&caller) || caller == state.stats.owner)
-            {
-                Ok(AcceptReason::Valid)
-            } else {
-                Err("Auction is not due yet or auction run method is called not by owner or bidder. Rejecting.")
-            }
         }
         "bidCycles" => {
             // We reject this message, because a call with cycles cannot be made through ingress,

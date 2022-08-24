@@ -21,12 +21,12 @@ fn init() -> (Metadata, TokenCanister, &'static mut MockContext) {
     let meta = Metadata {
         decimals: 11,
         fee: 127.into(),
-        feeTo: alice(),
+        fee_to: alice(),
         logo: "TST_logo".into(),
         name: "Testo".into(),
         symbol: "TST".into(),
         owner: alice(),
-        isTestToken: None,
+        is_test_token: None,
     };
     canister.init(meta.clone(), 1_000_000_000.into());
     (meta, canister, ctx)

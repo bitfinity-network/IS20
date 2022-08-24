@@ -1,10 +1,9 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use ic_canister::generate_exports;
-use ic_canister::Canister;
-use ic_canister::MethodType;
-use ic_canister::{query, update};
+use ic_auction::api::Auction;
+use ic_auction::{error::AuctionError, state::AuctionState};
+use ic_canister::{generate_exports, query, state_getter, update, Canister, MethodType};
 use ic_cdk::export::candid::Principal;
 use ic_helpers::ledger::AccountIdentifier;
 use ic_helpers::tokens::Tokens128;
@@ -12,32 +11,20 @@ use ic_storage::IcStorage;
 
 pub use inspect::AcceptReason;
 
-use crate::account::CheckedAccount;
-use crate::account::{Account, Subaccount};
+use crate::account::{Account, CheckedAccount, Subaccount};
 use crate::canister::icrc1_transfer::icrc1_transfer;
-use crate::canister::is20_auction::{
-    auction_info, bid_cycles, bidding_info, run_auction, AuctionError, BiddingInfo,
-};
-use crate::canister::is20_transactions::transfer_include_fee;
 use crate::error::{TransferError, TxError};
 use crate::principal::{CheckedPrincipal, Owner};
 use crate::state::CanisterState;
-use crate::types::BatchTransferArgs;
-use crate::types::Memo;
-use crate::types::StandardRecord;
-use crate::types::TransferArgs;
-use crate::types::Value;
 use crate::types::{
-    AuctionInfo, PaginatedResult, StatsData, Timestamp, TokenInfo, TxId, TxReceipt, TxRecord,
+    BatchTransferArgs, Memo, PaginatedResult, StandardRecord, StatsData, Timestamp, TokenInfo,
+    TransferArgs, TxId, TxReceipt, TxRecord, Value,
 };
 
-use self::is20_transactions::batch_transfer;
-use self::is20_transactions::burn_as_owner;
-use self::is20_transactions::burn_own_tokens;
-use self::is20_transactions::claim;
-use self::is20_transactions::mint_as_owner;
-use self::is20_transactions::mint_test_token;
-use self::is20_transactions::mint_to_accountid;
+use self::is20_transactions::{
+    batch_transfer, burn_as_owner, burn_own_tokens, claim, mint_as_owner, mint_test_token,
+    mint_to_accountid, transfer_include_fee,
+};
 
 mod inspect;
 
@@ -47,15 +34,11 @@ pub mod is20_auction;
 pub mod is20_transactions;
 
 pub(crate) const MAX_TRANSACTION_QUERY_LEN: usize = 1000;
-// 1 day in nanoseconds.
-pub const DEFAULT_AUCTION_PERIOD: Timestamp = 24 * 60 * 60 * 1_000_000;
+// 1 day in seconds.
+pub const DEFAULT_AUCTION_PERIOD_SECONDS: Timestamp = 60 * 60 * 24;
 
-pub fn pre_update(canister: &impl TokenCanisterAPI, method_name: &str, _method_type: MethodType) {
-    if method_name != "runAuction" {
-        if let Err(auction_error) = canister.runAuction() {
-            ic_cdk::println!("Auction error: {auction_error:#?}");
-        }
-    }
+pub fn pre_update<T: TokenCanisterAPI>(canister: &T, method_name: &str, method_type: MethodType) {
+    <T as Auction>::canister_pre_update(canister, method_name, method_type)
 }
 
 pub enum CanisterUpdate {
@@ -66,14 +49,12 @@ pub enum CanisterUpdate {
     FeeTo(Principal),
     Owner(Principal),
     MinCycles(u64),
-    AuctionPeriod(u64),
 }
 
 #[allow(non_snake_case)]
-pub trait TokenCanisterAPI: Canister + Sized {
-    fn state(&self) -> Rc<RefCell<CanisterState>> {
-        CanisterState::get()
-    }
+pub trait TokenCanisterAPI: Canister + Sized + Auction {
+    #[state_getter]
+    fn state(&self) -> Rc<RefCell<CanisterState>>;
 
     /// The `inspect_message()` call is not exported by default. Add your custom #[inspect_message]
     /// function and use this method there to export the `inspect_message()` call.
@@ -86,7 +67,7 @@ pub trait TokenCanisterAPI: Canister + Sized {
     }
 
     #[query(trait = true)]
-    fn isTestToken(&self) -> bool {
+    fn is_test_token(&self) -> bool {
         self.state().borrow().stats.is_test_token
     }
 
@@ -141,7 +122,7 @@ pub trait TokenCanisterAPI: Canister + Sized {
     }
 
     #[query(trait = true)]
-    fn getTokenInfo(&self) -> TokenInfo {
+    fn get_token_info(&self) -> TokenInfo {
         let StatsData {
             fee_to,
             deploy_time,
@@ -149,8 +130,8 @@ pub trait TokenCanisterAPI: Canister + Sized {
         } = self.state().borrow().stats;
         TokenInfo {
             metadata: self.state().borrow().get_metadata(),
-            feeTo: fee_to,
-            historySize: self.state().borrow().ledger.len(),
+            fee_to: fee_to,
+            history_size: self.state().borrow().ledger.len(),
             deployTime: deploy_time,
             holderNumber: self.state().borrow().balances.0.len(),
             cycles: ic_canister::ic_kit::ic::balance(),
@@ -159,7 +140,7 @@ pub trait TokenCanisterAPI: Canister + Sized {
 
     /// This method retreieves holders of `Account` and their amounts.
     #[query(trait = true)]
-    fn getHolders(&self, start: usize, limit: usize) -> Vec<(Account, Tokens128)> {
+    fn get_holders(&self, start: usize, limit: usize) -> Vec<(Account, Tokens128)> {
         self.state().borrow().balances.get_holders(start, limit)
     }
 
@@ -170,12 +151,12 @@ pub trait TokenCanisterAPI: Canister + Sized {
 
     /// This method returns the pending `claim` for the `Account`.
     #[query(trait = true)]
-    fn getClaim(&self, subaccount: Option<Subaccount>) -> Result<Tokens128, TxError> {
+    fn get_claim(&self, subaccount: Option<Subaccount>) -> Result<Tokens128, TxError> {
         self.state().borrow().get_claim(subaccount)
     }
 
     #[query(trait = true)]
-    fn historySize(&self) -> u64 {
+    fn history_size(&self) -> u64 {
         self.state().borrow().ledger.len()
     }
 
@@ -189,49 +170,46 @@ pub trait TokenCanisterAPI: Canister + Sized {
             FeeTo(fee_to) => self.state().borrow_mut().stats.fee_to = fee_to,
             Owner(owner) => self.state().borrow_mut().stats.owner = owner,
             MinCycles(min_cycles) => self.state().borrow_mut().stats.min_cycles = min_cycles,
-            AuctionPeriod(period_sec) => {
-                self.state().borrow_mut().bidding_state.auction_period = period_sec * 1_000_000
-            }
         }
     }
 
     #[update(trait = true)]
-    fn setName(&self, name: String) -> Result<(), TxError> {
+    fn set_name(&self, name: String) -> Result<(), TxError> {
         let caller = CheckedPrincipal::owner(&self.state().borrow_mut().stats)?;
         self.update_stats(caller, CanisterUpdate::Name(name));
         Ok(())
     }
 
     #[update(trait = true)]
-    fn setSymbol(&self, symbol: String) -> Result<(), TxError> {
+    fn set_symbol(&self, symbol: String) -> Result<(), TxError> {
         let caller = CheckedPrincipal::owner(&self.state().borrow_mut().stats)?;
         self.update_stats(caller, CanisterUpdate::Symbol(symbol));
         Ok(())
     }
 
     #[update(trait = true)]
-    fn setLogo(&self, logo: String) -> Result<(), TxError> {
+    fn set_logo(&self, logo: String) -> Result<(), TxError> {
         let caller = CheckedPrincipal::owner(&self.state().borrow_mut().stats)?;
         self.update_stats(caller, CanisterUpdate::Logo(logo));
         Ok(())
     }
 
     #[update(trait = true)]
-    fn setFee(&self, fee: Tokens128) -> Result<(), TxError> {
+    fn set_fee(&self, fee: Tokens128) -> Result<(), TxError> {
         let caller = CheckedPrincipal::owner(&self.state().borrow_mut().stats)?;
         self.update_stats(caller, CanisterUpdate::Fee(fee));
         Ok(())
     }
 
     #[update(trait = true)]
-    fn setFeeTo(&self, fee_to: Principal) -> Result<(), TxError> {
+    fn set_fee_to(&self, fee_to: Principal) -> Result<(), TxError> {
         let caller = CheckedPrincipal::owner(&self.state().borrow_mut().stats)?;
         self.update_stats(caller, CanisterUpdate::FeeTo(fee_to));
         Ok(())
     }
 
     #[update(trait = true)]
-    fn setOwner(&self, owner: Principal) -> Result<(), TxError> {
+    fn set_owner(&self, owner: Principal) -> Result<(), TxError> {
         let caller = CheckedPrincipal::owner(&self.state().borrow_mut().stats)?;
         self.update_stats(caller, CanisterUpdate::Owner(owner));
         Ok(())
@@ -251,7 +229,7 @@ pub trait TokenCanisterAPI: Canister + Sized {
     /// Note, that the `value` cannot be less than the `fee` amount. If the value given is too small,
     /// transaction will fail with `TxError::AmountTooSmall` error.
     #[cfg_attr(feature = "transfer", update(trait = true))]
-    fn transferIncludeFee(
+    fn transfer_include_fee(
         &self,
         from_subaccount: Option<Subaccount>,
         to: Principal,
@@ -280,7 +258,7 @@ pub trait TokenCanisterAPI: Canister + Sized {
     /// The balance of the caller is reduced by sum of `value + fee` amount for each transfer. If the total sum of `value + fee` for all transfers,
     /// is less than the `balance` of the caller, the transaction will fail with `TxError::InsufficientBalance` error.
     #[cfg_attr(feature = "transfer", update(trait = true))]
-    fn batchTransfer(
+    fn batch_transfer(
         &self,
         from_subaccount: Option<Subaccount>,
         transfers: Vec<BatchTransferArgs>,
@@ -299,7 +277,7 @@ pub trait TokenCanisterAPI: Canister + Sized {
         to_subaccount: Option<Subaccount>,
         amount: Tokens128,
     ) -> TxReceipt {
-        if self.isTestToken() {
+        if self.is_test_token() {
             let test_user = CheckedPrincipal::test_user(&self.state().borrow().stats)?;
             mint_test_token(
                 &mut *self.state().borrow_mut(),
@@ -352,7 +330,7 @@ pub trait TokenCanisterAPI: Canister + Sized {
     /// This function mints to `AccountIdentifier`, this is different from `Account`, this adds support for minting to `AccountIdentifier`
     ///
     #[cfg_attr(feature = "mint_burn", update(trait = true))]
-    fn mintToAccountId(&self, to: AccountIdentifier, amount: Tokens128) -> Result<(), TxError> {
+    fn mint_to_account_id(&self, to: AccountIdentifier, amount: Tokens128) -> Result<(), TxError> {
         let _ = CheckedPrincipal::owner(&self.state().borrow().stats)?;
         mint_to_accountid(&mut *self.state().borrow_mut(), to, amount)
     }
@@ -363,75 +341,9 @@ pub trait TokenCanisterAPI: Canister + Sized {
         claim(&mut *self.state().borrow_mut(), account, subaccount)
     }
 
-    /********************** AUCTION ***********************/
-    /// Bid cycles for the next cycle auction.
-    ///
-    /// This method must be called with the cycles provided in the call. The amount of cycles cannot be
-    /// less than 1_000_000. The provided cycles are accepted by the canister, and the user bid is
-    /// saved for the next auction.
-    #[update(trait = true)]
-    fn bidCycles(&self, bidder: Principal) -> Result<u64, AuctionError> {
-        bid_cycles(self, bidder)
-    }
-
-    /// Current information about bids and auction.
-    #[update(trait = true)]
-    fn biddingInfo(&self) -> BiddingInfo {
-        bidding_info(self)
-    }
-
-    /// Starts the cycle auction.
-    ///
-    /// This method can be called only once in a [BiddingState.auction_period]. If the time elapsed
-    /// since the last auction is less than the set period, [AuctionError::TooEarly] will be returned.
-    ///
-    /// The auction will distribute the accumulated fees in proportion to the user cycle bids, and
-    /// then will update the fee ratio until the next auction.
-    #[update(trait = true)]
-    fn runAuction(&self) -> Result<AuctionInfo, AuctionError> {
-        run_auction(self)
-    }
-
-    /// Returns the information about a previously held auction.
-    #[update(trait = true)]
-    fn auctionInfo(&self, id: usize) -> Result<AuctionInfo, AuctionError> {
-        auction_info(self, id)
-    }
-
-    /// Returns the minimum cycles set for the canister.
-    ///
-    /// This value affects the fee ratio set by the auctions. The more cycles available in the canister
-    /// the less proportion of the fees will be transferred to the auction participants. If the amount
-    /// of cycles in the canister drops below this value, all the fees will be used for cycle auction.
-    #[update(trait = true)]
-    fn getMinCycles(&self) -> u64 {
-        self.state().borrow().stats.min_cycles
-    }
-
-    /// Sets the minimum cycles for the canister. For more information about this value, read [get_min_cycles].
-    ///
-    /// Only the owner is allowed to call this method.
-    #[update(trait = true)]
-    fn setMinCycles(&self, min_cycles: u64) -> Result<(), TxError> {
-        let caller = CheckedPrincipal::owner(&self.state().borrow_mut().stats)?;
-        self.update_stats(caller, CanisterUpdate::MinCycles(min_cycles));
-        Ok(())
-    }
-
-    /// Sets the minimum time between two consecutive auctions, in seconds.
-    ///
-    /// Only the owner is allowed to call this method.
-    #[update(trait = true)]
-    fn setAuctionPeriod(&self, period_sec: u64) -> Result<(), TxError> {
-        let caller = CheckedPrincipal::owner(&self.state().borrow_mut().stats)?;
-        // IC timestamp is in nanoseconds, thus multiplying
-        self.update_stats(caller, CanisterUpdate::AuctionPeriod(period_sec));
-        Ok(())
-    }
-
     /********************** Transactions ***********************/
     #[query(trait = true)]
-    fn getTransaction(&self, id: TxId) -> TxRecord {
+    fn get_transaction(&self, id: TxId) -> TxRecord {
         self.state().borrow().ledger.get(id).unwrap_or_else(|| {
             ic_canister::ic_kit::ic::trap(&format!("Transaction {} does not exist", id))
         })
@@ -444,7 +356,7 @@ pub trait TokenCanisterAPI: Canister + Sized {
     /// It returns `PaginatedResult` a struct, which contains `result` which is a list of transactions `Vec<TxRecord>` that meet the requirements of the query,
     /// and `next_id` which is the index of the next transaction to return.
     #[query(trait = true)]
-    fn getTransactions(
+    fn get_transactions(
         &self,
         who: Option<Principal>,
         count: usize,
@@ -459,7 +371,7 @@ pub trait TokenCanisterAPI: Canister + Sized {
 
     /// Returns the total number of transactions related to the user `who`.
     #[query(trait = true)]
-    fn getUserTransactionCount(&self, who: Principal) -> usize {
+    fn get_user_transaction_count(&self, who: Principal) -> usize {
         self.state().borrow().ledger.get_len_user_history(who)
     }
 
@@ -472,6 +384,16 @@ pub trait TokenCanisterAPI: Canister + Sized {
 }
 
 generate_exports!(TokenCanisterAPI, TokenCanisterExports);
+
+impl Auction for TokenCanisterExports {
+    fn auction_state(&self) -> Rc<RefCell<AuctionState>> {
+        AuctionState::get()
+    }
+
+    fn disburse_rewards(&self) -> Result<ic_auction::state::AuctionInfo, AuctionError> {
+        is20_auction::disburse_rewards(self)
+    }
+}
 
 #[cfg(test)]
 mod tests {
@@ -509,8 +431,8 @@ mod tests {
 
                 owner: john(),
                 fee: Tokens128::from(0),
-                feeTo: john(),
-                isTestToken: None,
+                fee_to: john(),
+                is_test_token: None,
             },
             Tokens128::from(1000),
         );
@@ -539,8 +461,8 @@ mod tests {
                 decimals: 8,
                 owner: alice(),
                 fee: Tokens128::from(0),
-                feeTo: alice(),
-                isTestToken: None,
+                fee_to: alice(),
+                is_test_token: None,
             },
             Tokens128::from(1000),
         );
@@ -621,7 +543,7 @@ mod tests {
         let (ctx, canister) = test_context();
         ctx.update_caller(john());
         assert!(canister
-            .mintToAccountId(alice_aid, Tokens128::from(100))
+            .mint_to_account_id(alice_aid, Tokens128::from(100))
             .is_ok());
 
         ctx.update_caller(alice());
@@ -647,21 +569,21 @@ mod tests {
         ctx.update_caller(john());
 
         assert!(canister
-            .mintToAccountId(alice_aid, Tokens128::from(1000))
+            .mint_to_account_id(alice_aid, Tokens128::from(1000))
             .is_ok());
         assert!(canister
-            .mintToAccountId(bob_aid, Tokens128::from(2000))
+            .mint_to_account_id(bob_aid, Tokens128::from(2000))
             .is_ok());
 
         ctx.update_caller(alice());
         assert_eq!(
-            canister.getClaim(Some(alice_sub)).unwrap(),
+            canister.get_claim(Some(alice_sub)).unwrap(),
             Tokens128::from(1000)
         );
 
         ctx.update_caller(bob());
         assert_eq!(
-            canister.getClaim(Some(bob_sub)).unwrap(),
+            canister.get_claim(Some(bob_sub)).unwrap(),
             Tokens128::from(2000)
         );
     }
@@ -673,23 +595,23 @@ mod tests {
     async fn set_name() {
         let (ctx, canister) = test_context();
         ctx.update_id(john());
-        canister_call!(canister.setName("War and Piece".to_string()), Result<(), TxError>)
+        canister_call!(canister.set_name("War and Piece".to_string()), Result<(), TxError>)
             .await
             .unwrap()
             .unwrap();
-        let info = canister_call!(canister.getTokenInfo(), TokenInfo)
+        let info = canister_call!(canister.get_token_info(), TokenInfo)
             .await
             .unwrap();
 
         assert_eq!(info.metadata.name, "War and Piece".to_string());
 
         ctx.update_id(bob());
-        let res = canister_call!(canister.setName("Crime and Punishment".to_string()), Result<(), TxError>)
+        let res = canister_call!(canister.set_name("Crime and Punishment".to_string()), Result<(), TxError>)
             .await
             .unwrap();
 
         assert_eq!(res, Err(TxError::Unauthorized));
-        let info = canister_call!(canister.getTokenInfo(), TokenInfo)
+        let info = canister_call!(canister.get_token_info(), TokenInfo)
             .await
             .unwrap();
 
@@ -703,23 +625,23 @@ mod tests {
     async fn set_symbol() {
         let (ctx, canister) = test_context();
         ctx.update_id(john());
-        canister_call!(canister.setSymbol("MAX".to_string()), Result<(), TxError>)
+        canister_call!(canister.set_symbol("MAX".to_string()), Result<(), TxError>)
             .await
             .unwrap()
             .unwrap();
-        let info = canister_call!(canister.getTokenInfo(), TokenInfo)
+        let info = canister_call!(canister.get_token_info(), TokenInfo)
             .await
             .unwrap();
 
         assert_eq!(info.metadata.symbol, "MAX".to_string());
 
         ctx.update_id(bob());
-        let res = canister_call!(canister.setSymbol("BOB".to_string()), Result<(), TxError>)
+        let res = canister_call!(canister.set_symbol("BOB".to_string()), Result<(), TxError>)
             .await
             .unwrap();
 
         assert_eq!(res, Err(TxError::Unauthorized));
-        let info = canister_call!(canister.getTokenInfo(), TokenInfo)
+        let info = canister_call!(canister.get_token_info(), TokenInfo)
             .await
             .unwrap();
 
@@ -735,23 +657,23 @@ mod tests {
     async fn set_logo() {
         let (ctx, canister) = test_context();
         ctx.update_id(john());
-        canister_call!(canister.setLogo("1".to_string()), Result<(), TxError>)
+        canister_call!(canister.set_logo("1".to_string()), Result<(), TxError>)
             .await
             .unwrap()
             .unwrap();
-        let info = canister_call!(canister.getTokenInfo(), TokenInfo)
+        let info = canister_call!(canister.get_token_info(), TokenInfo)
             .await
             .unwrap();
 
         assert_eq!(info.metadata.logo, "1".to_string());
 
         ctx.update_id(bob());
-        let res = canister_call!(canister.setLogo("2".to_string()), Result<(), TxError>)
+        let res = canister_call!(canister.set_logo("2".to_string()), Result<(), TxError>)
             .await
             .unwrap();
 
         assert_eq!(res, Err(TxError::Unauthorized));
-        let info = canister_call!(canister.getTokenInfo(), TokenInfo)
+        let info = canister_call!(canister.get_token_info(), TokenInfo)
             .await
             .unwrap();
 
@@ -766,23 +688,23 @@ mod tests {
     async fn set_fee() {
         let (ctx, canister) = test_context();
         ctx.update_id(john());
-        canister_call!(canister.setFee(100500.into()), Result<(), TxError>)
+        canister_call!(canister.set_fee(100500.into()), Result<(), TxError>)
             .await
             .unwrap()
             .unwrap();
-        let info = canister_call!(canister.getTokenInfo(), TokenInfo)
+        let info = canister_call!(canister.get_token_info(), TokenInfo)
             .await
             .unwrap();
 
         assert_eq!(info.metadata.fee, 100500.into());
 
         ctx.update_id(bob());
-        let res = canister_call!(canister.setFee(0.into()), Result<(), TxError>)
+        let res = canister_call!(canister.set_fee(0.into()), Result<(), TxError>)
             .await
             .unwrap();
 
         assert_eq!(res, Err(TxError::Unauthorized));
-        let info = canister_call!(canister.getTokenInfo(), TokenInfo)
+        let info = canister_call!(canister.get_token_info(), TokenInfo)
             .await
             .unwrap();
 
@@ -798,27 +720,27 @@ mod tests {
     async fn set_fee_to() {
         let (ctx, canister) = test_context();
         ctx.update_id(john());
-        canister_call!(canister.setFeeTo(alice()), Result<(), TxError>)
+        canister_call!(canister.set_fee_to(alice()), Result<(), TxError>)
             .await
             .unwrap()
             .unwrap();
-        let info = canister_call!(canister.getTokenInfo(), TokenInfo)
+        let info = canister_call!(canister.get_token_info(), TokenInfo)
             .await
             .unwrap();
 
-        assert_eq!(info.metadata.feeTo, alice());
+        assert_eq!(info.metadata.fee_to, alice());
 
         ctx.update_id(bob());
-        let res = canister_call!(canister.setFeeTo(bob()), Result<(), TxError>)
+        let res = canister_call!(canister.set_fee_to(bob()), Result<(), TxError>)
             .await
             .unwrap();
 
         assert_eq!(res, Err(TxError::Unauthorized));
-        let info = canister_call!(canister.getTokenInfo(), TokenInfo)
+        let info = canister_call!(canister.get_token_info(), TokenInfo)
             .await
             .unwrap();
 
-        assert_eq!(info.metadata.feeTo, alice());
+        assert_eq!(info.metadata.fee_to, alice());
     }
 
     #[tokio::test]
@@ -826,23 +748,23 @@ mod tests {
     async fn set_owner() {
         let (ctx, canister) = test_context();
         ctx.update_id(john());
-        canister_call!(canister.setOwner(alice()), Result<(), TxError>)
+        canister_call!(canister.set_owner(alice()), Result<(), TxError>)
             .await
             .unwrap()
             .unwrap();
-        let info = canister_call!(canister.getTokenInfo(), TokenInfo)
+        let info = canister_call!(canister.get_token_info(), TokenInfo)
             .await
             .unwrap();
 
         assert_eq!(info.metadata.owner, alice());
 
         ctx.update_id(bob());
-        let res = canister_call!(canister.setOwner(bob()), Result<(), TxError>)
+        let res = canister_call!(canister.set_owner(bob()), Result<(), TxError>)
             .await
             .unwrap();
 
         assert_eq!(res, Err(TxError::Unauthorized));
-        let info = canister_call!(canister.getTokenInfo(), TokenInfo)
+        let info = canister_call!(canister.get_token_info(), TokenInfo)
             .await
             .unwrap();
 

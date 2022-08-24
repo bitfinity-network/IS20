@@ -27,13 +27,13 @@ pub(crate) fn is20_transfer(
     let mut state = state.borrow_mut();
     let CanisterState {
         ref mut balances,
-        ref bidding_state,
         ref stats,
         ..
     } = &mut *state;
+    let auction_state = canister.auction_state();
 
     let (fee, fee_to) = stats.fee_info();
-    let fee_ratio = bidding_state.fee_ratio;
+    let fee_ratio = auction_state.borrow().bidding_state.fee_ratio;
 
     if let Some(requested_fee) = transfer.fee {
         if fee != requested_fee {
@@ -41,7 +41,15 @@ pub(crate) fn is20_transfer(
         }
     }
 
-    transfer_internal(balances, from, to, *amount, fee, fee_to.into(), fee_ratio)?;
+    transfer_internal(
+        balances,
+        from,
+        to,
+        *amount,
+        fee,
+        fee_to.into(),
+        FeeRatio::new(fee_ratio),
+    )?;
 
     let id = state
         .ledger
@@ -59,7 +67,7 @@ pub(crate) fn transfer_internal(
     auction_fee_ratio: FeeRatio,
 ) -> Result<(), TxError> {
     if amount.is_zero() {
-        // This can happen either if the caller requested zero transfer, or if `transferIncludeFee`
+        // This can happen either if the caller requested zero transfer, or if `transfer_include_fee`
         // was called with the amount equal to the current fee value. In both cases we don't want
         // to charge fee for zero transaction so we return an error here.
         return Err(TxError::AmountTooSmall);
@@ -324,12 +332,13 @@ pub fn batch_transfer(
     let mut state = state.borrow_mut();
     let CanisterState {
         ref mut balances,
-        ref bidding_state,
         ref mut ledger,
         ref stats,
         ..
     } = &mut *state;
 
+    let auction_state = canister.auction_state();
+    let bidding_state = &mut auction_state.borrow_mut().bidding_state;
     let (fee, fee_to) = stats.fee_info();
     let fee_to = Account::new(fee_to, None);
     let auction_fee_ratio = bidding_state.fee_ratio;
@@ -351,7 +360,7 @@ pub fn batch_transfer(
             transfer.amount,
             fee,
             fee_to,
-            auction_fee_ratio,
+            FeeRatio::new(auction_fee_ratio),
         )
         .map_err(|err| match err {
             TxError::InsufficientFunds { .. } => TxError::InsufficientFunds {
@@ -403,8 +412,8 @@ mod tests {
                 decimals: 8,
                 owner: alice(),
                 fee: Tokens128::from(0),
-                feeTo: alice(),
-                isTestToken: None,
+                fee_to: alice(),
+                is_test_token: None,
             },
             Tokens128::from(1000),
         );
@@ -434,7 +443,7 @@ mod tests {
             amount: Tokens128::from(200),
         };
         let receipt = canister
-            .batchTransfer(None, vec![transfer1, transfer2])
+            .batch_transfer(None, vec![transfer1, transfer2])
             .unwrap();
         assert_eq!(receipt.len(), 2);
         assert_eq!(
@@ -471,7 +480,7 @@ mod tests {
             amount: Tokens128::from(200),
         };
         let receipt = canister
-            .batchTransfer(None, vec![transfer1, transfer2])
+            .batch_transfer(None, vec![transfer1, transfer2])
             .unwrap();
         assert_eq!(receipt.len(), 2);
         assert_eq!(
@@ -504,7 +513,7 @@ mod tests {
             receiver: Account::new(john(), None),
             amount: Tokens128::from(600),
         };
-        let receipt = canister.batchTransfer(None, vec![transfer1, transfer2]);
+        let receipt = canister.batch_transfer(None, vec![transfer1, transfer2]);
         assert!(receipt.is_err());
         let balance = canister.icrc1_balance_of(Account::new(alice(), None));
         assert_eq!(receipt.unwrap_err(), TxError::InsufficientFunds { balance });
@@ -534,7 +543,7 @@ mod tests {
             receiver: Account::new(john(), None),
             amount: Tokens128::from(20),
         };
-        let res = canister.batchTransfer(None, vec![transfer1, transfer2]);
+        let res = canister.batch_transfer(None, vec![transfer1, transfer2]);
         assert_eq!(
             res,
             Err(TxError::InsufficientFunds {
@@ -555,7 +564,7 @@ mod tests {
             receiver: Account::new(john(), None),
             amount: Tokens128::from(0),
         };
-        let res = canister.batchTransfer(None, vec![transfer1, transfer2]);
+        let res = canister.batch_transfer(None, vec![transfer1, transfer2]);
         assert_eq!(res, Err(TxError::AmountTooSmall));
     }
 
@@ -569,7 +578,7 @@ mod tests {
         );
 
         assert!(canister
-            .transferIncludeFee(None, bob(), None, Tokens128::from(100), None, None)
+            .transfer_include_fee(None, bob(), None, Tokens128::from(100), None, None)
             .is_ok());
         assert_eq!(
             canister.icrc1_balance_of(Account::new(bob(), None)),
@@ -581,7 +590,7 @@ mod tests {
         );
 
         assert!(canister
-            .transferIncludeFee(None, bob(), Some(bob_sub), Tokens128::from(100), None, None)
+            .transfer_include_fee(None, bob(), Some(bob_sub), Tokens128::from(100), None, None)
             .is_ok());
         assert_eq!(
             canister.icrc1_balance_of(Account::new(bob(), Some(bob_sub))),
@@ -599,7 +608,7 @@ mod tests {
         drop(state);
 
         assert!(canister
-            .transferIncludeFee(None, bob(), None, Tokens128::from(200), None, None)
+            .transfer_include_fee(None, bob(), None, Tokens128::from(200), None, None)
             .is_ok());
         assert_eq!(
             canister.icrc1_balance_of(Account::new(bob(), None)),
@@ -615,7 +624,7 @@ mod tests {
         );
 
         assert!(canister
-            .transferIncludeFee(None, bob(), Some(bob_sub), Tokens128::from(150), None, None)
+            .transfer_include_fee(None, bob(), Some(bob_sub), Tokens128::from(150), None, None)
             .is_ok());
         assert_eq!(
             canister.icrc1_balance_of(Account::new(bob(), Some(bob_sub))),
@@ -628,10 +637,10 @@ mod tests {
         let canister = test_canister();
         let balance = canister.icrc1_balance_of(Account::new(alice(), None));
         assert!(canister
-            .transferIncludeFee(None, bob(), None, Tokens128::from(1001), None, None)
+            .transfer_include_fee(None, bob(), None, Tokens128::from(1001), None, None)
             .is_err());
         assert_eq!(
-            canister.transferIncludeFee(None, bob(), None, Tokens128::from(1001), None, None),
+            canister.transfer_include_fee(None, bob(), None, Tokens128::from(1001), None, None),
             Err(TxError::InsufficientFunds { balance })
         );
         assert_eq!(

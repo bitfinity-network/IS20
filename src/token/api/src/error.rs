@@ -30,6 +30,9 @@ pub enum TxError {
     ClaimNotAllowed,
 }
 
+// This type is the exact error type from ICRC-1 standard. We use it as the return type for
+// icrc1_transfer method to fully comply with the standard. As such, it doesn't need to implement
+// `Error` trait, as internally everywhere the `TxError` is used.
 #[derive(CandidType, Debug, PartialEq, Deserialize)]
 pub enum TransferError {
     BadFee { expected_fee: Tokens128 },

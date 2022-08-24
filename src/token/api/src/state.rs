@@ -2,6 +2,7 @@ use std::collections::HashMap;
 
 use candid::Nat;
 use candid::{CandidType, Deserialize, Principal};
+use ic_auction::state::AuctionState;
 use ic_helpers::ledger::AccountIdentifier;
 use ic_helpers::ledger::Subaccount as SubaccountIdentifier;
 use ic_helpers::tokens::Tokens128;
@@ -11,13 +12,11 @@ use ic_storage::IcStorage;
 use crate::account::{Account, Subaccount, DEFAULT_SUBACCOUNT};
 use crate::error::TxError;
 use crate::ledger::Ledger;
-use crate::types::{AuctionInfo, Claims, Cycles, Metadata, StatsData, Timestamp, Value};
+use crate::types::{Claims, Metadata, StatsData, Value};
 
 #[derive(Debug, Default, CandidType, Deserialize, IcStorage)]
 pub struct CanisterState {
-    pub bidding_state: BiddingState,
     pub balances: Balances,
-    pub auction_history: AuctionHistory,
     pub stats: StatsData,
     pub ledger: Ledger,
     pub claims: Claims,
@@ -53,8 +52,8 @@ impl CanisterState {
             decimals: self.stats.decimals,
             owner: self.stats.owner,
             fee: self.stats.fee,
-            feeTo: self.stats.fee_to,
-            isTestToken: Some(self.stats.is_test_token),
+            fee_to: self.stats.fee_to,
+            is_test_token: Some(self.stats.is_test_token),
         }
     }
 
@@ -183,25 +182,22 @@ impl Balances {
     }
 }
 
-#[derive(CandidType, Default, Debug, Clone, Deserialize)]
-pub struct BiddingState {
-    pub fee_ratio: FeeRatio,
-    pub last_auction: Timestamp,
-    pub auction_period: Timestamp,
-    pub cycles_since_auction: Cycles,
-    pub bids: HashMap<Principal, Cycles>,
+/// A wrapper over stable state that is used only during upgrade process.
+/// Since we have two different stable states (canister and auction), we need
+/// to wrap it in this struct during canister upgrade.
+#[derive(CandidType, Deserialize, Default)]
+pub struct StableState {
+    pub token_state: CanisterState,
+    pub auction_state: AuctionState,
 }
 
-impl BiddingState {
-    pub fn is_auction_due(&self) -> bool {
-        let curr_time = ic_canister::ic_kit::ic::time();
-        let next_auction = self.last_auction + self.auction_period;
-        curr_time >= next_auction
+impl Versioned for StableState {
+    type Previous = ();
+
+    fn upgrade(_prev_state: Self::Previous) -> Self {
+        Self::default()
     }
 }
-
-#[derive(Debug, Default, CandidType, Deserialize)]
-pub struct AuctionHistory(pub Vec<AuctionInfo>);
 
 #[derive(CandidType, Default, Debug, Copy, Clone, Deserialize, PartialEq)]
 pub struct FeeRatio(f64);
