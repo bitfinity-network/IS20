@@ -475,6 +475,7 @@ generate_exports!(TokenCanisterAPI, TokenCanisterExports);
 
 #[cfg(test)]
 mod tests {
+    use ic_canister::canister_call;
     use ic_canister::ic_kit::mock_principals::{bob, john};
     use ic_canister::ic_kit::{mock_principals::alice, MockContext};
     use ic_helpers::ledger::{AccountIdentifier, Subaccount as SubaccountIdentifier};
@@ -663,5 +664,195 @@ mod tests {
             canister.getClaim(Some(bob_sub)).unwrap(),
             Tokens128::from(2000)
         );
+    }
+
+    // **** APIs tests ****
+
+    #[tokio::test]
+    #[cfg_attr(coverage_nightly, no_coverage)]
+    async fn set_name() {
+        let (ctx, canister) = test_context();
+        ctx.update_id(john());
+        canister_call!(canister.setName("War and Piece".to_string()), Result<(), TxError>)
+            .await
+            .unwrap()
+            .unwrap();
+        let info = canister_call!(canister.getTokenInfo(), TokenInfo)
+            .await
+            .unwrap();
+
+        assert_eq!(info.metadata.name, "War and Piece".to_string());
+
+        ctx.update_id(bob());
+        let res = canister_call!(canister.setName("Crime and Punishment".to_string()), Result<(), TxError>)
+            .await
+            .unwrap();
+
+        assert_eq!(res, Err(TxError::Unauthorized));
+        let info = canister_call!(canister.getTokenInfo(), TokenInfo)
+            .await
+            .unwrap();
+
+        assert_eq!(info.metadata.name, "War and Piece".to_string());
+        let name = canister_call!(canister.icrc1_name(), String).await.unwrap();
+        assert_eq!(name, "War and Piece".to_string());
+    }
+
+    #[tokio::test]
+    #[cfg_attr(coverage_nightly, no_coverage)]
+    async fn set_symbol() {
+        let (ctx, canister) = test_context();
+        ctx.update_id(john());
+        canister_call!(canister.setSymbol("MAX".to_string()), Result<(), TxError>)
+            .await
+            .unwrap()
+            .unwrap();
+        let info = canister_call!(canister.getTokenInfo(), TokenInfo)
+            .await
+            .unwrap();
+
+        assert_eq!(info.metadata.symbol, "MAX".to_string());
+
+        ctx.update_id(bob());
+        let res = canister_call!(canister.setSymbol("BOB".to_string()), Result<(), TxError>)
+            .await
+            .unwrap();
+
+        assert_eq!(res, Err(TxError::Unauthorized));
+        let info = canister_call!(canister.getTokenInfo(), TokenInfo)
+            .await
+            .unwrap();
+
+        assert_eq!(info.metadata.symbol, "MAX".to_string());
+        let symbol = canister_call!(canister.icrc1_symbol(), String)
+            .await
+            .unwrap();
+        assert_eq!(symbol, "MAX".to_string());
+    }
+
+    #[tokio::test]
+    #[cfg_attr(coverage_nightly, no_coverage)]
+    async fn set_logo() {
+        let (ctx, canister) = test_context();
+        ctx.update_id(john());
+        canister_call!(canister.setLogo("1".to_string()), Result<(), TxError>)
+            .await
+            .unwrap()
+            .unwrap();
+        let info = canister_call!(canister.getTokenInfo(), TokenInfo)
+            .await
+            .unwrap();
+
+        assert_eq!(info.metadata.logo, "1".to_string());
+
+        ctx.update_id(bob());
+        let res = canister_call!(canister.setLogo("2".to_string()), Result<(), TxError>)
+            .await
+            .unwrap();
+
+        assert_eq!(res, Err(TxError::Unauthorized));
+        let info = canister_call!(canister.getTokenInfo(), TokenInfo)
+            .await
+            .unwrap();
+
+        assert_eq!(info.metadata.logo, "1".to_string());
+
+        let logo = canister_call!(canister.logo(), String).await.unwrap();
+        assert_eq!(logo, "1".to_string());
+    }
+
+    #[tokio::test]
+    #[cfg_attr(coverage_nightly, no_coverage)]
+    async fn set_fee() {
+        let (ctx, canister) = test_context();
+        ctx.update_id(john());
+        canister_call!(canister.setFee(100500.into()), Result<(), TxError>)
+            .await
+            .unwrap()
+            .unwrap();
+        let info = canister_call!(canister.getTokenInfo(), TokenInfo)
+            .await
+            .unwrap();
+
+        assert_eq!(info.metadata.fee, 100500.into());
+
+        ctx.update_id(bob());
+        let res = canister_call!(canister.setFee(0.into()), Result<(), TxError>)
+            .await
+            .unwrap();
+
+        assert_eq!(res, Err(TxError::Unauthorized));
+        let info = canister_call!(canister.getTokenInfo(), TokenInfo)
+            .await
+            .unwrap();
+
+        assert_eq!(info.metadata.fee, 100500.into());
+        let fee = canister_call!(canister.icrc1_fee(), Tokens128)
+            .await
+            .unwrap();
+        assert_eq!(fee, 100500.into());
+    }
+
+    #[tokio::test]
+    #[cfg_attr(coverage_nightly, no_coverage)]
+    async fn set_fee_to() {
+        let (ctx, canister) = test_context();
+        ctx.update_id(john());
+        canister_call!(canister.setFeeTo(alice()), Result<(), TxError>)
+            .await
+            .unwrap()
+            .unwrap();
+        let info = canister_call!(canister.getTokenInfo(), TokenInfo)
+            .await
+            .unwrap();
+
+        assert_eq!(info.metadata.feeTo, alice());
+
+        ctx.update_id(bob());
+        let res = canister_call!(canister.setFeeTo(bob()), Result<(), TxError>)
+            .await
+            .unwrap();
+
+        assert_eq!(res, Err(TxError::Unauthorized));
+        let info = canister_call!(canister.getTokenInfo(), TokenInfo)
+            .await
+            .unwrap();
+
+        assert_eq!(info.metadata.feeTo, alice());
+    }
+
+    #[tokio::test]
+    #[cfg_attr(coverage_nightly, no_coverage)]
+    async fn set_owner() {
+        let (ctx, canister) = test_context();
+        ctx.update_id(john());
+        canister_call!(canister.setOwner(alice()), Result<(), TxError>)
+            .await
+            .unwrap()
+            .unwrap();
+        let info = canister_call!(canister.getTokenInfo(), TokenInfo)
+            .await
+            .unwrap();
+
+        assert_eq!(info.metadata.owner, alice());
+
+        ctx.update_id(bob());
+        let res = canister_call!(canister.setOwner(bob()), Result<(), TxError>)
+            .await
+            .unwrap();
+
+        assert_eq!(res, Err(TxError::Unauthorized));
+        let info = canister_call!(canister.getTokenInfo(), TokenInfo)
+            .await
+            .unwrap();
+
+        assert_eq!(info.metadata.owner, alice());
+        let owner = canister_call!(canister.owner(), Principal).await.unwrap();
+        assert_eq!(owner, alice());
+
+        let minting_account = canister_call!(canister.icrc1_minting_account(), Principal)
+            .await
+            .unwrap();
+        assert_eq!(minting_account, Some(alice().into()));
     }
 }
