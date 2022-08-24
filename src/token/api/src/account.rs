@@ -1,13 +1,13 @@
 use std::fmt::{Display, Formatter};
 
 use candid::{CandidType, Principal};
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 
 use crate::error::TxError;
 
 pub static DEFAULT_SUBACCOUNT: Subaccount = [0u8; 32];
 
-#[derive(Debug, Clone, CandidType, Deserialize, Copy, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, CandidType, Deserialize, Copy, PartialEq, Eq)]
 pub struct Account {
     pub owner: Principal,
     pub subaccount: Subaccount,
@@ -30,7 +30,16 @@ impl From<Principal> for Account {
 
 impl Display for Account {
     fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
-        write!(f, "{}", self.owner)
+        if self.subaccount == DEFAULT_SUBACCOUNT {
+            write!(f, "Account({})", self.owner)
+        } else {
+            write!(f, "Account({}, ", self.owner)?;
+            for b in self.subaccount {
+                write!(f, "{b:02X}")?;
+            }
+
+            write!(f, ")")
+        }
     }
 }
 
@@ -41,14 +50,6 @@ pub struct CheckedAccount<T>(Account, T);
 impl<T> CheckedAccount<T> {
     pub fn inner(&self) -> Account {
         self.0
-    }
-
-    pub fn owner(&self) -> Principal {
-        self.0.owner
-    }
-
-    pub fn subaccount(&self) -> Subaccount {
-        self.0.subaccount
     }
 }
 
@@ -76,6 +77,8 @@ impl CheckedAccount<WithRecipient> {
 
 #[cfg(test)]
 mod tests {
+    use candid::{Decode, Encode};
+    use coverage_helper::test;
     use ic_canister::ic_kit::mock_principals::alice;
 
     use super::*;
@@ -86,5 +89,34 @@ mod tests {
         let acc2 = Account::new(alice(), Some(DEFAULT_SUBACCOUNT));
 
         assert_eq!(acc1, acc2);
+    }
+
+    #[test]
+    fn account_display() {
+        assert_eq!(
+            format!("{}", Account::new(alice(), None)),
+            "Account(sgymv-uiaaa-aaaaa-aaaia-cai)".to_string()
+        );
+        assert_eq!(
+            format!("{:?}", Account::new(alice(), None)),
+            "Account { owner: Principal(PrincipalInner { len: 10, bytes: [0, 0, 0, 0, 0, 0, 0, 16, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0] }), subaccount: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0] }".to_string()
+        );
+        assert_eq!(
+            format!("{}", Account::new(alice(), Some(DEFAULT_SUBACCOUNT))),
+            "Account(sgymv-uiaaa-aaaaa-aaaia-cai)".to_string()
+        );
+        assert_eq!(
+            format!("{}", Account::new(alice(), Some([1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,255]))),
+            "Account(sgymv-uiaaa-aaaaa-aaaia-cai, 01000000000000000000000000000000000000000000000000000000000000FF)".to_string()
+        );
+    }
+
+    #[test]
+    fn serialization() {
+        let acc = Account::new(alice(), Some([1; 32]));
+        let serialized = Encode!(&acc).unwrap();
+        let deserialized = Decode!(&serialized, Account).unwrap();
+
+        assert_eq!(deserialized, acc);
     }
 }
