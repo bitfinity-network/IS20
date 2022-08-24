@@ -3,12 +3,14 @@
 use candid::Principal;
 use ic_auction::error::AuctionError;
 use ic_auction::state::{AuctionInfo, AuctionState};
+use ic_canister::ic_kit::ic;
 use ic_helpers::tokens::Tokens128;
 
 use crate::account::Account;
-use crate::state::{Balances, CanisterState, FeeRatio};
+use crate::state::{Balances, CanisterState};
+use crate::types::BatchTransferArgs;
 
-use super::is20_transactions::transfer_internal;
+use super::is20_transactions::batch_transfer_internal;
 use super::TokenCanisterAPI;
 
 pub fn disburse_rewards(canister: &impl TokenCanisterAPI) -> Result<AuctionInfo, AuctionError> {
@@ -18,6 +20,7 @@ pub fn disburse_rewards(canister: &impl TokenCanisterAPI) -> Result<AuctionInfo,
     let CanisterState {
         ref mut balances,
         ref mut ledger,
+        ref stats,
         ..
     } = *canister_state.borrow_mut();
 
@@ -33,24 +36,30 @@ pub fn disburse_rewards(canister: &impl TokenCanisterAPI) -> Result<AuctionInfo,
 
     let first_transaction_id = ledger.len();
 
+    let mut transfers = vec![];
     for (bidder, cycles) in &bidding_state.bids {
         let amount = (total_amount * cycles / total_cycles)
-            .expect("total cycles is not 0 checked by bids existing")
+            .ok_or(AuctionError::NoBids)?
             .to_tokens128()
-            .expect("total cycles is smaller then single user bid cycles");
-        transfer_internal(
-            balances,
-            auction_account(),
-            (*bidder).into(),
+            .unwrap_or(Tokens128::MAX);
+        transfers.push(BatchTransferArgs {
+            receiver: (*bidder).into(),
             amount,
-            Tokens128::ZERO,
-            auction_account(),
-            FeeRatio::new(0.0),
-        )
-        .expect("auction principal always have enough balance");
+        });
         ledger.record_auction(*bidder, amount);
-        transferred_amount =
-            (transferred_amount + amount).expect("can never be larger than total_supply");
+        transferred_amount = (transferred_amount + amount)
+            .ok_or_else(|| ic::trap("Token amount overflow on auction bids distribution."))
+            .unwrap();
+    }
+
+    if let Err(e) = batch_transfer_internal(
+        auction_account(),
+        &transfers,
+        balances,
+        stats,
+        &auction_state.borrow(),
+    ) {
+        ic::trap(&format!("Failed to transfer tokens to the bidders: {e}"));
     }
 
     let last_transaction_id = ledger.len() - 1;

@@ -1,4 +1,5 @@
 use candid::Principal;
+use ic_auction::state::AuctionState;
 use ic_canister::ic_kit::ic;
 use ic_helpers::ledger::{AccountIdentifier, Subaccount as SubaccountIdentifier};
 use ic_helpers::tokens::Tokens128;
@@ -7,7 +8,7 @@ use crate::account::{Account, CheckedAccount, Subaccount, WithRecipient};
 use crate::error::TxError;
 use crate::principal::{CheckedPrincipal, Owner, TestNet};
 use crate::state::{Balances, CanisterState, FeeRatio};
-use crate::types::{BatchTransferArgs, TransferArgs, TxId, TxReceipt};
+use crate::types::{BatchTransferArgs, StatsData, TransferArgs, TxId, TxReceipt};
 
 use super::icrc1_transfer::{PERMITTED_DRIFT, TX_WINDOW};
 use super::is20_auction::auction_account;
@@ -332,13 +333,26 @@ pub fn batch_transfer(
     let mut state = state.borrow_mut();
     let CanisterState {
         ref mut balances,
-        ref mut ledger,
         ref stats,
+        ref mut ledger,
         ..
     } = &mut *state;
 
     let auction_state = canister.auction_state();
-    let bidding_state = &mut auction_state.borrow_mut().bidding_state;
+    batch_transfer_internal(from, &transfers, balances, stats, &auction_state.borrow())?;
+    let (fee, _) = stats.fee_info();
+    let id = ledger.batch_transfer(from, transfers, fee);
+    Ok(id)
+}
+
+pub(crate) fn batch_transfer_internal(
+    from: Account,
+    transfers: &Vec<BatchTransferArgs>,
+    balances: &mut Balances,
+    stats: &StatsData,
+    auction_state: &AuctionState,
+) -> Result<(), TxError> {
+    let bidding_state = &auction_state.bidding_state;
     let (fee, fee_to) = stats.fee_info();
     let fee_to = Account::new(fee_to, None);
     let auction_fee_ratio = bidding_state.fee_ratio;
@@ -348,11 +362,11 @@ pub fn batch_transfer(
     updated_balances.set_balance(fee_to, balances.balance_of(fee_to));
     updated_balances.set_balance(auction_account(), balances.balance_of(auction_account()));
 
-    for transfer in &transfers {
+    for transfer in transfers {
         updated_balances.set_balance(transfer.receiver, balances.balance_of(transfer.receiver));
     }
 
-    for transfer in &transfers {
+    for transfer in transfers {
         transfer_internal(
             &mut updated_balances,
             from,
@@ -371,9 +385,7 @@ pub fn batch_transfer(
     }
 
     balances.apply_change(&updated_balances);
-
-    let id = ledger.batch_transfer(from, transfers, fee);
-    Ok(id)
+    Ok(())
 }
 
 #[cfg(test)]
