@@ -105,25 +105,23 @@ impl Balances {
     }
 
     pub fn get_mut(&mut self, account: Account) -> Option<&mut Tokens128> {
-        self.0.get_mut(&account.owner).and_then(|subaccounts| {
-            subaccounts.get_mut(&account.subaccount.unwrap_or(DEFAULT_SUBACCOUNT))
-        })
+        self.0
+            .get_mut(&account.owner)
+            .and_then(|subaccounts| subaccounts.get_mut(&account.subaccount))
     }
 
     pub fn get_mut_or_insert_default(&mut self, account: Account) -> &mut Tokens128 {
         self.0
             .entry(account.owner)
             .or_default()
-            .entry(account.subaccount.unwrap_or(DEFAULT_SUBACCOUNT))
+            .entry(account.subaccount)
             .or_default()
     }
 
     pub fn balance_of(&self, account: Account) -> Tokens128 {
         self.0
             .get(&account.owner)
-            .and_then(|subaccounts| {
-                subaccounts.get(&account.subaccount.unwrap_or(DEFAULT_SUBACCOUNT))
-            })
+            .and_then(|subaccounts| subaccounts.get(&account.subaccount))
             .copied()
             .unwrap_or_default()
     }
@@ -149,7 +147,7 @@ impl Balances {
 
     pub fn remove(&mut self, account: Account) {
         if let Some(subaccounts) = self.0.get_mut(&account.owner) {
-            subaccounts.remove(&account.subaccount.unwrap_or(DEFAULT_SUBACCOUNT));
+            subaccounts.remove(&account.subaccount);
         }
 
         if self
@@ -166,7 +164,7 @@ impl Balances {
         self.0
             .entry(account.owner)
             .or_default()
-            .insert(account.subaccount.unwrap_or(DEFAULT_SUBACCOUNT), amount);
+            .insert(account.subaccount, amount);
     }
 
     pub fn total_supply(&self) -> Tokens128 {

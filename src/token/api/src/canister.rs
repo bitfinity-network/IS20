@@ -286,7 +286,7 @@ pub trait TokenCanisterAPI: Canister + Sized {
         transfers: Vec<BatchTransferArgs>,
     ) -> Result<Vec<TxId>, TxError> {
         for x in &transfers {
-            let recipient = Account::new(x.receiver.owner, x.receiver.subaccount);
+            let recipient = x.receiver;
             CheckedAccount::with_recipient(recipient, from_subaccount)?;
         }
         batch_transfer(self, from_subaccount, transfers)
@@ -472,3 +472,196 @@ pub trait TokenCanisterAPI: Canister + Sized {
 }
 
 generate_exports!(TokenCanisterAPI, TokenCanisterExports);
+
+#[cfg(test)]
+mod tests {
+    use ic_canister::ic_kit::mock_principals::{bob, john};
+    use ic_canister::ic_kit::{mock_principals::alice, MockContext};
+    use ic_helpers::ledger::{AccountIdentifier, Subaccount as SubaccountIdentifier};
+    use rand::{thread_rng, Rng};
+
+    use crate::account::DEFAULT_SUBACCOUNT;
+    use crate::mock::TokenCanisterMock;
+    use crate::types::Metadata;
+
+    use super::*;
+
+    // Method for generating random Subaccount.
+    #[cfg_attr(coverage_nightly, no_coverage)]
+    fn gen_subaccount() -> Subaccount {
+        let mut subaccount = [0u8; 32];
+        thread_rng().fill(&mut subaccount);
+        subaccount
+    }
+
+    #[cfg_attr(coverage_nightly, no_coverage)]
+    fn test_context() -> (&'static MockContext, TokenCanisterMock) {
+        let context = MockContext::new().with_caller(john()).inject();
+
+        let canister = TokenCanisterMock::init_instance();
+        canister.init(
+            Metadata {
+                logo: "".to_string(),
+                name: "".to_string(),
+                symbol: "".to_string(),
+                decimals: 8,
+
+                owner: john(),
+                fee: Tokens128::from(0),
+                feeTo: john(),
+                isTestToken: None,
+            },
+            Tokens128::from(1000),
+        );
+
+        // This is to make tests that don't rely on auction state
+        // pass, because since we are running auction state on each
+        // endpoint call, it affects `BiddingInfo.fee_ratio` that is
+        // used for charging fees in `approve` endpoint.
+        canister.state.borrow_mut().stats.min_cycles = 0;
+
+        canister.mint(alice(), None, 1000.into()).unwrap();
+        context.update_caller(alice());
+
+        (context, canister)
+    }
+
+    fn test_canister() -> TokenCanisterMock {
+        MockContext::new().with_caller(alice()).inject();
+
+        let canister = TokenCanisterMock::init_instance();
+        canister.init(
+            Metadata {
+                logo: "".to_string(),
+                name: "".to_string(),
+                symbol: "".to_string(),
+                decimals: 8,
+                owner: alice(),
+                fee: Tokens128::from(0),
+                feeTo: alice(),
+                isTestToken: None,
+            },
+            Tokens128::from(1000),
+        );
+
+        canister.state.borrow_mut().stats.min_cycles = 0;
+
+        canister
+    }
+
+    #[test]
+    fn transfer_to_same_account() {
+        let canister = test_canister();
+        let transfer = TransferArgs {
+            from_subaccount: None,
+            to: alice().into(),
+            amount: 100.into(),
+            fee: None,
+            memo: None,
+            created_at_time: None,
+        };
+
+        let res = canister.icrc1_transfer(transfer);
+        assert_eq!(
+            res,
+            Err(TransferError::GenericError {
+                error_code: 500,
+                message: "Self transfer".into()
+            })
+        )
+    }
+
+    #[test]
+    fn transfer_to_same_default_subaccount() {
+        let canister = test_canister();
+        let transfer = TransferArgs {
+            from_subaccount: Some(crate::account::DEFAULT_SUBACCOUNT),
+            to: alice().into(),
+            amount: 100.into(),
+            fee: None,
+            memo: None,
+            created_at_time: None,
+        };
+
+        let res = canister.icrc1_transfer(transfer);
+        assert_eq!(
+            res,
+            Err(TransferError::GenericError {
+                error_code: 500,
+                message: "Self transfer".into()
+            })
+        );
+
+        let transfer = TransferArgs {
+            from_subaccount: None,
+            to: Account::new(alice(), Some(DEFAULT_SUBACCOUNT)),
+            amount: 100.into(),
+            fee: None,
+            memo: None,
+            created_at_time: None,
+        };
+
+        let res = canister.icrc1_transfer(transfer);
+        assert_eq!(
+            res,
+            Err(TransferError::GenericError {
+                error_code: 500,
+                message: "Self transfer".into()
+            })
+        );
+    }
+
+    #[test]
+    fn mint_to_account_id() {
+        let subaccount = gen_subaccount();
+        let alice_aid =
+            AccountIdentifier::new(alice().into(), Some(SubaccountIdentifier(subaccount)));
+
+        let (ctx, canister) = test_context();
+        ctx.update_caller(john());
+        assert!(canister
+            .mintToAccountId(alice_aid, Tokens128::from(100))
+            .is_ok());
+
+        ctx.update_caller(alice());
+        assert!(canister.claim(alice_aid, Some(subaccount)).is_ok());
+        assert_eq!(
+            canister.icrc1_balance_of(Account::new(alice(), Some(subaccount))),
+            Tokens128::from(100)
+        );
+        assert_eq!(canister.icrc1_total_supply(), Tokens128::from(2100));
+        assert_eq!(canister.state().borrow().claims.len(), 0);
+    }
+
+    #[test]
+    fn test_claim_amount() {
+        let bob_sub = gen_subaccount();
+        let alice_sub = gen_subaccount();
+
+        let alice_aid =
+            AccountIdentifier::new(alice().into(), Some(SubaccountIdentifier(alice_sub)));
+        let bob_aid = AccountIdentifier::new(bob().into(), Some(SubaccountIdentifier(bob_sub)));
+
+        let (ctx, canister) = test_context();
+        ctx.update_caller(john());
+
+        assert!(canister
+            .mintToAccountId(alice_aid, Tokens128::from(1000))
+            .is_ok());
+        assert!(canister
+            .mintToAccountId(bob_aid, Tokens128::from(2000))
+            .is_ok());
+
+        ctx.update_caller(alice());
+        assert_eq!(
+            canister.getClaim(Some(alice_sub)).unwrap(),
+            Tokens128::from(1000)
+        );
+
+        ctx.update_caller(bob());
+        assert_eq!(
+            canister.getClaim(Some(bob_sub)).unwrap(),
+            Tokens128::from(2000)
+        );
+    }
+}

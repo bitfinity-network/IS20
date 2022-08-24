@@ -44,7 +44,6 @@ mod tests {
     use ic_canister::ic_kit::mock_principals::{alice, bob, john, xtc};
     use ic_canister::ic_kit::MockContext;
     use ic_canister::Canister;
-    use ic_helpers::ledger::{AccountIdentifier, Subaccount as SubaccountIdentifier};
     use ic_helpers::tokens::Tokens128;
     use rand::prelude::*;
 
@@ -785,60 +784,6 @@ mod tests {
             canister.icrc1_transfer(transfer1.clone()).unwrap();
         }
         assert_eq!(canister.getUserTransactionCount(alice()), COUNT);
-    }
-
-    #[test]
-    fn mint_to_account_id() {
-        let subaccount = gen_subaccount();
-        let alice_aid =
-            AccountIdentifier::new(alice().into(), Some(SubaccountIdentifier(subaccount)));
-
-        let (ctx, canister) = test_context();
-        ctx.update_caller(john());
-        assert!(canister
-            .mintToAccountId(alice_aid, Tokens128::from(100))
-            .is_ok());
-
-        ctx.update_caller(alice());
-        assert!(canister.claim(alice_aid, Some(subaccount)).is_ok());
-        assert_eq!(
-            canister.icrc1_balance_of(Account::new(alice(), Some(subaccount))),
-            Tokens128::from(100)
-        );
-        assert_eq!(canister.icrc1_total_supply(), Tokens128::from(2100));
-        assert_eq!(canister.state().borrow().claims.len(), 0);
-    }
-
-    #[test]
-    fn test_claim_amount() {
-        let bob_sub = gen_subaccount();
-        let alice_sub = gen_subaccount();
-
-        let alice_aid =
-            AccountIdentifier::new(alice().into(), Some(SubaccountIdentifier(alice_sub)));
-        let bob_aid = AccountIdentifier::new(bob().into(), Some(SubaccountIdentifier(bob_sub)));
-
-        let (ctx, canister) = test_context();
-        ctx.update_caller(john());
-
-        assert!(canister
-            .mintToAccountId(alice_aid, Tokens128::from(1000))
-            .is_ok());
-        assert!(canister
-            .mintToAccountId(bob_aid, Tokens128::from(2000))
-            .is_ok());
-
-        ctx.update_caller(alice());
-        assert_eq!(
-            canister.getClaim(Some(alice_sub)).unwrap(),
-            Tokens128::from(1000)
-        );
-
-        ctx.update_caller(bob());
-        assert_eq!(
-            canister.getClaim(Some(bob_sub)).unwrap(),
-            Tokens128::from(2000)
-        );
     }
 
     #[test]

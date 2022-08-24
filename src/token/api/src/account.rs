@@ -10,12 +10,15 @@ pub static DEFAULT_SUBACCOUNT: Subaccount = [0u8; 32];
 #[derive(Debug, Clone, CandidType, Deserialize, Copy, PartialEq, Eq, Serialize)]
 pub struct Account {
     pub owner: Principal,
-    pub subaccount: Option<Subaccount>,
+    pub subaccount: Subaccount,
 }
 
 impl Account {
     pub fn new(owner: Principal, subaccount: Option<Subaccount>) -> Self {
-        Self { owner, subaccount }
+        Self {
+            owner,
+            subaccount: subaccount.unwrap_or(DEFAULT_SUBACCOUNT),
+        }
     }
 }
 
@@ -45,7 +48,7 @@ impl<T> CheckedAccount<T> {
     }
 
     pub fn subaccount(&self) -> Subaccount {
-        self.0.subaccount.unwrap_or(DEFAULT_SUBACCOUNT)
+        self.0.subaccount
     }
 }
 
@@ -68,5 +71,20 @@ impl CheckedAccount<WithRecipient> {
     }
     pub fn recipient(&self) -> Account {
         self.1.recipient
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use ic_canister::ic_kit::mock_principals::alice;
+
+    use super::*;
+
+    #[test]
+    fn compare_default_subaccount_and_none() {
+        let acc1 = Account::new(alice(), None);
+        let acc2 = Account::new(alice(), Some(DEFAULT_SUBACCOUNT));
+
+        assert_eq!(acc1, acc2);
     }
 }

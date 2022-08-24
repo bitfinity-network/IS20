@@ -107,16 +107,7 @@ impl Ledger {
     ) -> Vec<TxId> {
         transfers
             .into_iter()
-            .map(|x| {
-                self.transfer(
-                    from,
-                    Account::new(x.receiver.owner, x.receiver.subaccount),
-                    x.amount,
-                    fee,
-                    None,
-                    ic::time(),
-                )
-            })
+            .map(|x| self.transfer(from, x.receiver, x.amount, fee, None, ic::time()))
             .collect()
     }
 

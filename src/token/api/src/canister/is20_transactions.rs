@@ -58,6 +58,13 @@ pub(crate) fn transfer_internal(
     fee_to: Account,
     auction_fee_ratio: FeeRatio,
 ) -> Result<(), TxError> {
+    if amount.is_zero() {
+        // This can happen either if the caller requested zero transfer, or if `transferIncludeFee`
+        // was called with the amount equal to the current fee value. In both cases we don't want
+        // to charge fee for zero transaction so we return an error here.
+        return Err(TxError::AmountTooSmall);
+    }
+
     // We use `updaets` structure because sometimes from or to can be equal to fee_to or even to
     // auction_account, so we must take carefull approach.
     let mut updates = Balances::default();
@@ -143,7 +150,7 @@ fn validate_and_get_tx_ts(
             }
 
             for tx in canister.state().borrow().ledger.iter().rev() {
-                if now.saturating_sub(tx.timestamp) > TX_WINDOW {
+                if now.saturating_sub(tx.timestamp) > TX_WINDOW + PERMITTED_DRIFT {
                     break;
                 }
 
@@ -175,6 +182,13 @@ pub fn mint(
     to: Account,
     amount: Tokens128,
 ) -> TxReceipt {
+    let total_supply = state.balances.total_supply();
+    if (total_supply + amount).is_none() {
+        // If we allow to mint more then Tokens128::MAX then simplie operation such as getting
+        // total supply or token stats will panic, So we add this check to prevent this.
+        return Err(TxError::AmountOverflow);
+    }
+
     let balance = state.balances.get_mut_or_insert_default(to);
 
     let new_balance = (*balance + amount).ok_or(TxError::AmountOverflow)?;
@@ -360,6 +374,7 @@ mod tests {
     use ic_canister::Canister;
     use rand::{thread_rng, Rng};
 
+    use crate::account::DEFAULT_SUBACCOUNT;
     use crate::mock::TokenCanisterMock;
     use crate::types::Metadata;
 
@@ -411,17 +426,11 @@ mod tests {
             canister.icrc1_balance_of(Account::new(alice(), None))
         );
         let transfer1 = BatchTransferArgs {
-            receiver: Account {
-                owner: bob(),
-                subaccount: None,
-            },
+            receiver: Account::new(bob(), None),
             amount: Tokens128::from(100),
         };
         let transfer2 = BatchTransferArgs {
-            receiver: Account {
-                owner: john(),
-                subaccount: None,
-            },
+            receiver: Account::new(john(), None),
             amount: Tokens128::from(200),
         };
         let receipt = canister
@@ -454,17 +463,11 @@ mod tests {
             canister.icrc1_balance_of(Account::new(alice(), None))
         );
         let transfer1 = BatchTransferArgs {
-            receiver: Account {
-                owner: bob(),
-                subaccount: None,
-            },
+            receiver: Account::new(bob(), None),
             amount: Tokens128::from(100),
         };
         let transfer2 = BatchTransferArgs {
-            receiver: Account {
-                owner: xtc(),
-                subaccount: None,
-            },
+            receiver: Account::new(xtc(), None),
             amount: Tokens128::from(200),
         };
         let receipt = canister
@@ -494,17 +497,11 @@ mod tests {
         let canister = test_canister();
 
         let transfer1 = BatchTransferArgs {
-            receiver: Account {
-                owner: bob(),
-                subaccount: None,
-            },
+            receiver: Account::new(bob(), None),
             amount: Tokens128::from(500),
         };
         let transfer2 = BatchTransferArgs {
-            receiver: Account {
-                owner: john(),
-                subaccount: None,
-            },
+            receiver: Account::new(john(), None),
             amount: Tokens128::from(600),
         };
         let receipt = canister.batchTransfer(None, vec![transfer1, transfer2]);
@@ -523,6 +520,43 @@ mod tests {
             canister.icrc1_balance_of(Account::new(john(), None)),
             Tokens128::from(0)
         );
+    }
+
+    #[test]
+    fn batch_transfer_overflow() {
+        let canister = test_canister();
+
+        let transfer1 = BatchTransferArgs {
+            receiver: Account::new(bob(), None),
+            amount: Tokens128::from(u128::MAX - 10),
+        };
+        let transfer2 = BatchTransferArgs {
+            receiver: Account::new(john(), None),
+            amount: Tokens128::from(20),
+        };
+        let res = canister.batchTransfer(None, vec![transfer1, transfer2]);
+        assert_eq!(
+            res,
+            Err(TxError::InsufficientFunds {
+                balance: 1000.into()
+            })
+        );
+    }
+
+    #[test]
+    fn batch_transfer_zero_amount() {
+        let canister = test_canister();
+
+        let transfer1 = BatchTransferArgs {
+            receiver: Account::new(bob(), None),
+            amount: Tokens128::from(100),
+        };
+        let transfer2 = BatchTransferArgs {
+            receiver: Account::new(john(), None),
+            amount: Tokens128::from(0),
+        };
+        let res = canister.batchTransfer(None, vec![transfer1, transfer2]);
+        assert_eq!(res, Err(TxError::AmountTooSmall));
     }
 
     #[test]
@@ -713,5 +747,204 @@ mod tests {
 
         let _ = canister.icrc1_transfer(transfer.clone()).unwrap();
         assert!(validate_and_get_tx_ts(&canister, alice(), &transfer).is_ok());
+    }
+
+    #[test]
+    fn zero_transfer() {
+        let canister = test_canister();
+        let transfer = TransferArgs {
+            from_subaccount: None,
+            to: bob().into(),
+            amount: 0.into(),
+            fee: None,
+            memo: None,
+            created_at_time: None,
+        };
+
+        let caller = CheckedAccount::with_recipient(transfer.to, None).unwrap();
+
+        let res = is20_transfer(&canister, caller, &transfer);
+        assert_eq!(res, Err(TxError::AmountTooSmall));
+    }
+
+    #[test]
+    fn zero_transfers_with_fee() {
+        let canister = test_canister();
+        canister.state().borrow_mut().stats.fee = Tokens128::from(100);
+        let transfer = TransferArgs {
+            from_subaccount: None,
+            to: bob().into(),
+            amount: 100.into(),
+            fee: None,
+            memo: None,
+            created_at_time: None,
+        };
+
+        let caller = CheckedAccount::with_recipient(transfer.to, None).unwrap();
+        let res = transfer_include_fee(&canister, caller, &transfer);
+        assert_eq!(res, Err(TxError::AmountTooSmall));
+    }
+
+    #[test]
+    fn mint_too_much() {
+        let canister = test_canister();
+        mint(
+            &mut canister.state().borrow_mut(),
+            alice(),
+            bob().into(),
+            Tokens128::from(u128::MAX - 2000),
+        )
+        .unwrap();
+        let res = mint(
+            &mut canister.state().borrow_mut(),
+            alice(),
+            john().into(),
+            Tokens128::from(2000),
+        );
+        assert_eq!(res, Err(TxError::AmountOverflow));
+    }
+
+    #[test]
+    fn transfer_too_large() {
+        // Calling transfer with such fee and amount will cause Tokens128 overflow, so we check
+        // that transfer returns an error as expected.
+        let canister = test_canister();
+        canister.state().borrow_mut().stats.fee = Tokens128::from(10_000);
+        let transfer = TransferArgs {
+            from_subaccount: None,
+            to: bob().into(),
+            amount: (u128::MAX - 9000).into(),
+            fee: None,
+            memo: None,
+            created_at_time: None,
+        };
+
+        let caller = CheckedAccount::with_recipient(transfer.to, None).unwrap();
+        let res = transfer_include_fee(&canister, caller, &transfer);
+        assert_eq!(
+            res,
+            Err(TxError::InsufficientFunds {
+                balance: 1000.into()
+            })
+        );
+    }
+
+    #[test]
+    fn transfer_to_own_subaccount() {
+        let canister = test_canister();
+        let transfer = TransferArgs {
+            from_subaccount: None,
+            to: Account::new(alice(), Some([1; 32])),
+            amount: (200).into(),
+            fee: None,
+            memo: None,
+            created_at_time: None,
+        };
+        let caller = CheckedAccount::with_recipient(transfer.to, None).unwrap();
+
+        is20_transfer(&canister, caller, &transfer).unwrap();
+        assert_eq!(canister.icrc1_balance_of(alice().into()), 800.into());
+        assert_eq!(canister.icrc1_balance_of(transfer.to), 200.into());
+    }
+
+    #[test]
+    fn transfer_using_default_subaccount() {
+        let canister = test_canister();
+        let transfer = TransferArgs {
+            from_subaccount: None,
+            to: Account::new(bob(), Some(DEFAULT_SUBACCOUNT)),
+            amount: 200.into(),
+            fee: None,
+            memo: None,
+            created_at_time: None,
+        };
+        let caller = CheckedAccount::with_recipient(transfer.to, None).unwrap();
+
+        is20_transfer(&canister, caller, &transfer).unwrap();
+        assert_eq!(canister.icrc1_balance_of(bob().into()), 200.into());
+    }
+
+    // The transactions in the ledger can be saved not in the order of their `created_at_time`
+    // value. In this test we check if the deduplication logic works properly in such cases.
+    #[test]
+    fn validate_time_transactions_with_strange_ts() {
+        let canister = test_canister();
+        let now = ic::time();
+
+        let delayed_transfer = TransferArgs {
+            from_subaccount: None,
+            to: bob().into(),
+            amount: 200.into(),
+            fee: None,
+            memo: None,
+            created_at_time: Some(now + 121_000_000_000),
+        };
+        let caller = CheckedAccount::with_recipient(bob().into(), None).unwrap();
+        let result = is20_transfer(&canister, caller, &delayed_transfer);
+        assert_eq!(result, Err(TxError::CreatedInFuture { ledger_time: now }));
+
+        let transfer = TransferArgs {
+            from_subaccount: None,
+            to: bob().into(),
+            amount: 200.into(),
+            fee: None,
+            memo: None,
+            created_at_time: Some(now),
+        };
+
+        let caller = CheckedAccount::with_recipient(bob().into(), None).unwrap();
+        is20_transfer(&canister, caller, &transfer).unwrap();
+
+        let context = MockContext::new().with_caller(alice()).inject();
+        context.add_time(61_000_000_000);
+
+        let caller = CheckedAccount::with_recipient(bob().into(), None).unwrap();
+        let tx_id = is20_transfer(&canister, caller, &delayed_transfer).unwrap();
+
+        let caller = CheckedAccount::with_recipient(bob().into(), None).unwrap();
+        let result = is20_transfer(&canister, caller, &delayed_transfer);
+        assert_eq!(
+            result,
+            Err(TxError::Duplicate {
+                duplicate_of: tx_id as u64
+            })
+        );
+
+        context.add_time(60_000_000_000);
+
+        let caller = CheckedAccount::with_recipient(bob().into(), None).unwrap();
+        let result = is20_transfer(&canister, caller, &delayed_transfer);
+        assert_eq!(
+            result,
+            Err(TxError::Duplicate {
+                duplicate_of: tx_id as u64
+            })
+        );
+
+        context.add_time(180_000_000_000);
+
+        let caller = CheckedAccount::with_recipient(bob().into(), None).unwrap();
+        let result = is20_transfer(&canister, caller, &delayed_transfer);
+        assert_eq!(
+            result,
+            Err(TxError::TooOld {
+                allowed_window_nanos: 60_000_000_000
+            })
+        );
+
+        // This last transfer is needed to check if the deduplication logic stops at the right
+        // moment when iterating over old transactions. It is visible in the test coverage report
+        // only though.
+        let transfer = TransferArgs {
+            from_subaccount: None,
+            to: bob().into(),
+            amount: 200.into(),
+            fee: None,
+            memo: None,
+            created_at_time: Some(ic::time()),
+        };
+
+        let caller = CheckedAccount::with_recipient(bob().into(), None).unwrap();
+        is20_transfer(&canister, caller, &transfer).unwrap();
     }
 }
