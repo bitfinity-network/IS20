@@ -10,7 +10,6 @@ use ic_storage::stable::Versioned;
 use ic_storage::IcStorage;
 
 use crate::account::{Account, Subaccount, DEFAULT_SUBACCOUNT};
-use crate::error::TxError;
 use crate::ledger::Ledger;
 use crate::types::{Claims, Metadata, StatsData, Value};
 
@@ -19,6 +18,9 @@ pub struct CanisterState {
     pub balances: Balances,
     pub stats: StatsData,
     pub ledger: Ledger,
+
+    // We leave this field here not to introduce new version of the state.
+    #[deprecated(note = "Claims are now stored in owner's subaccounts.")]
     pub claims: Claims,
 }
 
@@ -57,24 +59,17 @@ impl CanisterState {
         }
     }
 
-    pub fn claim_amount(&self, account: AccountIdentifier) -> Tokens128 {
-        self.claims
-            .get(&account)
-            .copied()
-            .unwrap_or(Tokens128::ZERO)
-    }
-
-    pub fn get_claim(&self, subaccount: Option<Subaccount>) -> Result<Tokens128, TxError> {
-        let acc = AccountIdentifier::new(
+    pub fn get_claimable_amount(&self, subaccount: Option<Subaccount>) -> Tokens128 {
+        let claim_subaccount = AccountIdentifier::new(
             ic_canister::ic_kit::ic::caller().into(),
             Some(SubaccountIdentifier(
                 subaccount.unwrap_or(DEFAULT_SUBACCOUNT),
             )),
-        );
-        self.claims
-            .get(&acc)
-            .ok_or(TxError::AccountNotFound)
-            .copied()
+        )
+        .to_address();
+
+        let claim_account = Account::new(self.stats.owner, Some(claim_subaccount));
+        self.balances.balance_of(claim_account)
     }
 }
 

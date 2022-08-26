@@ -143,4 +143,11 @@ impl Ledger {
             self.vec_offset += HISTORY_REMOVAL_BATCH_SIZE as u64;
         }
     }
+
+    pub fn claim(&mut self, claim_account: Account, to: Account, amount: Tokens128) -> TxId {
+        let id = self.next_id();
+        self.push(TxRecord::claim(id, claim_account, to, amount));
+
+        id
+    }
 }

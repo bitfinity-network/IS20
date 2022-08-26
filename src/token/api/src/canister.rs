@@ -6,7 +6,6 @@ use ic_auction::{error::AuctionError, state::AuctionState};
 use ic_canister::ic_kit::ic;
 use ic_canister::{generate_exports, query, state_getter, update, Canister, MethodType};
 use ic_cdk::export::candid::Principal;
-use ic_helpers::ledger::AccountIdentifier;
 use ic_helpers::tokens::Tokens128;
 use ic_storage::IcStorage;
 
@@ -24,7 +23,7 @@ use crate::types::{
 
 use self::is20_transactions::{
     batch_transfer, burn_as_owner, burn_own_tokens, claim, is20_transfer, mint_as_owner,
-    mint_test_token, mint_to_accountid,
+    mint_test_token,
 };
 
 mod inspect;
@@ -164,10 +163,9 @@ pub trait TokenCanisterAPI: Canister + Sized + Auction {
             .list_subaccounts(ic::caller())
     }
 
-    /// This method returns the pending `claim` for the `Account`.
     #[query(trait = true)]
-    fn get_claim(&self, subaccount: Option<Subaccount>) -> Result<Tokens128, TxError> {
-        self.state().borrow().get_claim(subaccount)
+    fn get_claimable_amount(&self, subaccount: Option<Subaccount>) -> Tokens128 {
+        self.state().borrow().get_claimable_amount(subaccount)
     }
 
     #[query(trait = true)]
@@ -319,18 +317,10 @@ pub trait TokenCanisterAPI: Canister + Sized + Auction {
         }
     }
 
-    /// This function mints to `AccountIdentifier`, this is different from `Account`, this adds support for minting to `AccountIdentifier`
-    ///
-    #[cfg_attr(feature = "mint_burn", update(trait = true))]
-    fn mint_to_account_id(&self, to: AccountIdentifier, amount: Tokens128) -> Result<(), TxError> {
-        let _ = CheckedPrincipal::owner(&self.state().borrow().stats)?;
-        mint_to_accountid(&mut *self.state().borrow_mut(), to, amount)
-    }
-
     /// When we mint to `AccountIdentifier`, Only the user who has been minted can claim the amount that has been minted to `AccountIdentifier`, if another user claims the `claim`, it fails with Error `ClaimNotAllowed`.
     #[update(trait = true)]
-    fn claim(&self, account: AccountIdentifier, subaccount: Option<Subaccount>) -> TxReceipt {
-        claim(&mut *self.state().borrow_mut(), account, subaccount)
+    fn claim(&self, subaccount: Option<Subaccount>) -> TxReceipt {
+        claim(&mut *self.state().borrow_mut(), subaccount)
     }
 
     /********************** Transactions ***********************/
@@ -527,29 +517,7 @@ mod tests {
     }
 
     #[test]
-    fn mint_to_account_id() {
-        let subaccount = gen_subaccount();
-        let alice_aid =
-            AccountIdentifier::new(alice().into(), Some(SubaccountIdentifier(subaccount)));
-
-        let (ctx, canister) = test_context();
-        ctx.update_caller(john());
-        assert!(canister
-            .mint_to_account_id(alice_aid, Tokens128::from(100))
-            .is_ok());
-
-        ctx.update_caller(alice());
-        assert!(canister.claim(alice_aid, Some(subaccount)).is_ok());
-        assert_eq!(
-            canister.icrc1_balance_of(Account::new(alice(), Some(subaccount))),
-            Tokens128::from(100)
-        );
-        assert_eq!(canister.icrc1_total_supply(), Tokens128::from(2100));
-        assert_eq!(canister.state().borrow().claims.len(), 0);
-    }
-
-    #[test]
-    fn test_claim_amount() {
+    fn test_claim() {
         let bob_sub = gen_subaccount();
         let alice_sub = gen_subaccount();
 
@@ -561,21 +529,37 @@ mod tests {
         ctx.update_caller(john());
 
         assert!(canister
-            .mint_to_account_id(alice_aid, Tokens128::from(1000))
+            .mint(
+                canister.owner(),
+                Some(alice_aid.to_address()),
+                Tokens128::from(1000)
+            )
             .is_ok());
         assert!(canister
-            .mint_to_account_id(bob_aid, Tokens128::from(2000))
+            .mint(
+                canister.owner(),
+                Some(bob_aid.to_address()),
+                Tokens128::from(2000)
+            )
             .is_ok());
 
         ctx.update_caller(alice());
         assert_eq!(
-            canister.get_claim(Some(alice_sub)).unwrap(),
+            canister.get_claimable_amount(Some(alice_sub)),
             Tokens128::from(1000)
         );
 
+        let balance_before = canister.icrc1_balance_of(alice().into());
+        canister.claim(Some(alice_sub)).unwrap();
+        assert_eq!(
+            canister.icrc1_balance_of(alice().into()),
+            (Tokens128::from(1000) + balance_before).unwrap()
+        );
+        assert_eq!(canister.get_claimable_amount(Some(alice_sub)), 0.into());
+
         ctx.update_caller(bob());
         assert_eq!(
-            canister.get_claim(Some(bob_sub)).unwrap(),
+            canister.get_claimable_amount(Some(bob_sub)),
             Tokens128::from(2000)
         );
     }

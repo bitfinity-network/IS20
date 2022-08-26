@@ -26,8 +26,8 @@ pub enum TxError {
     AmountOverflow,
     #[error("Account is not found")]
     AccountNotFound,
-    #[error("Claim not Allowed")]
-    ClaimNotAllowed,
+    #[error("No claimable tokens are on the requested subaccount")]
+    NothingToClaim,
 }
 
 // This type is the exact error type from ICRC-1 standard. We use it as the return type for

@@ -151,6 +151,7 @@ pub enum Operation {
     TransferFrom,
     Burn,
     Auction,
+    Claim,
 }
 
 /// `PaginatedResult` is returned by paginated queries i.e `get_transactions`.

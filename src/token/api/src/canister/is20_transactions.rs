@@ -264,40 +264,33 @@ pub fn burn_as_owner(
     )
 }
 
-pub fn mint_to_accountid(
-    state: &mut CanisterState,
-    to: AccountIdentifier,
-    amount: Tokens128,
-) -> Result<(), TxError> {
-    let balance = state.claims.entry(to).or_default();
-    let new_balance = (*balance + amount).ok_or(TxError::AmountOverflow)?;
-    *balance = new_balance;
-    Ok(())
-}
-
-pub fn claim(
-    state: &mut CanisterState,
-    account: AccountIdentifier,
-    subaccount: Option<Subaccount>,
-) -> TxReceipt {
+pub fn claim(state: &mut CanisterState, subaccount: Option<Subaccount>) -> TxReceipt {
     let caller = ic_canister::ic_kit::ic::caller();
-    let amount = state.claim_amount(account);
+    let account_id = AccountIdentifier::new(
+        caller.into(),
+        Some(SubaccountIdentifier(subaccount.unwrap_or_default())),
+    );
 
-    if account
-        != AccountIdentifier::new(
-            caller.into(),
-            Some(SubaccountIdentifier(subaccount.unwrap_or_default())),
-        )
-    {
-        return Err(TxError::ClaimNotAllowed);
+    let claim_subaccount = account_id.to_address();
+    let claim_account = Account::new(state.stats.owner, Some(claim_subaccount));
+    let amount = state.balances.balance_of(claim_account);
+    if amount.is_zero() {
+        return Err(TxError::NothingToClaim);
     }
-    let to = Account::new(caller, subaccount);
 
-    let id = mint(state, caller, to, amount);
-
-    state.claims.remove(&account);
-
-    id
+    transfer_internal(
+        &mut state.balances,
+        claim_account,
+        caller.into(),
+        amount,
+        0.into(),
+        state.stats.owner.into(),
+        FeeRatio::default(),
+    )?;
+    let id = state
+        .ledger
+        .claim(claim_account, Account::new(caller, None), amount);
+    Ok(id.into())
 }
 
 pub fn batch_transfer(
@@ -673,6 +666,30 @@ mod tests {
     }
 
     #[test]
+    fn transfer_with_overflow() {
+        let canister = test_canister();
+        canister.state().borrow_mut().stats.fee = 100500.into();
+        let transfer = TransferArgs {
+            from_subaccount: None,
+            to: bob().into(),
+            amount: (u128::MAX - 100000).into(),
+            fee: None,
+            memo: None,
+            created_at_time: None,
+        };
+
+        let caller = CheckedAccount::with_recipient(transfer.to, None).unwrap();
+
+        let res = is20_transfer(&canister, caller, &transfer);
+        assert_eq!(
+            res,
+            Err(TxError::InsufficientFunds {
+                balance: 1000.into()
+            })
+        );
+    }
+
+    #[test]
     fn mint_too_much() {
         let canister = test_canister();
         mint(
@@ -808,5 +825,14 @@ mod tests {
 
         let caller = CheckedAccount::with_recipient(bob().into(), None).unwrap();
         is20_transfer(&canister, caller, &transfer).unwrap();
+    }
+
+    #[test]
+    fn zero_claim_returns_error() {
+        let canister = test_canister();
+        MockContext::new().with_caller(john()).inject();
+
+        let res = claim(&mut canister.state.borrow_mut(), None);
+        assert_eq!(res, Err(TxError::NothingToClaim));
     }
 }

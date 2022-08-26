@@ -1156,9 +1156,13 @@ mod proptests {
                             }
                         }
 
+                        if amount.is_zero() {
+                            prop_assert_eq!(res, Err(TransferError::GenericError { error_code: 500, message: "Amount too small".into() }));
+                            return Ok(());
+                        }
                         if from_balance < amount_with_fee {
                             prop_assert_eq!(res, Err(TransferError::InsufficientFunds { balance:from_balance }));
-                            return Ok(())
+                            return Ok(());
                         }
 
                         if fee_to == from {

@@ -94,4 +94,19 @@ impl TxRecord {
     pub fn contains(&self, pid: Principal) -> bool {
         self.caller == pid || self.from.owner == pid || self.to.owner == pid
     }
+
+    pub fn claim(id: u64, from: Account, to: Account, amount: Tokens128) -> Self {
+        Self {
+            caller: to.owner,
+            index: id,
+            from,
+            to,
+            amount,
+            fee: 0.into(),
+            timestamp: ic::time(),
+            status: TransactionStatus::Succeeded,
+            operation: Operation::Claim,
+            memo: None,
+        }
+    }
 }
