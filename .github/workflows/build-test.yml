@@ -12,6 +12,7 @@ jobs:
     with:
       container-image: ghcr.io/infinity-swap/ic-dev-full:rust1.62-dfx0.9
       skip-test: ${{ github.ref_type == 'tag' }}
+      audit-allow-warnings: true
       git-fetch-depth: '0'
       test-script: |
         ./scripts/build.sh
