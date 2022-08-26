@@ -61,17 +61,23 @@ impl TokenCanister {
         let token_state = self.state().replace(CanisterState::default());
         let auction_state = self.auction_state().replace(AuctionState::default());
 
-        ic_storage::stable::write(&StableState {
+        if let Err(err) = ic_storage::stable::write(&StableState {
             token_state,
             auction_state,
-        })
-        .expect("failed to serialize state to the stable storage");
+        }) {
+            ic_canister::ic_kit::ic::trap(&format!(
+                "Error while serializing state to the stable storage: {err}"
+            ));
+        }
     }
 
     #[post_upgrade]
     fn post_upgrade(&self) {
-        let stable_state = ic_storage::stable::read::<StableState>()
-            .expect("failed to read stable state from the stable storage");
+        let stable_state = ic_storage::stable::read::<StableState>().unwrap_or_else(|err| {
+            ic_canister::ic_kit::ic::trap(&format!(
+                "Error while deserializing state from the stable storage: {err}"
+            ));
+        });
 
         let StableState {
             token_state,

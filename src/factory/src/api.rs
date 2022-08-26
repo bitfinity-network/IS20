@@ -8,6 +8,7 @@ use std::rc::Rc;
 use crate::state::StableState;
 use crate::{error::TokenFactoryError, state::State};
 use candid::Principal;
+use ic_canister::ic_kit::ic;
 use ic_canister::{init, post_upgrade, pre_upgrade, query, update, Canister, PreUpdate};
 use ic_factory::{api::FactoryCanister, error::FactoryError, FactoryConfiguration, FactoryState};
 use ic_helpers::candid_header::{candid_header, CandidHeader};
@@ -39,24 +40,26 @@ impl TokenFactoryCanister {
 
     #[pre_upgrade]
     fn pre_upgrade(&self) {
-        let token_factory_state = Rc::<RefCell<State>>::try_unwrap(self.state.clone())
-            .expect("Someone has the token factory state borrowed. This is a program bug because state lock was bypassed.")
-            .into_inner();
-        let base_factory_state = Rc::<RefCell<FactoryState>>::try_unwrap(self.factory_state())
-            .expect("Someone has the base factory state borrowed. This is a program bug because state lock was bypassed.")
-            .into_inner();
+        let token_factory_state = self.state.replace(State::default());
+        let base_factory_state = self.factory_state().replace(FactoryState::default());
 
-        ic_storage::stable::write(&StableState {
+        if let Err(err) = ic_storage::stable::write(&StableState {
             token_factory_state,
             base_factory_state,
-        })
-        .expect("failed to serialize state to the stable storage");
+        }) {
+            ic::trap(&format!(
+                "Error while seirializing state to the stable storage: {err}"
+            ));
+        }
     }
 
     #[post_upgrade]
     fn post_upgrade(&self) {
-        let stable_state = ic_storage::stable::read::<StableState>()
-            .expect("failed to read stable state from the stable storage");
+        let stable_state = ic_storage::stable::read::<StableState>().unwrap_or_else(|err| {
+            ic::trap(&format!(
+                "Error while deserializing state from the stable storage: {err}",
+            ));
+        });
         let StableState {
             token_factory_state,
             base_factory_state,
@@ -68,8 +71,9 @@ impl TokenFactoryCanister {
 
     #[init]
     pub fn init(&self, controller: Principal, ledger_principal: Option<Principal>) {
-        let ledger = ledger_principal
-            .unwrap_or_else(|| Principal::from_text(DEFAULT_LEDGER_PRINCIPAL).unwrap());
+        let ledger = ledger_principal.unwrap_or_else(|| {
+            Principal::from_text(DEFAULT_LEDGER_PRINCIPAL).expect("const value conversion")
+        });
 
         let factory_configuration =
             FactoryConfiguration::new(ledger, DEFAULT_ICP_FEE, controller, controller);
