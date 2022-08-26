@@ -966,11 +966,6 @@ mod proptests {
             amount: Tokens128,
         },
         Burn(Tokens128, Principal),
-        TransferWithFee {
-            from: Principal,
-            to: Principal,
-            amount: Tokens128,
-        },
         TransferWithoutFee {
             from: Principal,
             to: Principal,
@@ -1004,17 +999,6 @@ mod proptests {
             // Burn
             (make_tokens128(), select_principal(principals.clone()))
                 .prop_map(|(amount, principal)| Action::Burn(amount, principal)),
-            // With fee
-            (
-                select_principal(principals.clone()),
-                select_principal(principals.clone()),
-                make_tokens128()
-            )
-                .prop_map(|(from, to, amount)| Action::TransferWithFee {
-                    from,
-                    to,
-                    amount
-                }),
             // Without fee
             (
                 select_principal(principals.clone()),
@@ -1079,7 +1063,7 @@ mod proptests {
                 decimals,
                 owner,
                 fee,
-                fee_to: fee_to,
+                fee_to,
                 is_test_token: None,
             };
             let canister = TokenCanisterMock::init_instance();
@@ -1193,43 +1177,6 @@ mod proptests {
 
                         prop_assert_eq!((from_balance - amount_with_fee).unwrap(), canister.icrc1_balance_of(Account::new(from, None)));
                         prop_assert_eq!((to_balance + amount).unwrap(), canister.icrc1_balance_of(Account::new(to, None)));
-                    }
-                    TransferWithFee { from, to, amount } => {
-                        MockContext::new().with_caller(from).inject();
-                        let from_balance = canister.icrc1_balance_of(Account::new(from, None));
-                        let to_balance = canister.icrc1_balance_of(Account::new(to, None));
-                        let (fee , fee_to) = canister.state().borrow().stats.fee_info();
-                        let res = canister.transfer_include_fee(None, to, None, amount, None, None);
-
-                        if to == from {
-                            prop_assert_eq!(res, Err(TxError::SelfTransfer));
-                            return Ok(())
-                        }
-
-                        if amount <= fee  {
-                            prop_assert_eq!(res, Err(TxError::AmountTooSmall));
-                            return Ok(());
-                        }
-                        if from_balance < amount {
-                            prop_assert_eq!(res, Err(TxError::InsufficientFunds { balance: from_balance }));
-                            return Ok(());
-                        }
-
-                        // Sometimes the fee can be sent `to` or `from`
-                        if fee_to == from  {
-                            prop_assert_eq!(((from_balance - amount).unwrap() + fee).unwrap(), canister.icrc1_balance_of(Account::new(from, None)));
-                            return Ok(());
-                        }
-
-                        if fee_to == to  {
-                            prop_assert_eq!((to_balance + amount).unwrap(), canister.icrc1_balance_of(Account::new(to, None)));
-                            return Ok(());
-                        }
-
-                        prop_assert!(matches!(res, Ok(_)));
-                        prop_assert_eq!(((to_balance + amount).unwrap() - fee).unwrap(), canister.icrc1_balance_of(Account::new(to, None)));
-                        prop_assert_eq!((from_balance - amount).unwrap(), canister.icrc1_balance_of(Account::new(from, None)));
-
                     }
                 }
             }

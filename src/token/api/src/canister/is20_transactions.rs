@@ -68,9 +68,6 @@ pub(crate) fn transfer_internal(
     auction_fee_ratio: FeeRatio,
 ) -> Result<(), TxError> {
     if amount.is_zero() {
-        // This can happen either if the caller requested zero transfer, or if `transfer_include_fee`
-        // was called with the amount equal to the current fee value. In both cases we don't want
-        // to charge fee for zero transaction so we return an error here.
         return Err(TxError::AmountTooSmall);
     }
 
@@ -116,25 +113,6 @@ pub(crate) fn transfer_internal(
     balances.apply_change(&updates);
 
     Ok(())
-}
-
-/// Transfers `value` amount to the `to` principal, applying American style fee. This means, that
-/// the recipient will receive `value - fee`, and the sender account will be reduced exactly by `value`.
-///
-/// Note, that the `value` cannot be less than the `fee` amount. If the value given is too small,
-/// transaction will fail with `TxError::AmountTooSmall` error.
-pub fn transfer_include_fee(
-    canister: &impl TokenCanisterAPI,
-    from: CheckedAccount<WithRecipient>,
-    transfer_args: &TransferArgs,
-) -> TxReceipt {
-    let (fee, _) = canister.state().borrow().stats.fee_info();
-    let adjusted_amount = (transfer_args.amount - fee).ok_or(TxError::AmountTooSmall)?;
-    if adjusted_amount.is_zero() {
-        return Err(TxError::AmountTooSmall);
-    }
-
-    is20_transfer(canister, from, &transfer_args.with_amount(adjusted_amount))
 }
 
 fn validate_and_get_tx_ts(
@@ -393,7 +371,6 @@ mod tests {
     use ic_canister::ic_kit::mock_principals::{alice, bob, john, xtc};
     use ic_canister::ic_kit::MockContext;
     use ic_canister::Canister;
-    use rand::{thread_rng, Rng};
 
     use crate::account::DEFAULT_SUBACCOUNT;
     use crate::mock::TokenCanisterMock;
@@ -403,14 +380,6 @@ mod tests {
 
     #[cfg(coverage_nightly)]
     use coverage_helper::test;
-
-    // Method for generating random Subaccount.
-    fn gen_subaccount() -> Subaccount {
-        // generate a random subaccount
-        let mut subaccount = [0u8; 32];
-        thread_rng().fill(&mut subaccount);
-        subaccount
-    }
 
     fn test_canister() -> TokenCanisterMock {
         MockContext::new().with_caller(alice()).inject();
@@ -581,91 +550,6 @@ mod tests {
     }
 
     #[test]
-    fn transfer_without_fee() {
-        let canister = test_canister();
-        let bob_sub = gen_subaccount();
-        assert_eq!(
-            Tokens128::from(1000),
-            canister.icrc1_balance_of(Account::new(alice(), None))
-        );
-
-        assert!(canister
-            .transfer_include_fee(None, bob(), None, Tokens128::from(100), None, None)
-            .is_ok());
-        assert_eq!(
-            canister.icrc1_balance_of(Account::new(bob(), None)),
-            Tokens128::from(100)
-        );
-        assert_eq!(
-            canister.icrc1_balance_of(Account::new(alice(), None)),
-            Tokens128::from(900)
-        );
-
-        assert!(canister
-            .transfer_include_fee(None, bob(), Some(bob_sub), Tokens128::from(100), None, None)
-            .is_ok());
-        assert_eq!(
-            canister.icrc1_balance_of(Account::new(bob(), Some(bob_sub))),
-            Tokens128::from(100)
-        );
-    }
-
-    #[test]
-    fn transfer_with_fee() {
-        let bob_sub = gen_subaccount();
-        let canister = test_canister();
-        let mut state = canister.state.borrow_mut();
-        state.stats.fee = Tokens128::from(100);
-        state.stats.fee_to = john();
-        drop(state);
-
-        assert!(canister
-            .transfer_include_fee(None, bob(), None, Tokens128::from(200), None, None)
-            .is_ok());
-        assert_eq!(
-            canister.icrc1_balance_of(Account::new(bob(), None)),
-            Tokens128::from(100)
-        );
-        assert_eq!(
-            canister.icrc1_balance_of(Account::new(alice(), None)),
-            Tokens128::from(800)
-        );
-        assert_eq!(
-            canister.icrc1_balance_of(Account::new(john(), None)),
-            Tokens128::from(100)
-        );
-
-        assert!(canister
-            .transfer_include_fee(None, bob(), Some(bob_sub), Tokens128::from(150), None, None)
-            .is_ok());
-        assert_eq!(
-            canister.icrc1_balance_of(Account::new(bob(), Some(bob_sub))),
-            Tokens128::from(50)
-        );
-    }
-
-    #[test]
-    fn transfer_insufficient_balance() {
-        let canister = test_canister();
-        let balance = canister.icrc1_balance_of(Account::new(alice(), None));
-        assert!(canister
-            .transfer_include_fee(None, bob(), None, Tokens128::from(1001), None, None)
-            .is_err());
-        assert_eq!(
-            canister.transfer_include_fee(None, bob(), None, Tokens128::from(1001), None, None),
-            Err(TxError::InsufficientFunds { balance })
-        );
-        assert_eq!(
-            canister.icrc1_balance_of(Account::new(alice(), None)),
-            Tokens128::from(1000)
-        );
-        assert_eq!(
-            canister.icrc1_balance_of(Account::new(bob(), None)),
-            Tokens128::from(0)
-        );
-    }
-
-    #[test]
     fn deduplication_error() {
         let canister = test_canister();
         let curr_time = ic::time();
@@ -789,24 +673,6 @@ mod tests {
     }
 
     #[test]
-    fn zero_transfers_with_fee() {
-        let canister = test_canister();
-        canister.state().borrow_mut().stats.fee = Tokens128::from(100);
-        let transfer = TransferArgs {
-            from_subaccount: None,
-            to: bob().into(),
-            amount: 100.into(),
-            fee: None,
-            memo: None,
-            created_at_time: None,
-        };
-
-        let caller = CheckedAccount::with_recipient(transfer.to, None).unwrap();
-        let res = transfer_include_fee(&canister, caller, &transfer);
-        assert_eq!(res, Err(TxError::AmountTooSmall));
-    }
-
-    #[test]
     fn mint_too_much() {
         let canister = test_canister();
         mint(
@@ -823,31 +689,6 @@ mod tests {
             Tokens128::from(2000),
         );
         assert_eq!(res, Err(TxError::AmountOverflow));
-    }
-
-    #[test]
-    fn transfer_too_large() {
-        // Calling transfer with such fee and amount will cause Tokens128 overflow, so we check
-        // that transfer returns an error as expected.
-        let canister = test_canister();
-        canister.state().borrow_mut().stats.fee = Tokens128::from(10_000);
-        let transfer = TransferArgs {
-            from_subaccount: None,
-            to: bob().into(),
-            amount: (u128::MAX - 9000).into(),
-            fee: None,
-            memo: None,
-            created_at_time: None,
-        };
-
-        let caller = CheckedAccount::with_recipient(transfer.to, None).unwrap();
-        let res = transfer_include_fee(&canister, caller, &transfer);
-        assert_eq!(
-            res,
-            Err(TxError::InsufficientFunds {
-                balance: 1000.into()
-            })
-        );
     }
 
     #[test]

@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use candid::Nat;
 use candid::{CandidType, Deserialize, Principal};
-use ic_auction::state::AuctionState;
+use ic_auction::state::{AuctionInfo, AuctionState};
 use ic_helpers::ledger::AccountIdentifier;
 use ic_helpers::ledger::Subaccount as SubaccountIdentifier;
 use ic_helpers::tokens::Tokens128;
@@ -198,6 +198,9 @@ impl Versioned for StableState {
         Self::default()
     }
 }
+
+#[derive(Debug, Default, CandidType, Deserialize)]
+pub struct AuctionHistory(pub Vec<AuctionInfo>);
 
 #[derive(CandidType, Default, Debug, Copy, Clone, Deserialize, PartialEq)]
 pub struct FeeRatio(f64);

@@ -17,13 +17,13 @@ use crate::error::{TransferError, TxError};
 use crate::principal::{CheckedPrincipal, Owner};
 use crate::state::CanisterState;
 use crate::types::{
-    BatchTransferArgs, Memo, PaginatedResult, StandardRecord, StatsData, Timestamp, TokenInfo,
+    BatchTransferArgs, PaginatedResult, StandardRecord, StatsData, Timestamp, TokenInfo,
     TransferArgs, TxId, TxReceipt, TxRecord, Value,
 };
 
 use self::is20_transactions::{
     batch_transfer, burn_as_owner, burn_own_tokens, claim, mint_as_owner, mint_test_token,
-    mint_to_accountid, transfer_include_fee,
+    mint_to_accountid,
 };
 
 mod inspect;
@@ -130,7 +130,7 @@ pub trait TokenCanisterAPI: Canister + Sized + Auction {
         } = self.state().borrow().stats;
         TokenInfo {
             metadata: self.state().borrow().get_metadata(),
-            fee_to: fee_to,
+            fee_to,
             history_size: self.state().borrow().ledger.len(),
             deployTime: deploy_time,
             holderNumber: self.state().borrow().balances.0.len(),
@@ -221,35 +221,6 @@ pub trait TokenCanisterAPI: Canister + Sized + Auction {
         let account = CheckedAccount::with_recipient(transfer.to, transfer.from_subaccount)?;
 
         Ok(icrc1_transfer(self, account, &transfer)?)
-    }
-
-    /// Transfers `value` amount to the `to` principal, applying American style fee. This means, that
-    /// the recipient will receive `value - fee`, and the sender account will be reduced exactly by `value`.
-    ///
-    /// Note, that the `value` cannot be less than the `fee` amount. If the value given is too small,
-    /// transaction will fail with `TxError::AmountTooSmall` error.
-    #[cfg_attr(feature = "transfer", update(trait = true))]
-    fn transfer_include_fee(
-        &self,
-        from_subaccount: Option<Subaccount>,
-        to: Principal,
-        to_subaccount: Option<Subaccount>,
-        amount: Tokens128,
-        memo: Option<Memo>,
-        created_at_time: Option<Timestamp>,
-    ) -> TxReceipt {
-        let recipient = Account::new(to, to_subaccount);
-        let account = CheckedAccount::with_recipient(recipient, from_subaccount)?;
-        let args = TransferArgs {
-            from_subaccount,
-            to: recipient,
-            amount,
-            memo,
-            fee: None,
-            created_at_time,
-        };
-
-        transfer_include_fee(self, account, &args)
     }
 
     /// Takes a list of transfers, each of which is a pair of `to` and `value` fields, it returns a `TxReceipt` which contains

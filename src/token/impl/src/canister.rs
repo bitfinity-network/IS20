@@ -34,16 +34,16 @@ pub struct TokenCanister {
 impl TokenCanister {
     #[init]
     pub fn init(&self, metadata: Metadata, amount: Tokens128) {
+        let owner = metadata.owner;
         self.state()
             .borrow_mut()
             .balances
-            .insert(metadata.owner, None, amount);
+            .insert(owner, None, amount);
 
-        self.state().borrow_mut().ledger.mint(
-            Account::from(metadata.owner),
-            Account::from(metadata.owner),
-            amount,
-        );
+        self.state()
+            .borrow_mut()
+            .ledger
+            .mint(Account::from(owner), Account::from(owner), amount);
 
         self.state().borrow_mut().stats = metadata.into();
 
@@ -52,7 +52,7 @@ impl TokenCanister {
             Interval::Period {
                 seconds: DEFAULT_AUCTION_PERIOD_SECONDS,
             },
-            ic_canister::ic_kit::ic::caller(),
+            owner,
         ));
     }
 

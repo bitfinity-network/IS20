@@ -12,12 +12,14 @@ use token_api::{
     account::Account,
     canister::TokenCanisterAPI,
     error::TransferError,
+    state::CanisterState,
     types::{Metadata, StandardRecord, TransferArgs, Value},
 };
 
 fn init() -> (Metadata, TokenCanister, &'static mut MockContext) {
     let ctx = ic_canister::ic_kit::MockContext::new().inject();
     let canister = TokenCanister::init_instance();
+    canister.state().replace(CanisterState::default());
     let meta = Metadata {
         decimals: 11,
         fee: 127.into(),
