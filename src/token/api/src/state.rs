@@ -180,6 +180,10 @@ impl Balances {
             }
         }
     }
+
+    pub fn list_subaccounts(&self, account: Principal) -> HashMap<Subaccount, Tokens128> {
+        self.0.get(&account).cloned().unwrap_or_default()
+    }
 }
 
 /// A wrapper over stable state that is used only during upgrade process.

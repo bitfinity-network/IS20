@@ -3,6 +3,7 @@ use std::rc::Rc;
 
 use ic_auction::api::Auction;
 use ic_auction::{error::AuctionError, state::AuctionState};
+use ic_canister::ic_kit::ic;
 use ic_canister::{generate_exports, query, state_getter, update, Canister, MethodType};
 use ic_cdk::export::candid::Principal;
 use ic_helpers::ledger::AccountIdentifier;
@@ -22,8 +23,8 @@ use crate::types::{
 };
 
 use self::is20_transactions::{
-    batch_transfer, burn_as_owner, burn_own_tokens, claim, mint_as_owner, mint_test_token,
-    mint_to_accountid,
+    batch_transfer, burn_as_owner, burn_own_tokens, claim, is20_transfer, mint_as_owner,
+    mint_test_token, mint_to_accountid,
 };
 
 mod inspect;
@@ -149,6 +150,20 @@ pub trait TokenCanisterAPI: Canister + Sized + Auction {
         self.state().borrow().balances.balance_of(account)
     }
 
+    /// Returns the list of the caller's subaccounts with balances. If the caller account does not exist, will
+    /// return an empty list.
+    ///
+    /// It is intentional that the method does not accept the principal to list the subaccounts
+    /// for, because in some cases the token holder want to keep some of his subaccounts a secret.
+    /// So only own subaccounts can be listed safely.
+    #[query(trait = true)]
+    fn list_subaccounts(&self) -> std::collections::HashMap<Subaccount, Tokens128> {
+        self.state()
+            .borrow()
+            .balances
+            .list_subaccounts(ic::caller())
+    }
+
     /// This method returns the pending `claim` for the `Account`.
     #[query(trait = true)]
     fn get_claim(&self, subaccount: Option<Subaccount>) -> Result<Tokens128, TxError> {
@@ -239,6 +254,12 @@ pub trait TokenCanisterAPI: Canister + Sized + Auction {
             CheckedAccount::with_recipient(recipient, from_subaccount)?;
         }
         batch_transfer(self, from_subaccount, transfers)
+    }
+
+    #[cfg_attr(feature = "transfer", update(trait = true))]
+    fn transfer(&self, transfer: TransferArgs) -> Result<u128, TxError> {
+        let account = CheckedAccount::with_recipient(transfer.to, transfer.from_subaccount)?;
+        is20_transfer(self, account, &transfer)
     }
 
     #[cfg_attr(feature = "mint_burn", update(trait = true))]
@@ -747,5 +768,27 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(minting_account, Some(alice().into()));
+    }
+
+    #[tokio::test]
+    #[cfg_attr(coverage_nightly, no_coverage)]
+    async fn list_subaccounts() {
+        let canister = test_canister();
+        let subaccount: Subaccount = [1; 32];
+        canister
+            .transfer(TransferArgs {
+                from_subaccount: None,
+                to: Account::new(alice(), Some(subaccount)),
+                amount: 100.into(),
+                fee: None,
+                memo: None,
+                created_at_time: None,
+            })
+            .unwrap();
+
+        let list = canister_call!(canister.list_subaccounts(), std::collections::HashMap<Subaccount, Tokens128>).await.unwrap();
+        assert_eq!(list.len(), 2);
+        assert_eq!(list[&DEFAULT_SUBACCOUNT], 900.into());
+        assert_eq!(list[&subaccount], 100.into());
     }
 }
