@@ -59,7 +59,11 @@ impl CanisterState {
         }
     }
 
-    pub fn get_claimable_amount(&self, subaccount: Option<Subaccount>) -> Tokens128 {
+    pub fn get_claimable_amount(
+        &self,
+        holder: Principal,
+        subaccount: Option<Subaccount>,
+    ) -> Tokens128 {
         let claim_subaccount = AccountIdentifier::new(
             ic_canister::ic_kit::ic::caller().into(),
             Some(SubaccountIdentifier(
@@ -68,7 +72,7 @@ impl CanisterState {
         )
         .to_address();
 
-        let claim_account = Account::new(self.stats.owner, Some(claim_subaccount));
+        let claim_account = Account::new(holder, Some(claim_subaccount));
         self.balances.balance_of(claim_account)
     }
 }

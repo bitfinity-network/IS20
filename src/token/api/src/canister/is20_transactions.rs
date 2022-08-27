@@ -264,15 +264,26 @@ pub fn burn_as_owner(
     )
 }
 
-pub fn claim(state: &mut CanisterState, subaccount: Option<Subaccount>) -> TxReceipt {
-    let caller = ic_canister::ic_kit::ic::caller();
+pub fn get_claim_subaccount(
+    claimer: Principal,
+    claimer_subaccount: Option<Subaccount>,
+) -> Subaccount {
     let account_id = AccountIdentifier::new(
-        caller.into(),
-        Some(SubaccountIdentifier(subaccount.unwrap_or_default())),
+        claimer.into(),
+        Some(SubaccountIdentifier(claimer_subaccount.unwrap_or_default())),
     );
 
-    let claim_subaccount = account_id.to_address();
-    let claim_account = Account::new(state.stats.owner, Some(claim_subaccount));
+    account_id.to_address()
+}
+
+pub fn claim(
+    state: &mut CanisterState,
+    holder: Principal,
+    subaccount: Option<Subaccount>,
+) -> TxReceipt {
+    let caller = ic_canister::ic_kit::ic::caller();
+    let claim_subaccount = get_claim_subaccount(caller, subaccount);
+    let claim_account = Account::new(holder, Some(claim_subaccount));
     let amount = state.balances.balance_of(claim_account);
     if amount.is_zero() {
         return Err(TxError::NothingToClaim);

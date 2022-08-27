@@ -22,8 +22,8 @@ use crate::types::{
 };
 
 use self::is20_transactions::{
-    batch_transfer, burn_as_owner, burn_own_tokens, claim, is20_transfer, mint_as_owner,
-    mint_test_token,
+    batch_transfer, burn_as_owner, burn_own_tokens, claim, get_claim_subaccount, is20_transfer,
+    mint_as_owner, mint_test_token,
 };
 
 mod inspect;
@@ -66,6 +66,8 @@ pub trait TokenCanisterAPI: Canister + Sized + Auction {
         inspect::inspect_message(state, method, caller)
     }
 
+    /********************** METADATA ***********************/
+
     #[query(trait = true)]
     fn is_test_token(&self) -> bool {
         self.state().borrow().stats.is_test_token
@@ -87,41 +89,6 @@ pub trait TokenCanisterAPI: Canister + Sized + Auction {
     }
 
     #[query(trait = true)]
-    fn icrc1_name(&self) -> String {
-        self.state().borrow().stats.name.clone()
-    }
-
-    #[query(trait = true)]
-    fn icrc1_symbol(&self) -> String {
-        self.state().borrow().stats.symbol.clone()
-    }
-
-    #[query(trait = true)]
-    fn icrc1_decimals(&self) -> u8 {
-        self.state().borrow().stats.decimals
-    }
-
-    /// Returns the default transfer fee.
-    #[query(trait = true)]
-    fn icrc1_fee(&self) -> Tokens128 {
-        self.state().borrow().stats.fee
-    }
-    #[query(trait = true)]
-    fn icrc1_metadata(&self) -> Vec<(String, Value)> {
-        self.state().borrow().icrc1_metadata()
-    }
-
-    #[query(trait = true)]
-    fn icrc1_supported_standards(&self) -> Vec<StandardRecord> {
-        self.state().borrow().stats.supported_standards()
-    }
-
-    #[query(trait = true)]
-    fn icrc1_minting_account(&self) -> Option<Account> {
-        Some(self.state().borrow().stats.owner.into())
-    }
-
-    #[query(trait = true)]
     fn get_token_info(&self) -> TokenInfo {
         let StatsData {
             fee_to,
@@ -135,54 +102,6 @@ pub trait TokenCanisterAPI: Canister + Sized + Auction {
             deployTime: deploy_time,
             holderNumber: self.state().borrow().balances.0.len(),
             cycles: ic_canister::ic_kit::ic::balance(),
-        }
-    }
-
-    /// This method retreieves holders of `Account` and their amounts.
-    #[query(trait = true)]
-    fn get_holders(&self, start: usize, limit: usize) -> Vec<(Account, Tokens128)> {
-        self.state().borrow().balances.get_holders(start, limit)
-    }
-
-    #[query(trait = true)]
-    fn icrc1_balance_of(&self, account: Account) -> Tokens128 {
-        self.state().borrow().balances.balance_of(account)
-    }
-
-    /// Returns the list of the caller's subaccounts with balances. If the caller account does not exist, will
-    /// return an empty list.
-    ///
-    /// It is intentional that the method does not accept the principal to list the subaccounts
-    /// for, because in some cases the token holder want to keep some of his subaccounts a secret.
-    /// So only own subaccounts can be listed safely.
-    #[query(trait = true)]
-    fn list_subaccounts(&self) -> std::collections::HashMap<Subaccount, Tokens128> {
-        self.state()
-            .borrow()
-            .balances
-            .list_subaccounts(ic::caller())
-    }
-
-    #[query(trait = true)]
-    fn get_claimable_amount(&self, subaccount: Option<Subaccount>) -> Tokens128 {
-        self.state().borrow().get_claimable_amount(subaccount)
-    }
-
-    #[query(trait = true)]
-    fn history_size(&self) -> u64 {
-        self.state().borrow().ledger.len()
-    }
-
-    fn update_stats(&self, _caller: CheckedPrincipal<Owner>, update: CanisterUpdate) {
-        use CanisterUpdate::*;
-        match update {
-            Name(name) => self.state().borrow_mut().stats.name = name,
-            Symbol(symbol) => self.state().borrow_mut().stats.symbol = symbol,
-            Logo(logo) => self.state().borrow_mut().stats.logo = logo,
-            Fee(fee) => self.state().borrow_mut().stats.fee = fee,
-            FeeTo(fee_to) => self.state().borrow_mut().stats.fee_to = fee_to,
-            Owner(owner) => self.state().borrow_mut().stats.owner = owner,
-            MinCycles(min_cycles) => self.state().borrow_mut().stats.min_cycles = min_cycles,
         }
     }
 
@@ -228,12 +147,97 @@ pub trait TokenCanisterAPI: Canister + Sized + Auction {
         Ok(())
     }
 
-    /********************** TRANSFERS ***********************/
-    #[cfg_attr(feature = "transfer", update(trait = true))]
-    fn icrc1_transfer(&self, transfer: TransferArgs) -> Result<u128, TransferError> {
-        let account = CheckedAccount::with_recipient(transfer.to, transfer.from_subaccount)?;
+    /********************** BALANCCES INFO ***********************/
 
-        Ok(icrc1_transfer(self, account, &transfer)?)
+    /// This method retreieves holders of `Account` and their amounts.
+    #[query(trait = true)]
+    fn get_holders(&self, start: usize, limit: usize) -> Vec<(Account, Tokens128)> {
+        self.state().borrow().balances.get_holders(start, limit)
+    }
+
+    /// Returns the list of the caller's subaccounts with balances. If the caller account does not exist, will
+    /// return an empty list.
+    ///
+    /// It is intentional that the method does not accept the principal to list the subaccounts
+    /// for, because in some cases the token holder want to keep some of his subaccounts a secret.
+    /// So only own subaccounts can be listed safely.
+    #[query(trait = true)]
+    fn list_subaccounts(&self) -> std::collections::HashMap<Subaccount, Tokens128> {
+        self.state()
+            .borrow()
+            .balances
+            .list_subaccounts(ic::caller())
+    }
+
+    /********************** CLAIMS ***********************/
+
+    #[query(trait = true)]
+    fn get_claimable_amount(&self, holder: Principal, subaccount: Option<Subaccount>) -> Tokens128 {
+        self.state()
+            .borrow()
+            .get_claimable_amount(holder, subaccount)
+    }
+
+    #[query(trait = true)]
+    fn get_claim_subaccount(
+        &self,
+        claimer: Principal,
+        claimer_subaccount: Option<Subaccount>,
+    ) -> Subaccount {
+        get_claim_subaccount(claimer, claimer_subaccount)
+    }
+
+    #[update(trait = true)]
+    fn claim(&self, holder: Principal, subaccount: Option<Subaccount>) -> TxReceipt {
+        claim(&mut *self.state().borrow_mut(), holder, subaccount)
+    }
+
+    /********************** TRANSACTION HISTORY ***********************/
+
+    #[query(trait = true)]
+    fn history_size(&self) -> u64 {
+        self.state().borrow().ledger.len()
+    }
+
+    #[query(trait = true)]
+    fn get_transaction(&self, id: TxId) -> TxRecord {
+        self.state().borrow().ledger.get(id).unwrap_or_else(|| {
+            ic_canister::ic_kit::ic::trap(&format!("Transaction {} does not exist", id))
+        })
+    }
+
+    /// Returns a list of transactions in paginated form. The `who` is optional, if given, only transactions of the `who` are
+    /// returned. `count` is the number of transactions to return, `transaction_id` is the transaction index which is used as
+    /// the offset of the first transaction to return, any
+    ///
+    /// It returns `PaginatedResult` a struct, which contains `result` which is a list of transactions `Vec<TxRecord>` that meet the requirements of the query,
+    /// and `next_id` which is the index of the next transaction to return.
+    #[query(trait = true)]
+    fn get_transactions(
+        &self,
+        who: Option<Principal>,
+        count: usize,
+        transaction_id: Option<TxId>,
+    ) -> PaginatedResult {
+        self.state().borrow().ledger.get_transactions(
+            who,
+            count.min(MAX_TRANSACTION_QUERY_LEN),
+            transaction_id,
+        )
+    }
+
+    /// Returns the total number of transactions related to the user `who`.
+    #[query(trait = true)]
+    fn get_user_transaction_count(&self, who: Principal) -> usize {
+        self.state().borrow().ledger.get_len_user_history(who)
+    }
+
+    /********************** IS20 TRANSACTIONS ***********************/
+
+    #[cfg_attr(feature = "transfer", update(trait = true))]
+    fn transfer(&self, transfer: TransferArgs) -> Result<u128, TxError> {
+        let account = CheckedAccount::with_recipient(transfer.to, transfer.from_subaccount)?;
+        is20_transfer(self, account, &transfer)
     }
 
     /// Takes a list of transfers, each of which is a pair of `to` and `value` fields, it returns a `TxReceipt` which contains
@@ -252,12 +256,6 @@ pub trait TokenCanisterAPI: Canister + Sized + Auction {
             CheckedAccount::with_recipient(recipient, from_subaccount)?;
         }
         batch_transfer(self, from_subaccount, transfers)
-    }
-
-    #[cfg_attr(feature = "transfer", update(trait = true))]
-    fn transfer(&self, transfer: TransferArgs) -> Result<u128, TxError> {
-        let account = CheckedAccount::with_recipient(transfer.to, transfer.from_subaccount)?;
-        is20_transfer(self, account, &transfer)
     }
 
     #[cfg_attr(feature = "mint_burn", update(trait = true))]
@@ -317,51 +315,75 @@ pub trait TokenCanisterAPI: Canister + Sized + Auction {
         }
     }
 
-    /// When we mint to `AccountIdentifier`, Only the user who has been minted can claim the amount that has been minted to `AccountIdentifier`, if another user claims the `claim`, it fails with Error `ClaimNotAllowed`.
-    #[update(trait = true)]
-    fn claim(&self, subaccount: Option<Subaccount>) -> TxReceipt {
-        claim(&mut *self.state().borrow_mut(), subaccount)
+    /********************** ICRC-1 METHODS ***********************/
+
+    #[query(trait = true)]
+    fn icrc1_balance_of(&self, account: Account) -> Tokens128 {
+        self.state().borrow().balances.balance_of(account)
     }
 
-    /********************** Transactions ***********************/
-    #[query(trait = true)]
-    fn get_transaction(&self, id: TxId) -> TxRecord {
-        self.state().borrow().ledger.get(id).unwrap_or_else(|| {
-            ic_canister::ic_kit::ic::trap(&format!("Transaction {} does not exist", id))
-        })
+    #[cfg_attr(feature = "transfer", update(trait = true))]
+    fn icrc1_transfer(&self, transfer: TransferArgs) -> Result<u128, TransferError> {
+        let account = CheckedAccount::with_recipient(transfer.to, transfer.from_subaccount)?;
+
+        Ok(icrc1_transfer(self, account, &transfer)?)
     }
 
-    /// Returns a list of transactions in paginated form. The `who` is optional, if given, only transactions of the `who` are
-    /// returned. `count` is the number of transactions to return, `transaction_id` is the transaction index which is used as
-    /// the offset of the first transaction to return, any
-    ///
-    /// It returns `PaginatedResult` a struct, which contains `result` which is a list of transactions `Vec<TxRecord>` that meet the requirements of the query,
-    /// and `next_id` which is the index of the next transaction to return.
     #[query(trait = true)]
-    fn get_transactions(
-        &self,
-        who: Option<Principal>,
-        count: usize,
-        transaction_id: Option<TxId>,
-    ) -> PaginatedResult {
-        self.state().borrow().ledger.get_transactions(
-            who,
-            count.min(MAX_TRANSACTION_QUERY_LEN),
-            transaction_id,
-        )
+    fn icrc1_name(&self) -> String {
+        self.state().borrow().stats.name.clone()
     }
 
-    /// Returns the total number of transactions related to the user `who`.
     #[query(trait = true)]
-    fn get_user_transaction_count(&self, who: Principal) -> usize {
-        self.state().borrow().ledger.get_len_user_history(who)
+    fn icrc1_symbol(&self) -> String {
+        self.state().borrow().stats.symbol.clone()
     }
+
+    #[query(trait = true)]
+    fn icrc1_decimals(&self) -> u8 {
+        self.state().borrow().stats.decimals
+    }
+
+    /// Returns the default transfer fee.
+    #[query(trait = true)]
+    fn icrc1_fee(&self) -> Tokens128 {
+        self.state().borrow().stats.fee
+    }
+    #[query(trait = true)]
+    fn icrc1_metadata(&self) -> Vec<(String, Value)> {
+        self.state().borrow().icrc1_metadata()
+    }
+
+    #[query(trait = true)]
+    fn icrc1_supported_standards(&self) -> Vec<StandardRecord> {
+        self.state().borrow().stats.supported_standards()
+    }
+
+    #[query(trait = true)]
+    fn icrc1_minting_account(&self) -> Option<Account> {
+        Some(self.state().borrow().stats.owner.into())
+    }
+
+    /********************** INTERNAL METHODS ***********************/
 
     // Important: This function *must* be defined to be the
     // last one in the trait because it depends on the order
     // of expansion of update/query(trait = true) methods.
     fn get_idl() -> ic_canister::Idl {
         ic_canister::generate_idl!()
+    }
+
+    fn update_stats(&self, _caller: CheckedPrincipal<Owner>, update: CanisterUpdate) {
+        use CanisterUpdate::*;
+        match update {
+            Name(name) => self.state().borrow_mut().stats.name = name,
+            Symbol(symbol) => self.state().borrow_mut().stats.symbol = symbol,
+            Logo(logo) => self.state().borrow_mut().stats.logo = logo,
+            Fee(fee) => self.state().borrow_mut().stats.fee = fee,
+            FeeTo(fee_to) => self.state().borrow_mut().stats.fee_to = fee_to,
+            Owner(owner) => self.state().borrow_mut().stats.owner = owner,
+            MinCycles(min_cycles) => self.state().borrow_mut().stats.min_cycles = min_cycles,
+        }
     }
 }
 
@@ -545,21 +567,24 @@ mod tests {
 
         ctx.update_caller(alice());
         assert_eq!(
-            canister.get_claimable_amount(Some(alice_sub)),
+            canister.get_claimable_amount(canister.owner(), Some(alice_sub)),
             Tokens128::from(1000)
         );
 
         let balance_before = canister.icrc1_balance_of(alice().into());
-        canister.claim(Some(alice_sub)).unwrap();
+        canister.claim(canister.owner(), Some(alice_sub)).unwrap();
         assert_eq!(
             canister.icrc1_balance_of(alice().into()),
             (Tokens128::from(1000) + balance_before).unwrap()
         );
-        assert_eq!(canister.get_claimable_amount(Some(alice_sub)), 0.into());
+        assert_eq!(
+            canister.get_claimable_amount(canister.owner(), Some(alice_sub)),
+            0.into()
+        );
 
         ctx.update_caller(bob());
         assert_eq!(
-            canister.get_claimable_amount(Some(bob_sub)),
+            canister.get_claimable_amount(canister.owner(), Some(bob_sub)),
             Tokens128::from(2000)
         );
     }
