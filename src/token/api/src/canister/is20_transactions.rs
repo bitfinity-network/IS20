@@ -843,7 +843,7 @@ mod tests {
         let canister = test_canister();
         MockContext::new().with_caller(john()).inject();
 
-        let res = claim(&mut canister.state.borrow_mut(), None);
+        let res = claim(&mut canister.state.borrow_mut(), alice(), None);
         assert_eq!(res, Err(TxError::NothingToClaim));
     }
 }
