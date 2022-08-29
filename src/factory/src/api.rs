@@ -48,7 +48,7 @@ impl TokenFactoryCanister {
             base_factory_state,
         }) {
             ic::trap(&format!(
-                "Error while seirializing state to the stable storage: {err}"
+                "Error while serializing state to the stable storage: {err}"
             ));
         }
     }
