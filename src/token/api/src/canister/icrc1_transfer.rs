@@ -1,4 +1,4 @@
-use crate::account::{Account, CheckedAccount, WithRecipient};
+use crate::account::{AccountInternal, CheckedAccount, WithRecipient};
 use crate::types::{TransferArgs, TxReceipt};
 
 use super::is20_transactions::burn;
@@ -15,12 +15,12 @@ pub(crate) fn icrc1_transfer(
     transfer: &TransferArgs,
 ) -> TxReceipt {
     let amount = transfer.amount;
-    let minter = Account::new(canister.state().borrow().stats.owner, None);
+    let minter = AccountInternal::new(canister.state().borrow().stats.owner, None);
     if caller.inner() == minter {
         return mint(
             &mut canister.state().borrow_mut(),
             caller.inner().owner,
-            transfer.to,
+            transfer.to.into(),
             amount,
         );
     }
@@ -48,7 +48,7 @@ mod tests {
     use ic_helpers::tokens::Tokens128;
     use rand::prelude::*;
 
-    use crate::account::Subaccount;
+    use crate::account::{Account, Subaccount};
     use crate::canister::is20_auction::auction_principal;
     use crate::error::{TransferError, TxError};
     use crate::mock::*;
@@ -952,6 +952,7 @@ mod proptests {
     use proptest::prelude::*;
     use proptest::sample::Index;
 
+    use crate::account::Account;
     use crate::error::{TransferError, TxError};
     use crate::mock::*;
     use crate::types::Metadata;

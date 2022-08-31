@@ -15,7 +15,7 @@ use ic_helpers::candid_header::{candid_header, CandidHeader};
 use ic_helpers::tokens::Tokens128;
 use token::types::Metadata;
 
-const DEFAULT_LEDGER_PRINCIPAL: &str = "ryjl3-tyaaa-aaaaa-aaaba-cai";
+const DEFAULT_LEDGER_PRINCIPAL: Principal = Principal::from_slice(&[0, 0, 0, 0, 0, 0, 0, 2, 1, 1]);
 const DEFAULT_ICP_FEE: u64 = 10u64.pow(8); // 1 ICP
 
 #[cfg(not(feature = "no_api"))]
@@ -71,9 +71,7 @@ impl TokenFactoryCanister {
 
     #[init]
     pub fn init(&self, controller: Principal, ledger_principal: Option<Principal>) {
-        let ledger = ledger_principal.unwrap_or_else(|| {
-            Principal::from_text(DEFAULT_LEDGER_PRINCIPAL).expect("const value conversion")
-        });
+        let ledger = ledger_principal.unwrap_or(DEFAULT_LEDGER_PRINCIPAL);
 
         let factory_configuration =
             FactoryConfiguration::new(ledger, DEFAULT_ICP_FEE, controller, controller);
@@ -187,5 +185,17 @@ impl FactoryCanister for TokenFactoryCanister {
     fn factory_state(&self) -> Rc<RefCell<FactoryState>> {
         use ic_storage::IcStorage;
         FactoryState::get()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn ledger_principal() {
+        const LEDGER: &str = "ryjl3-tyaaa-aaaaa-aaaba-cai";
+        let original_principal = Principal::from_text(LEDGER).unwrap();
+        assert_eq!(DEFAULT_LEDGER_PRINCIPAL, original_principal);
     }
 }

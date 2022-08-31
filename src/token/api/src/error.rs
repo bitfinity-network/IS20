@@ -6,27 +6,27 @@ use crate::types::Timestamp;
 
 #[derive(CandidType, Debug, PartialEq, Deserialize, Error)]
 pub enum TxError {
-    #[error("Unauthorized")]
+    #[error("unauthorized")]
     Unauthorized,
-    #[error("Amount too small")]
+    #[error("amount too small")]
     AmountTooSmall,
-    #[error("Bad fee {expected_fee}")]
+    #[error("bad fee {expected_fee}")]
     BadFee { expected_fee: Tokens128 },
-    #[error("Insufficient funds : {balance}")]
+    #[error("insufficient funds : {balance}")]
     InsufficientFunds { balance: Tokens128 },
-    #[error("Transaction is too old : {allowed_window_nanos}")]
+    #[error("transaction is too old : {allowed_window_nanos}")]
     TooOld { allowed_window_nanos: u64 },
-    #[error("Transaction is created in the future {ledger_time}")]
+    #[error("transaction is created in the future {ledger_time}")]
     CreatedInFuture { ledger_time: u64 },
-    #[error("Transaction is duplicate of {duplicate_of}")]
+    #[error("transaction is duplicate of {duplicate_of}")]
     Duplicate { duplicate_of: u64 },
-    #[error("Self transfer")]
+    #[error("self transfer")]
     SelfTransfer,
-    #[error("Amount overflow")]
+    #[error("amount overflow")]
     AmountOverflow,
-    #[error("Account is not found")]
+    #[error("account is not found")]
     AccountNotFound,
-    #[error("No claimable tokens are on the requested subaccount")]
+    #[error("no claimable tokens are on the requested subaccount")]
     NothingToClaim,
 }
 

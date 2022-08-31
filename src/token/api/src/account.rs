@@ -10,10 +10,24 @@ pub static DEFAULT_SUBACCOUNT: Subaccount = [0u8; 32];
 #[derive(Debug, Clone, CandidType, Deserialize, Copy, PartialEq, Eq)]
 pub struct Account {
     pub owner: Principal,
-    pub subaccount: Subaccount,
+    pub subaccount: Option<Subaccount>,
 }
 
 impl Account {
+    pub fn new(owner: Principal, subaccount: Option<Subaccount>) -> Self {
+        Self { owner, subaccount }
+    }
+}
+
+// We use internal type separately from `Acccount` to make it semantically more correct. This
+// simplifies, for example comparison of accounts with default subaccount.
+#[derive(Debug, Clone, CandidType, Deserialize, Copy, PartialEq, Eq)]
+pub struct AccountInternal {
+    pub owner: Principal,
+    pub subaccount: Subaccount,
+}
+
+impl AccountInternal {
     pub fn new(owner: Principal, subaccount: Option<Subaccount>) -> Self {
         Self {
             owner,
@@ -22,13 +36,43 @@ impl Account {
     }
 }
 
-impl From<Principal> for Account {
+impl From<Principal> for AccountInternal {
     fn from(owner: Principal) -> Self {
         Self::new(owner, None)
     }
 }
 
-impl Display for Account {
+impl From<Principal> for Account {
+    fn from(owner: Principal) -> Self {
+        Self {
+            owner,
+            subaccount: None,
+        }
+    }
+}
+
+impl From<Account> for AccountInternal {
+    fn from(acc: Account) -> Self {
+        Self::new(acc.owner, acc.subaccount)
+    }
+}
+
+impl From<AccountInternal> for Account {
+    fn from(acc: AccountInternal) -> Self {
+        let subaccount = if acc.subaccount == DEFAULT_SUBACCOUNT {
+            None
+        } else {
+            Some(acc.subaccount)
+        };
+
+        Account {
+            owner: acc.owner,
+            subaccount,
+        }
+    }
+}
+
+impl Display for AccountInternal {
     fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
         if self.subaccount == DEFAULT_SUBACCOUNT {
             write!(f, "Account({})", self.owner)
@@ -45,32 +89,32 @@ impl Display for Account {
 
 pub type Subaccount = [u8; 32];
 
-pub struct CheckedAccount<T>(Account, T);
+pub struct CheckedAccount<T>(AccountInternal, T);
 
 impl<T> CheckedAccount<T> {
-    pub fn inner(&self) -> Account {
+    pub fn inner(&self) -> AccountInternal {
         self.0
     }
 }
 
 pub struct WithRecipient {
-    pub recipient: Account,
+    pub recipient: AccountInternal,
 }
 
 impl CheckedAccount<WithRecipient> {
     pub fn with_recipient(
-        recipient: Account,
+        recipient: AccountInternal,
         from_subaccount: Option<Subaccount>,
     ) -> Result<Self, TxError> {
         let caller = ic_canister::ic_kit::ic::caller();
-        let from = Account::new(caller, from_subaccount);
+        let from = AccountInternal::new(caller, from_subaccount);
         if recipient == from {
             Err(TxError::SelfTransfer)
         } else {
             Ok(Self(from, WithRecipient { recipient }))
         }
     }
-    pub fn recipient(&self) -> Account {
+    pub fn recipient(&self) -> AccountInternal {
         self.1.recipient
     }
 }
@@ -85,8 +129,8 @@ mod tests {
 
     #[test]
     fn compare_default_subaccount_and_none() {
-        let acc1 = Account::new(alice(), None);
-        let acc2 = Account::new(alice(), Some(DEFAULT_SUBACCOUNT));
+        let acc1 = AccountInternal::new(alice(), None);
+        let acc2 = AccountInternal::new(alice(), Some(DEFAULT_SUBACCOUNT));
 
         assert_eq!(acc1, acc2);
     }
@@ -94,28 +138,31 @@ mod tests {
     #[test]
     fn account_display() {
         assert_eq!(
-            format!("{}", Account::new(alice(), None)),
+            format!("{}", AccountInternal::new(alice(), None)),
             "Account(sgymv-uiaaa-aaaaa-aaaia-cai)".to_string()
         );
         assert_eq!(
-            format!("{:?}", Account::new(alice(), None)),
-            "Account { owner: Principal(PrincipalInner { len: 10, bytes: [0, 0, 0, 0, 0, 0, 0, 16, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0] }), subaccount: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0] }".to_string()
+            format!("{:?}", AccountInternal::new(alice(), None)),
+            "AccountInternal { owner: Principal(PrincipalInner { len: 10, bytes: [0, 0, 0, 0, 0, 0, 0, 16, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0] }), subaccount: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0] }".to_string()
         );
         assert_eq!(
-            format!("{}", Account::new(alice(), Some(DEFAULT_SUBACCOUNT))),
+            format!(
+                "{}",
+                AccountInternal::new(alice(), Some(DEFAULT_SUBACCOUNT))
+            ),
             "Account(sgymv-uiaaa-aaaaa-aaaia-cai)".to_string()
         );
         assert_eq!(
-            format!("{}", Account::new(alice(), Some([1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,255]))),
+            format!("{}", AccountInternal::new(alice(), Some([1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,255]))),
             "Account(sgymv-uiaaa-aaaaa-aaaia-cai, 01000000000000000000000000000000000000000000000000000000000000FF)".to_string()
         );
     }
 
     #[test]
     fn serialization() {
-        let acc = Account::new(alice(), Some([1; 32]));
+        let acc = AccountInternal::new(alice(), Some([1; 32]));
         let serialized = Encode!(&acc).unwrap();
-        let deserialized = Decode!(&serialized, Account).unwrap();
+        let deserialized = Decode!(&serialized, AccountInternal).unwrap();
 
         assert_eq!(deserialized, acc);
     }

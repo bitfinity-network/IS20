@@ -18,7 +18,7 @@ use ic_helpers::{
 use ic_storage::IcStorage;
 use std::{cell::RefCell, rc::Rc};
 use token_api::{
-    account::Account,
+    account::AccountInternal,
     canister::{TokenCanisterAPI, DEFAULT_AUCTION_PERIOD_SECONDS},
     state::{CanisterState, StableState},
     types::Metadata,
@@ -40,10 +40,11 @@ impl TokenCanister {
             .balances
             .insert(owner, None, amount);
 
-        self.state()
-            .borrow_mut()
-            .ledger
-            .mint(Account::from(owner), Account::from(owner), amount);
+        self.state().borrow_mut().ledger.mint(
+            AccountInternal::from(owner),
+            AccountInternal::from(owner),
+            amount,
+        );
 
         self.state().borrow_mut().stats = metadata.into();
 
@@ -156,7 +157,7 @@ mod test {
         canister.__pre_upgrade();
 
         // Update the value without writing it to stable storage
-        canister.state().borrow_mut().stats.name = "David Coperfield".to_string();
+        canister.state().borrow_mut().stats.name = "David Copperfield".to_string();
 
         // Upgrade the canister should have the state
         // written before pre_upgrade

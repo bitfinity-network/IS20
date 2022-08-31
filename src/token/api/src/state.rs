@@ -9,7 +9,7 @@ use ic_helpers::tokens::Tokens128;
 use ic_storage::stable::Versioned;
 use ic_storage::IcStorage;
 
-use crate::account::{Account, Subaccount, DEFAULT_SUBACCOUNT};
+use crate::account::{AccountInternal, Subaccount, DEFAULT_SUBACCOUNT};
 use crate::ledger::Ledger;
 use crate::types::{Claims, Metadata, StatsData, Value};
 
@@ -19,8 +19,8 @@ pub struct CanisterState {
     pub stats: StatsData,
     pub ledger: Ledger,
 
-    // We leave this field here not to introduce new version of the state.
-    #[deprecated(note = "Claims are now stored in owner's subaccounts.")]
+    // We leave this field here to not introduce a new version of the state.
+    #[deprecated(note = "claims are now stored in owner's subaccounts.")]
     pub claims: Claims,
 }
 
@@ -72,7 +72,7 @@ impl CanisterState {
         )
         .to_address();
 
-        let claim_account = Account::new(holder, Some(claim_subaccount));
+        let claim_account = AccountInternal::new(holder, Some(claim_subaccount));
         self.balances.balance_of(claim_account)
     }
 }
@@ -102,13 +102,13 @@ impl Balances {
             .insert(subaccount.unwrap_or(DEFAULT_SUBACCOUNT), token);
     }
 
-    pub fn get_mut(&mut self, account: Account) -> Option<&mut Tokens128> {
+    pub fn get_mut(&mut self, account: AccountInternal) -> Option<&mut Tokens128> {
         self.0
             .get_mut(&account.owner)
             .and_then(|subaccounts| subaccounts.get_mut(&account.subaccount))
     }
 
-    pub fn get_mut_or_insert_default(&mut self, account: Account) -> &mut Tokens128 {
+    pub fn get_mut_or_insert_default(&mut self, account: AccountInternal) -> &mut Tokens128 {
         self.0
             .entry(account.owner)
             .or_default()
@@ -116,7 +116,7 @@ impl Balances {
             .or_default()
     }
 
-    pub fn balance_of(&self, account: Account) -> Tokens128 {
+    pub fn balance_of(&self, account: AccountInternal) -> Tokens128 {
         self.0
             .get(&account.owner)
             .and_then(|subaccounts| subaccounts.get(&account.subaccount))
@@ -124,7 +124,7 @@ impl Balances {
             .unwrap_or_default()
     }
 
-    pub fn get_holders(&self, start: usize, limit: usize) -> Vec<(Account, Tokens128)> {
+    pub fn get_holders(&self, start: usize, limit: usize) -> Vec<(AccountInternal, Tokens128)> {
         let mut holders = self
             .0
             .iter()
@@ -132,7 +132,7 @@ impl Balances {
                 subaccounts
                     .iter()
                     .map(|(subaccount, token)| {
-                        (Account::new(*principal, Some(*subaccount)), *token)
+                        (AccountInternal::new(*principal, Some(*subaccount)), *token)
                     })
                     .collect::<Vec<_>>()
             })
@@ -143,7 +143,7 @@ impl Balances {
         holders
     }
 
-    pub fn remove(&mut self, account: Account) {
+    pub fn remove(&mut self, account: AccountInternal) {
         if let Some(subaccounts) = self.0.get_mut(&account.owner) {
             subaccounts.remove(&account.subaccount);
         }
@@ -158,7 +158,7 @@ impl Balances {
         }
     }
 
-    pub fn set_balance(&mut self, account: Account, amount: Tokens128) {
+    pub fn set_balance(&mut self, account: AccountInternal, amount: Tokens128) {
         self.0
             .entry(account.owner)
             .or_default()
@@ -175,7 +175,7 @@ impl Balances {
     pub(crate) fn apply_change(&mut self, change: &Balances) {
         for (principal, subaccounts) in &change.0 {
             for (subaccount, amount) in subaccounts {
-                self.set_balance(Account::new(*principal, Some(*subaccount)), *amount);
+                self.set_balance(AccountInternal::new(*principal, Some(*subaccount)), *amount);
             }
         }
     }

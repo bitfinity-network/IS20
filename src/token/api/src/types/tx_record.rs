@@ -2,11 +2,15 @@ use candid::{CandidType, Deserialize, Principal};
 use ic_canister::ic_kit::ic;
 use ic_helpers::tokens::Tokens128;
 
-use crate::account::Account;
+use crate::account::{Account, AccountInternal};
 use crate::types::{Operation, Timestamp, TransactionStatus, TxId};
 
 use super::Memo;
 
+// We use `Account` instead of `AccountInternal` in this structure for two reasons:
+// 1. It was there before `AccountInternal` was introduced, so if we want to change this type, we
+//    would need to introduce a new version of the state.
+// 2. This structre is returned to the client by APIs, and it's prefered to use `Account` in APIs.
 #[derive(Deserialize, CandidType, Debug, Clone)]
 pub struct TxRecord {
     pub caller: Principal,
@@ -24,8 +28,8 @@ pub struct TxRecord {
 impl TxRecord {
     pub fn transfer(
         index: TxId,
-        from: Account,
-        to: Account,
+        from: AccountInternal,
+        to: AccountInternal,
         amount: Tokens128,
         fee: Tokens128,
         memo: Option<Memo>,
@@ -34,8 +38,8 @@ impl TxRecord {
         Self {
             caller: from.owner,
             index,
-            from,
-            to,
+            from: from.into(),
+            to: to.into(),
             amount,
             fee,
             timestamp: created_at_time,
@@ -45,12 +49,17 @@ impl TxRecord {
         }
     }
 
-    pub fn mint(index: TxId, from: Account, to: Account, amount: Tokens128) -> Self {
+    pub fn mint(
+        index: TxId,
+        from: AccountInternal,
+        to: AccountInternal,
+        amount: Tokens128,
+    ) -> Self {
         Self {
             caller: from.owner,
             index,
-            from,
-            to,
+            from: from.into(),
+            to: to.into(),
             amount,
             fee: Tokens128::from(0u128),
             timestamp: ic::time(),
@@ -60,12 +69,17 @@ impl TxRecord {
         }
     }
 
-    pub fn burn(index: TxId, caller: Account, from: Account, amount: Tokens128) -> Self {
+    pub fn burn(
+        index: TxId,
+        caller: AccountInternal,
+        from: AccountInternal,
+        amount: Tokens128,
+    ) -> Self {
         Self {
             caller: caller.owner,
             index,
-            from,
-            to: from,
+            from: from.into(),
+            to: from.into(),
             amount,
             fee: Tokens128::from(0u128),
             timestamp: ic::time(),
@@ -75,12 +89,12 @@ impl TxRecord {
         }
     }
 
-    pub fn auction(index: TxId, to: Account, amount: Tokens128) -> Self {
+    pub fn auction(index: TxId, to: AccountInternal, amount: Tokens128) -> Self {
         Self {
             caller: to.owner,
             index,
-            from: to,
-            to,
+            from: to.into(),
+            to: to.into(),
             amount,
             fee: Tokens128::from(0u128),
             timestamp: ic::time(),
@@ -95,12 +109,12 @@ impl TxRecord {
         self.caller == pid || self.from.owner == pid || self.to.owner == pid
     }
 
-    pub fn claim(id: u64, from: Account, to: Account, amount: Tokens128) -> Self {
+    pub fn claim(id: u64, from: AccountInternal, to: AccountInternal, amount: Tokens128) -> Self {
         Self {
             caller: to.owner,
             index: id,
-            from,
-            to,
+            from: from.into(),
+            to: to.into(),
             amount,
             fee: 0.into(),
             timestamp: ic::time(),

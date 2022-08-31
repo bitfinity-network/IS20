@@ -6,7 +6,7 @@ use ic_auction::state::{AuctionInfo, AuctionState};
 use ic_canister::ic_kit::ic;
 use ic_helpers::tokens::Tokens128;
 
-use crate::account::Account;
+use crate::account::AccountInternal;
 use crate::state::{Balances, CanisterState};
 use crate::types::BatchTransferArgs;
 
@@ -83,9 +83,9 @@ pub fn auction_principal() -> Principal {
     Principal::management_canister()
 }
 
-pub fn auction_account() -> Account {
+pub fn auction_account() -> AccountInternal {
     // There are no sub accounts for the auction principal
-    Account::new(Principal::management_canister(), None)
+    AccountInternal::new(Principal::management_canister(), None)
 }
 
 pub fn accumulated_fees(balances: &Balances) -> Tokens128 {

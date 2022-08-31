@@ -147,12 +147,18 @@ pub trait TokenCanisterAPI: Canister + Sized + Auction {
         Ok(())
     }
 
-    /********************** BALANCCES INFO ***********************/
+    /********************** BALANCES INFO ***********************/
 
     /// This method retreieves holders of `Account` and their amounts.
     #[query(trait = true)]
     fn get_holders(&self, start: usize, limit: usize) -> Vec<(Account, Tokens128)> {
-        self.state().borrow().balances.get_holders(start, limit)
+        self.state()
+            .borrow()
+            .balances
+            .get_holders(start, limit)
+            .into_iter()
+            .map(|(acc, amount)| (acc.into(), amount))
+            .collect()
     }
 
     /// Returns the list of the caller's subaccounts with balances. If the caller account does not exist, will
@@ -236,7 +242,7 @@ pub trait TokenCanisterAPI: Canister + Sized + Auction {
 
     #[cfg_attr(feature = "transfer", update(trait = true))]
     fn transfer(&self, transfer: TransferArgs) -> Result<u128, TxError> {
-        let account = CheckedAccount::with_recipient(transfer.to, transfer.from_subaccount)?;
+        let account = CheckedAccount::with_recipient(transfer.to.into(), transfer.from_subaccount)?;
         is20_transfer(self, account, &transfer)
     }
 
@@ -253,7 +259,7 @@ pub trait TokenCanisterAPI: Canister + Sized + Auction {
     ) -> Result<Vec<TxId>, TxError> {
         for x in &transfers {
             let recipient = x.receiver;
-            CheckedAccount::with_recipient(recipient, from_subaccount)?;
+            CheckedAccount::with_recipient(recipient.into(), from_subaccount)?;
         }
         batch_transfer(self, from_subaccount, transfers)
     }
@@ -319,12 +325,12 @@ pub trait TokenCanisterAPI: Canister + Sized + Auction {
 
     #[query(trait = true)]
     fn icrc1_balance_of(&self, account: Account) -> Tokens128 {
-        self.state().borrow().balances.balance_of(account)
+        self.state().borrow().balances.balance_of(account.into())
     }
 
     #[cfg_attr(feature = "transfer", update(trait = true))]
     fn icrc1_transfer(&self, transfer: TransferArgs) -> Result<u128, TransferError> {
-        let account = CheckedAccount::with_recipient(transfer.to, transfer.from_subaccount)?;
+        let account = CheckedAccount::with_recipient(transfer.to.into(), transfer.from_subaccount)?;
 
         Ok(icrc1_transfer(self, account, &transfer)?)
     }
@@ -493,7 +499,7 @@ mod tests {
             res,
             Err(TransferError::GenericError {
                 error_code: 500,
-                message: "Self transfer".into()
+                message: "self transfer".into()
             })
         )
     }
@@ -515,7 +521,7 @@ mod tests {
             res,
             Err(TransferError::GenericError {
                 error_code: 500,
-                message: "Self transfer".into()
+                message: "self transfer".into()
             })
         );
 
@@ -533,7 +539,7 @@ mod tests {
             res,
             Err(TransferError::GenericError {
                 error_code: 500,
-                message: "Self transfer".into()
+                message: "self transfer".into()
             })
         );
     }
