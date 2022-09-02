@@ -3,41 +3,18 @@ use ic_storage::IcStorage;
 
 use crate::state::CanisterState;
 
-static PUBLIC_METHODS: &[&str] = &[
-    "auctionInfo",
-    "icrc1_balance_of",
-    "biddingInfo",
-    "decimals",
-    "getHolders",
-    "getMetadata",
-    "getTokenInfo",
-    "getTransaction",
-    "getTransactions",
-    "getUserTransactionAmount",
-    "getUserTransactions",
-    "historySize",
-    "logo",
-    "icrc1_name",
-    "owner",
-    "icrc1_symbol",
-    "icrc1_total_supply",
-    "isTestToken",
-];
-
 static OWNER_METHODS: &[&str] = &[
-    "mint",
-    "setAuctionPeriod",
-    "setFee",
-    "setFeeTo",
-    "setLogo",
-    "setMinCycles",
-    "setName",
-    "setSymbol",
-    "setOwner",
-    "toggleTest",
+    "set_auction_period",
+    "set_fee",
+    "set_fee_to",
+    "set_logo",
+    "set_min_cycles",
+    "set_name",
+    "set_symbol",
+    "set_owner",
 ];
 
-static TRANSACTION_METHODS: &[&str] = &["burn", "icrc1_transfer", "transferIncludeFee"];
+static TRANSACTION_METHODS: &[&str] = &["burn", "icrc1_transfer"];
 
 /// Reason why the method may be accepted.
 #[derive(Debug, Clone, Copy)]
@@ -61,7 +38,10 @@ pub fn inspect_message(
         // These are query methods, so no checks are needed.
         #[cfg(feature = "mint_burn")]
         "mint" if state.stats.is_test_token => Ok(AcceptReason::Valid),
-        m if PUBLIC_METHODS.contains(&m) => Ok(AcceptReason::Valid),
+        #[cfg(feature = "mint_burn")]
+        "mint" if caller == state.stats.owner => Ok(AcceptReason::Valid),
+        #[cfg(feature = "mint_burn")]
+        "mint" => Err("Only the owner can mint"),
         // Owner
         m if OWNER_METHODS.contains(&m) && caller == state.stats.owner => Ok(AcceptReason::Valid),
         // Not owner
@@ -91,21 +71,7 @@ pub fn inspect_message(
 
             Ok(AcceptReason::Valid)
         }
-
-        "runAuction" => {
-            // We allow running auction only to the owner or any of the cycle bidders.
-            let state = CanisterState::get();
-            let state = state.borrow();
-            let bidding_state = &state.bidding_state;
-            if bidding_state.is_auction_due()
-                && (bidding_state.bids.contains_key(&caller) || caller == state.stats.owner)
-            {
-                Ok(AcceptReason::Valid)
-            } else {
-                Err("Auction is not due yet or auction run method is called not by owner or bidder. Rejecting.")
-            }
-        }
-        "bidCycles" => {
+        "bid_cycles" => {
             // We reject this message, because a call with cycles cannot be made through ingress,
             // only from the wallet canister.
             Err("Call with cycles cannot be made through ingress.")

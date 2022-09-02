@@ -1,16 +1,9 @@
-use ic_canister::ic_kit::ic;
-use ic_cdk::export::Principal;
-use ic_helpers::ledger::AccountIdentifier;
-use ic_helpers::ledger::Subaccount as SubaccountIdentifier;
-use ic_helpers::tokens::Tokens128;
-
-use crate::account::{Account, CheckedAccount, Subaccount, WithRecipient};
-use crate::canister::is20_auction::auction_principal;
-use crate::error::TxError;
-use crate::principal::{CheckedPrincipal, Owner, TestNet};
-use crate::state::{Balances, CanisterState};
+use crate::account::{AccountInternal, CheckedAccount, WithRecipient};
 use crate::types::{TransferArgs, TxReceipt};
 
+use super::is20_transactions::burn;
+use super::is20_transactions::is20_transfer;
+use super::is20_transactions::mint;
 use super::TokenCanisterAPI;
 
 pub const TX_WINDOW: u64 = 60_000_000_000;
@@ -19,15 +12,15 @@ pub const PERMITTED_DRIFT: u64 = 2 * 60_000_000_000;
 pub(crate) fn icrc1_transfer(
     canister: &impl TokenCanisterAPI,
     caller: CheckedAccount<WithRecipient>,
-    transfer: TransferArgs,
+    transfer: &TransferArgs,
 ) -> TxReceipt {
     let amount = transfer.amount;
-    let minter = Account::new(canister.state().borrow().stats.owner, None);
+    let minter = AccountInternal::new(canister.state().borrow().stats.owner, None);
     if caller.inner() == minter {
         return mint(
             &mut canister.state().borrow_mut(),
             caller.inner().owner,
-            transfer.to,
+            transfer.to.into(),
             amount,
         );
     }
@@ -44,303 +37,20 @@ pub(crate) fn icrc1_transfer(
     is20_transfer(canister, caller, transfer)
 }
 
-pub(crate) fn is20_transfer(
-    canister: &impl TokenCanisterAPI,
-    caller: CheckedAccount<WithRecipient>,
-    transfer: TransferArgs,
-) -> TxReceipt {
-    let TransferArgs {
-        amount,
-        memo,
-        created_at_time,
-        ..
-    } = transfer;
-    let now = ic::time();
-
-    // We check if the `created_at_time` is within the ONE MINUTE WINDOW TIME,
-    // if it is less than or greater than ONE MINUTE WINDOW, we reject the
-    // transaction.
-    let created_at_time = match created_at_time {
-        Some(created_at_time) => {
-            if now.saturating_sub(created_at_time) > TX_WINDOW {
-                return Err(TxError::TooOld {
-                    allowed_window_nanos: TX_WINDOW,
-                });
-            }
-
-            if created_at_time.saturating_sub(now) > PERMITTED_DRIFT {
-                return Err(TxError::CreatedInFuture { ledger_time: now });
-            }
-
-            for tx in canister.state().borrow().ledger.iter().rev() {
-                if now.saturating_sub(tx.timestamp) > TX_WINDOW {
-                    break;
-                }
-
-                if tx.timestamp == created_at_time
-                    && tx.from == caller.inner()
-                    && tx.to == caller.recipient()
-                    && tx.memo == transfer.memo
-                    && tx.amount == transfer.amount
-                    && tx.fee == transfer.fee.unwrap_or(tx.fee)
-                {
-                    return Err(TxError::Duplicate {
-                        duplicate_of: tx.index,
-                    });
-                }
-            }
-
-            created_at_time
-        }
-
-        None => now,
-    };
-
-    let from = caller.inner();
-    let to = caller.recipient();
-
-    let state = canister.state();
-    let mut state = state.borrow_mut();
-    let CanisterState {
-        ref mut balances,
-        ref bidding_state,
-        ref stats,
-        ..
-    } = &mut *state;
-
-    let (fee, fee_to) = stats.fee_info();
-    let fee_ratio = bidding_state.fee_ratio;
-
-    if let Some(fee_limit) = transfer.fee {
-        if fee != fee_limit {
-            return Err(TxError::FeeExceededLimit { fee_limit: fee });
-        }
-    }
-
-    let balance = balances.balance_of(from);
-
-    if balance < (amount + fee).ok_or(TxError::AmountOverflow)? {
-        return Err(TxError::InsufficientFunds { balance });
-    }
-
-    charge_fee(balances, from, fee_to, fee, fee_ratio).expect("never fails due to checks above");
-
-    transfer_balance(balances, from, to, amount).expect("never fails due to checks above");
-
-    let id = state
-        .ledger
-        .transfer(from, to, amount, fee, memo, created_at_time);
-    Ok(id.into())
-}
-
-pub fn mint(
-    state: &mut CanisterState,
-    caller: Principal,
-    to: Account,
-    amount: Tokens128,
-) -> TxReceipt {
-    let balance = state.balances.get_mut_or_insert_default(to);
-
-    let new_balance = (*balance + amount)
-        .expect("balance cannot be larger than total_supply which is already checked");
-
-    *balance = new_balance;
-
-    let id = state.ledger.mint(caller.into(), to, amount);
-
-    Ok(id.into())
-}
-
-pub fn mint_test_token(
-    state: &mut CanisterState,
-    caller: CheckedPrincipal<TestNet>,
-    to: Principal,
-    to_subaccount: Option<Subaccount>,
-    amount: Tokens128,
-) -> TxReceipt {
-    mint(
-        state,
-        caller.inner(),
-        Account::new(to, to_subaccount),
-        amount,
-    )
-}
-
-pub fn mint_as_owner(
-    state: &mut CanisterState,
-    caller: CheckedPrincipal<Owner>,
-    to: Principal,
-    to_subaccount: Option<Subaccount>,
-    amount: Tokens128,
-) -> TxReceipt {
-    mint(
-        state,
-        caller.inner(),
-        Account::new(to, to_subaccount),
-        amount,
-    )
-}
-
-pub fn burn(
-    state: &mut CanisterState,
-    caller: Principal,
-    from: Account,
-    amount: Tokens128,
-) -> TxReceipt {
-    let balance = state.balances.balance_of(from);
-
-    if !amount.is_zero() && balance == Tokens128::ZERO {
-        return Err(TxError::InsufficientFunds { balance });
-    }
-
-    let new_balance = (balance - amount).ok_or(TxError::InsufficientFunds { balance })?;
-
-    if new_balance == Tokens128::ZERO {
-        state.balances.remove(from)
-    } else {
-        state.balances.set_balance(from, new_balance)
-    }
-
-    let id = state.ledger.burn(caller.into(), from, amount);
-    Ok(id.into())
-}
-
-pub fn burn_own_tokens(
-    state: &mut CanisterState,
-    from_subaccount: Option<Subaccount>,
-    amount: Tokens128,
-) -> TxReceipt {
-    let caller = ic::caller();
-    burn(state, caller, Account::new(caller, from_subaccount), amount)
-}
-
-pub fn burn_as_owner(
-    state: &mut CanisterState,
-    caller: CheckedPrincipal<Owner>,
-    from: Principal,
-    from_subaccount: Option<Subaccount>,
-    amount: Tokens128,
-) -> TxReceipt {
-    burn(
-        state,
-        caller.inner(),
-        Account::new(from, from_subaccount),
-        amount,
-    )
-}
-
-pub fn mint_to_accountid(
-    state: &mut CanisterState,
-    to: AccountIdentifier,
-    amount: Tokens128,
-) -> Result<(), TxError> {
-    let balance = state.claims.entry(to).or_default();
-    let new_balance = (*balance + amount)
-        .expect("balance cannot be larger than total_supply which is already checked");
-    *balance = new_balance;
-    Ok(())
-}
-
-pub fn claim(
-    state: &mut CanisterState,
-    account: AccountIdentifier,
-    subaccount: Option<Subaccount>,
-) -> TxReceipt {
-    let caller = ic_canister::ic_kit::ic::caller();
-    let amount = state.claim_amount(account);
-
-    if account
-        != AccountIdentifier::new(
-            caller.into(),
-            Some(SubaccountIdentifier(subaccount.unwrap_or_default())),
-        )
-    {
-        return Err(TxError::ClaimNotAllowed);
-    }
-    let to = Account::new(caller, subaccount);
-
-    let id = mint(state, caller, to, amount);
-
-    state.claims.remove(&account);
-
-    id
-}
-
-pub fn transfer_balance(
-    balances: &mut Balances,
-    from: Account,
-    to: Account,
-    amount: Tokens128,
-) -> Result<(), TxError> {
-    if amount == Tokens128::ZERO {
-        return Ok(());
-    }
-
-    let from_balance = balances.get_mut(from).ok_or(TxError::InsufficientFunds {
-        balance: Tokens128::ZERO,
-    })?;
-
-    *from_balance = (*from_balance - amount).ok_or(TxError::InsufficientFunds {
-        balance: *from_balance,
-    })?;
-
-    let to_balance = balances.get_mut_or_insert_default(to);
-
-    *to_balance = (*to_balance + amount).expect(
-        "never overflows since `from_balance + to_balance` is limited by `total_supply` amount",
-    );
-
-    if balances.balance_of(from) == Tokens128::ZERO {
-        balances.remove(from);
-    }
-
-    Ok(())
-}
-
-pub(crate) fn charge_fee(
-    balances: &mut Balances,
-    user: Account,
-    fee_to: Principal,
-    fee: Tokens128,
-    fee_ratio: f64,
-) -> Result<(), TxError> {
-    // todo: check if this is enforced
-    debug_assert!((0.0..=1.0).contains(&fee_ratio));
-
-    if fee == Tokens128::ZERO {
-        return Ok(());
-    }
-
-    // todo: test and figure out overflows
-    const INT_CONVERSION_K: u128 = 1_000_000_000_000;
-    let auction_fee_amount = (fee * Tokens128::from((fee_ratio * INT_CONVERSION_K as f64) as u128)
-        / INT_CONVERSION_K)
-        .expect("never division by 0");
-    let auction_fee_amount = auction_fee_amount
-        .to_tokens128()
-        .expect("fee is always greater");
-    let owner_fee_amount = (fee - auction_fee_amount).expect("fee is always greater");
-    transfer_balance(balances, user, fee_to.into(), owner_fee_amount)?;
-    transfer_balance(
-        balances,
-        user,
-        auction_principal().into(),
-        auction_fee_amount,
-    )?;
-
-    Ok(())
-}
-
 #[cfg(test)]
 mod tests {
     use std::time::UNIX_EPOCH;
 
+    use ic_auction::api::Auction;
     use ic_canister::ic_kit::mock_principals::{alice, bob, john, xtc};
     use ic_canister::ic_kit::MockContext;
     use ic_canister::Canister;
+    use ic_helpers::tokens::Tokens128;
     use rand::prelude::*;
 
-    use crate::error::TransferError;
+    use crate::account::{Account, Subaccount};
+    use crate::canister::is20_auction::auction_principal;
+    use crate::error::{TransferError, TxError};
     use crate::mock::*;
     use crate::types::{Metadata, Operation, TransactionStatus};
 
@@ -368,11 +78,10 @@ mod tests {
                 name: "".to_string(),
                 symbol: "".to_string(),
                 decimals: 8,
-
                 owner: john(),
                 fee: Tokens128::from(0),
-                feeTo: john(),
-                isTestToken: None,
+                fee_to: john(),
+                is_test_token: None,
             },
             Tokens128::from(1000),
         );
@@ -563,7 +272,11 @@ mod tests {
         canister.state().borrow_mut().stats.fee = Tokens128::from(50);
         canister.state().borrow_mut().stats.fee_to = john();
         canister.state().borrow_mut().stats.min_cycles = crate::types::DEFAULT_MIN_CYCLES;
-        canister.state().borrow_mut().bidding_state.fee_ratio = 0.5;
+        canister
+            .auction_state()
+            .borrow_mut()
+            .bidding_state
+            .fee_ratio = 0.5;
 
         let transfer1 = TransferArgs {
             from_subaccount: None,
@@ -686,7 +399,7 @@ mod tests {
     fn transfer_saved_into_history() {
         let (ctx, canister) = test_context();
         canister.state().borrow_mut().stats.fee = Tokens128::from(10);
-        let before_history_size = canister.historySize();
+        let before_history_size = canister.history_size();
 
         let transfer1 = TransferArgs {
             from_subaccount: None,
@@ -698,7 +411,7 @@ mod tests {
         };
 
         canister.icrc1_transfer(transfer1).unwrap_err();
-        assert_eq!(canister.historySize(), before_history_size);
+        assert_eq!(canister.history_size(), before_history_size);
 
         const COUNT: u64 = 5;
         let mut ts = ic_canister::ic_kit::ic::time();
@@ -713,8 +426,8 @@ mod tests {
             };
             ctx.add_time(10);
             let id = canister.icrc1_transfer(transfer1).unwrap();
-            assert_eq!(canister.historySize() - before_history_size, 1 + i);
-            let tx = canister.getTransaction(id as u64);
+            assert_eq!(canister.history_size() - before_history_size, 1 + i);
+            let tx = canister.get_transaction(id as u64);
             assert_eq!(tx.amount, Tokens128::from(100 + i as u128));
             assert_eq!(tx.fee, Tokens128::from(10));
             assert_eq!(tx.operation, Operation::Transfer);
@@ -803,7 +516,7 @@ mod tests {
         canister.state().borrow_mut().stats.fee = Tokens128::from(10);
         ctx.update_caller(john());
 
-        assert_eq!(canister.historySize(), 2);
+        assert_eq!(canister.history_size(), 2);
 
         const COUNT: u64 = 5;
         let mut ts = ic_canister::ic_kit::ic::time();
@@ -812,8 +525,8 @@ mod tests {
             let id = canister
                 .mint(bob(), None, Tokens128::from(100 + i as u128))
                 .unwrap();
-            assert_eq!(canister.historySize(), 3 + i);
-            let tx = canister.getTransaction(id as u64);
+            assert_eq!(canister.history_size(), 3 + i);
+            let tx = canister.get_transaction(id as u64);
             assert_eq!(tx.amount, Tokens128::from(100 + i as u128));
             assert_eq!(tx.fee, Tokens128::from(0));
             assert_eq!(tx.operation, Operation::Mint);
@@ -925,13 +638,13 @@ mod tests {
     fn burn_saved_into_history() {
         let (ctx, canister) = test_context();
         canister.state().borrow_mut().stats.fee = Tokens128::from(10);
-        let history_size_before = canister.historySize();
+        let history_size_before = canister.history_size();
 
         ctx.update_caller(john());
         canister
             .burn(None, None, Tokens128::from(1001))
             .unwrap_err();
-        assert_eq!(canister.historySize(), history_size_before);
+        assert_eq!(canister.history_size(), history_size_before);
 
         const COUNT: u64 = 5;
         let mut ts = ic_canister::ic_kit::ic::time();
@@ -940,8 +653,8 @@ mod tests {
             let id = canister
                 .burn(None, None, Tokens128::from(100 + i as u128))
                 .unwrap();
-            assert_eq!(canister.historySize(), history_size_before + 1 + i);
-            let tx = canister.getTransaction(id as u64);
+            assert_eq!(canister.history_size(), history_size_before + 1 + i);
+            let tx = canister.get_transaction(id as u64);
             assert_eq!(tx.amount, Tokens128::from(100 + i as u128));
             assert_eq!(tx.fee, Tokens128::from(0));
             assert_eq!(tx.operation, Operation::Burn);
@@ -998,29 +711,35 @@ mod tests {
         };
         canister.icrc1_transfer(transfer4).unwrap();
 
-        assert_eq!(canister.getTransactions(None, 11, None).result.len(), 10);
-        assert_eq!(canister.getTransactions(None, 10, Some(3)).result.len(), 4);
+        assert_eq!(canister.get_transactions(None, 11, None).result.len(), 10);
+        assert_eq!(canister.get_transactions(None, 10, Some(3)).result.len(), 4);
         assert_eq!(
-            canister.getTransactions(Some(bob()), 10, None).result.len(),
+            canister
+                .get_transactions(Some(bob()), 10, None)
+                .result
+                .len(),
             6
         );
         assert_eq!(
-            canister.getTransactions(Some(xtc()), 5, None).result.len(),
+            canister.get_transactions(Some(xtc()), 5, None).result.len(),
             1
         );
         assert_eq!(
             canister
-                .getTransactions(Some(alice()), 10, Some(5))
+                .get_transactions(Some(alice()), 10, Some(5))
                 .result
                 .len(),
             5
         );
-        assert_eq!(canister.getTransactions(None, 5, None).next, Some(4));
+        assert_eq!(canister.get_transactions(None, 5, None).next, Some(4));
         assert_eq!(
-            canister.getTransactions(Some(alice()), 3, Some(5)).next,
+            canister.get_transactions(Some(alice()), 3, Some(5)).next,
             Some(2)
         );
-        assert_eq!(canister.getTransactions(Some(bob()), 3, Some(2)).next, None);
+        assert_eq!(
+            canister.get_transactions(Some(bob()), 3, Some(2)).next,
+            None
+        );
 
         let transfer5 = TransferArgs {
             from_subaccount: None,
@@ -1035,26 +754,26 @@ mod tests {
             canister.icrc1_transfer(transfer5.clone()).unwrap();
         }
 
-        let txn = canister.getTransactions(None, 5, None);
+        let txn = canister.get_transactions(None, 5, None);
         assert_eq!(txn.result[0].index, 19);
         assert_eq!(txn.result[1].index, 18);
         assert_eq!(txn.result[2].index, 17);
         assert_eq!(txn.result[3].index, 16);
         assert_eq!(txn.result[4].index, 15);
-        let txn2 = canister.getTransactions(None, 5, txn.next);
+        let txn2 = canister.get_transactions(None, 5, txn.next);
         assert_eq!(txn2.result[0].index, 14);
         assert_eq!(txn2.result[1].index, 13);
         assert_eq!(txn2.result[2].index, 12);
         assert_eq!(txn2.result[3].index, 11);
         assert_eq!(txn2.result[4].index, 10);
-        assert_eq!(canister.getTransactions(None, 5, txn.next).next, Some(9));
+        assert_eq!(canister.get_transactions(None, 5, txn.next).next, Some(9));
     }
 
     #[test]
     #[should_panic]
     fn get_transaction_not_existing() {
         let canister = test_canister();
-        canister.getTransaction(2);
+        canister.get_transaction(2);
     }
 
     #[test]
@@ -1073,61 +792,7 @@ mod tests {
         for _ in 1..COUNT {
             canister.icrc1_transfer(transfer1.clone()).unwrap();
         }
-        assert_eq!(canister.getUserTransactionCount(alice()), COUNT);
-    }
-
-    #[test]
-    fn mint_to_account_id() {
-        let subaccount = gen_subaccount();
-        let alice_aid =
-            AccountIdentifier::new(alice().into(), Some(SubaccountIdentifier(subaccount)));
-
-        let (ctx, canister) = test_context();
-        ctx.update_caller(john());
-        assert!(canister
-            .mintToAccountId(alice_aid, Tokens128::from(100))
-            .is_ok());
-
-        ctx.update_caller(alice());
-        assert!(canister.claim(alice_aid, Some(subaccount)).is_ok());
-        assert_eq!(
-            canister.icrc1_balance_of(Account::new(alice(), Some(subaccount))),
-            Tokens128::from(100)
-        );
-        assert_eq!(canister.icrc1_total_supply(), Tokens128::from(2100));
-        assert_eq!(canister.state().borrow().claims.len(), 0);
-    }
-
-    #[test]
-    fn test_claim_amount() {
-        let bob_sub = gen_subaccount();
-        let alice_sub = gen_subaccount();
-
-        let alice_aid =
-            AccountIdentifier::new(alice().into(), Some(SubaccountIdentifier(alice_sub)));
-        let bob_aid = AccountIdentifier::new(bob().into(), Some(SubaccountIdentifier(bob_sub)));
-
-        let (ctx, canister) = test_context();
-        ctx.update_caller(john());
-
-        assert!(canister
-            .mintToAccountId(alice_aid, Tokens128::from(1000))
-            .is_ok());
-        assert!(canister
-            .mintToAccountId(bob_aid, Tokens128::from(2000))
-            .is_ok());
-
-        ctx.update_caller(alice());
-        assert_eq!(
-            canister.getClaim(Some(alice_sub)).unwrap(),
-            Tokens128::from(1000)
-        );
-
-        ctx.update_caller(bob());
-        assert_eq!(
-            canister.getClaim(Some(bob_sub)).unwrap(),
-            Tokens128::from(2000)
-        );
+        assert_eq!(canister.get_user_transaction_count(alice()), COUNT);
     }
 
     #[test]
@@ -1279,13 +944,16 @@ mod tests {
 
 #[cfg(test)]
 mod proptests {
+    use candid::Principal;
     use ic_canister::ic_kit::MockContext;
     use ic_canister::Canister;
+    use ic_helpers::tokens::Tokens128;
     use proptest::collection::vec;
     use proptest::prelude::*;
     use proptest::sample::Index;
 
-    use crate::error::TransferError;
+    use crate::account::Account;
+    use crate::error::{TransferError, TxError};
     use crate::mock::*;
     use crate::types::Metadata;
 
@@ -1299,11 +967,6 @@ mod proptests {
             amount: Tokens128,
         },
         Burn(Tokens128, Principal),
-        TransferWithFee {
-            from: Principal,
-            to: Principal,
-            amount: Tokens128,
-        },
         TransferWithoutFee {
             from: Principal,
             to: Principal,
@@ -1337,17 +1000,6 @@ mod proptests {
             // Burn
             (make_tokens128(), select_principal(principals.clone()))
                 .prop_map(|(amount, principal)| Action::Burn(amount, principal)),
-            // With fee
-            (
-                select_principal(principals.clone()),
-                select_principal(principals.clone()),
-                make_tokens128()
-            )
-                .prop_map(|(from, to, amount)| Action::TransferWithFee {
-                    from,
-                    to,
-                    amount
-                }),
             // Without fee
             (
                 select_principal(principals.clone()),
@@ -1412,8 +1064,8 @@ mod proptests {
                 decimals,
                 owner,
                 fee,
-                feeTo: fee_to,
-                isTestToken: None,
+                fee_to,
+                is_test_token: None,
             };
             let canister = TokenCanisterMock::init_instance();
             canister.init(meta,total_supply);
@@ -1505,9 +1157,13 @@ mod proptests {
                             }
                         }
 
+                        if amount.is_zero() {
+                            prop_assert_eq!(res, Err(TransferError::GenericError { error_code: 500, message: "amount too small".into() }));
+                            return Ok(());
+                        }
                         if from_balance < amount_with_fee {
                             prop_assert_eq!(res, Err(TransferError::InsufficientFunds { balance:from_balance }));
-                            return Ok(())
+                            return Ok(());
                         }
 
                         if fee_to == from {
@@ -1518,7 +1174,7 @@ mod proptests {
 
                         if fee_to == to {
                             prop_assert!(matches!(res, Ok(_)));
-                            prop_assert_eq!((to_balance + amount).unwrap(), canister.icrc1_balance_of(Account::new(to, None)));
+                            prop_assert_eq!(((to_balance + amount).unwrap() + fee).unwrap(), canister.icrc1_balance_of(Account::new(to, None)));
                             return Ok(());
                         }
 
@@ -1526,43 +1182,6 @@ mod proptests {
 
                         prop_assert_eq!((from_balance - amount_with_fee).unwrap(), canister.icrc1_balance_of(Account::new(from, None)));
                         prop_assert_eq!((to_balance + amount).unwrap(), canister.icrc1_balance_of(Account::new(to, None)));
-                    }
-                    TransferWithFee { from, to, amount } => {
-                        MockContext::new().with_caller(from).inject();
-                        let from_balance = canister.icrc1_balance_of(Account::new(from, None));
-                        let to_balance = canister.icrc1_balance_of(Account::new(to, None));
-                        let (fee , fee_to) = canister.state().borrow().stats.fee_info();
-                        let res = canister.transferIncludeFee(None, to, None, amount, None, None);
-
-                        if to == from {
-                            prop_assert_eq!(res, Err(TxError::SelfTransfer));
-                            return Ok(())
-                        }
-
-                        if amount <= fee  {
-                            prop_assert_eq!(res, Err(TxError::AmountTooSmall));
-                            return Ok(());
-                        }
-                        if from_balance < amount {
-                            prop_assert_eq!(res, Err(TxError::InsufficientFunds { balance: from_balance }));
-                            return Ok(());
-                        }
-
-                        // Sometimes the fee can be sent `to` or `from`
-                        if fee_to == from  {
-                            prop_assert_eq!(((from_balance - amount).unwrap() + fee).unwrap(), canister.icrc1_balance_of(Account::new(from, None)));
-                            return Ok(());
-                        }
-
-                        if fee_to == to  {
-                            prop_assert_eq!((to_balance + amount).unwrap(), canister.icrc1_balance_of(Account::new(to, None)));
-                            return Ok(());
-                        }
-
-                        prop_assert!(matches!(res, Ok(_)));
-                        prop_assert_eq!(((to_balance + amount).unwrap() - fee).unwrap(), canister.icrc1_balance_of(Account::new(to, None)));
-                        prop_assert_eq!((from_balance - amount).unwrap(), canister.icrc1_balance_of(Account::new(from, None)));
-
                     }
                 }
             }

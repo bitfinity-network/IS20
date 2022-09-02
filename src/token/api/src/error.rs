@@ -6,40 +6,33 @@ use crate::types::Timestamp;
 
 #[derive(CandidType, Debug, PartialEq, Deserialize, Error)]
 pub enum TxError {
-    #[error("Unauthorized")]
+    #[error("unauthorized")]
     Unauthorized,
-    #[error("Amount too small")]
+    #[error("amount too small")]
     AmountTooSmall,
-    #[error("Fee exceeded limit {fee_limit}")]
-    FeeExceededLimit { fee_limit: Tokens128 },
-    #[error("Already actioned")]
-    AlreadyActioned,
-    #[error("Transaction does not exist")]
-    TransactionDoesNotExist,
-    #[error("Bad fee {expected_fee}")]
+    #[error("bad fee {expected_fee}")]
     BadFee { expected_fee: Tokens128 },
-    #[error("Insufficient funds : {balance}")]
+    #[error("insufficient funds : {balance}")]
     InsufficientFunds { balance: Tokens128 },
-    #[error("Transaction is too old : {allowed_window_nanos}")]
+    #[error("transaction is too old : {allowed_window_nanos}")]
     TooOld { allowed_window_nanos: u64 },
-    #[error("Transaction is created in the future {ledger_time}")]
+    #[error("transaction is created in the future {ledger_time}")]
     CreatedInFuture { ledger_time: u64 },
-    #[error("Transaction is duplicate of {duplicate_of}")]
+    #[error("transaction is duplicate of {duplicate_of}")]
     Duplicate { duplicate_of: u64 },
-    #[error("Self transfer")]
+    #[error("self transfer")]
     SelfTransfer,
-    #[error("Amount overflow")]
+    #[error("amount overflow")]
     AmountOverflow,
-    #[error("Account is not found")]
+    #[error("account is not found")]
     AccountNotFound,
-    #[error("{message}")]
-    GenericError { message: String },
-    #[error("Claim not Allowed")]
-    ClaimNotAllowed,
-    #[error("Temporary unavailable")]
-    TemporaryUnavailable,
+    #[error("no claimable tokens are on the requested subaccount")]
+    NothingToClaim,
 }
 
+// This type is the exact error type from ICRC-1 standard. We use it as the return type for
+// icrc1_transfer method to fully comply with the standard. As such, it doesn't need to implement
+// `Error` trait, as internally everywhere the `TxError` is used.
 #[derive(CandidType, Debug, PartialEq, Deserialize)]
 pub enum TransferError {
     BadFee { expected_fee: Tokens128 },
@@ -55,9 +48,6 @@ pub enum TransferError {
 impl From<TxError> for TransferError {
     fn from(err: TxError) -> Self {
         match err {
-            TxError::FeeExceededLimit { fee_limit } => Self::BadFee {
-                expected_fee: fee_limit,
-            },
             TxError::BadFee { expected_fee } => Self::BadFee { expected_fee },
             TxError::InsufficientFunds { balance } => Self::InsufficientFunds { balance },
             TxError::TooOld { .. } => Self::TooOld,
@@ -65,7 +55,6 @@ impl From<TxError> for TransferError {
             TxError::Duplicate { duplicate_of } => Self::Duplicate {
                 duplicate_of: duplicate_of as u128,
             },
-            TxError::TemporaryUnavailable => Self::TemporarilyUnavailable,
             _ => TransferError::GenericError {
                 error_code: 500,
                 message: format!("{err}"),

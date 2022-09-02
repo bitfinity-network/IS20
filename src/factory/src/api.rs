@@ -8,13 +8,14 @@ use std::rc::Rc;
 use crate::state::StableState;
 use crate::{error::TokenFactoryError, state::State};
 use candid::Principal;
+use ic_canister::ic_kit::ic;
 use ic_canister::{init, post_upgrade, pre_upgrade, query, update, Canister, PreUpdate};
 use ic_factory::{api::FactoryCanister, error::FactoryError, FactoryConfiguration, FactoryState};
 use ic_helpers::candid_header::{candid_header, CandidHeader};
 use ic_helpers::tokens::Tokens128;
 use token::types::Metadata;
 
-const DEFAULT_LEDGER_PRINCIPAL: &str = "ryjl3-tyaaa-aaaaa-aaaba-cai";
+const DEFAULT_LEDGER_PRINCIPAL: Principal = Principal::from_slice(&[0, 0, 0, 0, 0, 0, 0, 2, 1, 1]);
 const DEFAULT_ICP_FEE: u64 = 10u64.pow(8); // 1 ICP
 
 #[cfg(not(feature = "no_api"))]
@@ -39,24 +40,26 @@ impl TokenFactoryCanister {
 
     #[pre_upgrade]
     fn pre_upgrade(&self) {
-        let token_factory_state = Rc::<RefCell<State>>::try_unwrap(self.state.clone())
-            .expect("Someone has the token factory state borrowed. This is a program bug because state lock was bypassed.")
-            .into_inner();
-        let base_factory_state = Rc::<RefCell<FactoryState>>::try_unwrap(self.factory_state())
-            .expect("Someone has the base factory state borrowed. This is a program bug because state lock was bypassed.")
-            .into_inner();
+        let token_factory_state = self.state.replace(State::default());
+        let base_factory_state = self.factory_state().replace(FactoryState::default());
 
-        ic_storage::stable::write(&StableState {
+        if let Err(err) = ic_storage::stable::write(&StableState {
             token_factory_state,
             base_factory_state,
-        })
-        .expect("failed to serialize state to the stable storage");
+        }) {
+            ic::trap(&format!(
+                "Error while serializing state to the stable storage: {err}"
+            ));
+        }
     }
 
     #[post_upgrade]
     fn post_upgrade(&self) {
-        let stable_state = ic_storage::stable::read::<StableState>()
-            .expect("failed to read stable state from the stable storage");
+        let stable_state = ic_storage::stable::read::<StableState>().unwrap_or_else(|err| {
+            ic::trap(&format!(
+                "Error while deserializing state from the stable storage: {err}",
+            ));
+        });
         let StableState {
             token_factory_state,
             base_factory_state,
@@ -68,8 +71,7 @@ impl TokenFactoryCanister {
 
     #[init]
     pub fn init(&self, controller: Principal, ledger_principal: Option<Principal>) {
-        let ledger = ledger_principal
-            .unwrap_or_else(|| Principal::from_text(DEFAULT_LEDGER_PRINCIPAL).unwrap());
+        let ledger = ledger_principal.unwrap_or(DEFAULT_LEDGER_PRINCIPAL);
 
         let factory_configuration =
             FactoryConfiguration::new(ledger, DEFAULT_ICP_FEE, controller, controller);
@@ -87,8 +89,6 @@ impl TokenFactoryCanister {
     #[update]
     pub async fn set_token_bytecode(&self, bytecode: Vec<u8>) -> Result<u32, FactoryError> {
         let state_header = candid_header::<token::state::CanisterState>();
-        // TODO: we should remove token_wasm out of canister state and extract it from
-        // factory state as this field is only used in inspect_message
         self.state.borrow_mut().token_wasm = Some(bytecode.clone());
         self.set_canister_code::<token::state::CanisterState>(bytecode, state_header)
     }
@@ -185,5 +185,17 @@ impl FactoryCanister for TokenFactoryCanister {
     fn factory_state(&self) -> Rc<RefCell<FactoryState>> {
         use ic_storage::IcStorage;
         FactoryState::get()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn ledger_principal() {
+        const LEDGER: &str = "ryjl3-tyaaa-aaaaa-aaaba-cai";
+        let original_principal = Principal::from_text(LEDGER).unwrap();
+        assert_eq!(DEFAULT_LEDGER_PRINCIPAL, original_principal);
     }
 }

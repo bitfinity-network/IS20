@@ -8,7 +8,7 @@ use ic_canister::ic_kit::ic;
 pub struct Owner;
 
 /// Any principal but the canister
-/// has isTestToken set to true
+/// has is_test_token set to true
 pub struct TestNet;
 
 pub struct CheckedPrincipal<T>(Principal, T);

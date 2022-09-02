@@ -2,7 +2,7 @@ use candid::{CandidType, Deserialize, Principal};
 use ic_canister::ic_kit::ic;
 use ic_helpers::tokens::Tokens128;
 
-use crate::account::Account;
+use crate::account::AccountInternal;
 use crate::types::{BatchTransferArgs, Memo, PaginatedResult, Timestamp, TxId, TxRecord};
 
 const MAX_HISTORY_LENGTH: usize = 1_000_000;
@@ -78,8 +78,8 @@ impl Ledger {
 
     pub fn transfer(
         &mut self,
-        from: Account,
-        to: Account,
+        from: AccountInternal,
+        to: AccountInternal,
         amount: Tokens128,
         fee: Tokens128,
         memo: Option<Memo>,
@@ -101,40 +101,36 @@ impl Ledger {
 
     pub fn batch_transfer(
         &mut self,
-        from: Account,
+        from: AccountInternal,
         transfers: Vec<BatchTransferArgs>,
         fee: Tokens128,
     ) -> Vec<TxId> {
         transfers
             .into_iter()
-            .map(|x| {
-                self.transfer(
-                    from,
-                    Account::new(x.receiver.owner, x.receiver.subaccount),
-                    x.amount,
-                    fee,
-                    None,
-                    ic::time(),
-                )
-            })
+            .map(|x| self.transfer(from, x.receiver.into(), x.amount, fee, None, ic::time()))
             .collect()
     }
 
-    pub fn mint(&mut self, from: Account, to: Account, amount: Tokens128) -> TxId {
+    pub fn mint(&mut self, from: AccountInternal, to: AccountInternal, amount: Tokens128) -> TxId {
         let id = self.len();
         self.push(TxRecord::mint(id, from, to, amount));
 
         id
     }
 
-    pub fn burn(&mut self, caller: Account, from: Account, amount: Tokens128) -> TxId {
+    pub fn burn(
+        &mut self,
+        caller: AccountInternal,
+        from: AccountInternal,
+        amount: Tokens128,
+    ) -> TxId {
         let id = self.next_id();
         self.push(TxRecord::burn(id, caller, from, amount));
 
         id
     }
 
-    pub fn auction(&mut self, to: Principal, amount: Tokens128) {
+    pub fn record_auction(&mut self, to: Principal, amount: Tokens128) {
         let id = self.next_id();
         self.push(TxRecord::auction(id, to.into(), amount))
     }
@@ -151,5 +147,17 @@ impl Ledger {
             self.history = self.history[HISTORY_REMOVAL_BATCH_SIZE..].into();
             self.vec_offset += HISTORY_REMOVAL_BATCH_SIZE as u64;
         }
+    }
+
+    pub fn claim(
+        &mut self,
+        claim_account: AccountInternal,
+        to: AccountInternal,
+        amount: Tokens128,
+    ) -> TxId {
+        let id = self.next_id();
+        self.push(TxRecord::claim(id, claim_account, to, amount));
+
+        id
     }
 }

@@ -2,24 +2,25 @@ use std::collections::HashMap;
 
 use candid::Nat;
 use candid::{CandidType, Deserialize, Principal};
+use ic_auction::state::{AuctionInfo, AuctionState};
 use ic_helpers::ledger::AccountIdentifier;
 use ic_helpers::ledger::Subaccount as SubaccountIdentifier;
 use ic_helpers::tokens::Tokens128;
 use ic_storage::stable::Versioned;
 use ic_storage::IcStorage;
 
-use crate::account::{Account, Subaccount, DEFAULT_SUBACCOUNT};
-use crate::error::TxError;
+use crate::account::{AccountInternal, Subaccount, DEFAULT_SUBACCOUNT};
 use crate::ledger::Ledger;
-use crate::types::{AuctionInfo, Claims, Cycles, Metadata, StatsData, Timestamp, Value};
+use crate::types::{Claims, Metadata, StatsData, Value};
 
 #[derive(Debug, Default, CandidType, Deserialize, IcStorage)]
 pub struct CanisterState {
-    pub bidding_state: BiddingState,
     pub balances: Balances,
-    pub auction_history: AuctionHistory,
     pub stats: StatsData,
     pub ledger: Ledger,
+
+    // We leave this field here to not introduce a new version of the state.
+    #[deprecated(note = "claims are now stored in owner's subaccounts.")]
     pub claims: Claims,
 }
 
@@ -53,29 +54,26 @@ impl CanisterState {
             decimals: self.stats.decimals,
             owner: self.stats.owner,
             fee: self.stats.fee,
-            feeTo: self.stats.fee_to,
-            isTestToken: Some(self.stats.is_test_token),
+            fee_to: self.stats.fee_to,
+            is_test_token: Some(self.stats.is_test_token),
         }
     }
 
-    pub fn claim_amount(&self, account: AccountIdentifier) -> Tokens128 {
-        self.claims
-            .get(&account)
-            .copied()
-            .unwrap_or(Tokens128::ZERO)
-    }
-
-    pub fn get_claim(&self, subaccount: Option<Subaccount>) -> Result<Tokens128, TxError> {
-        let acc = AccountIdentifier::new(
+    pub fn get_claimable_amount(
+        &self,
+        holder: Principal,
+        subaccount: Option<Subaccount>,
+    ) -> Tokens128 {
+        let claim_subaccount = AccountIdentifier::new(
             ic_canister::ic_kit::ic::caller().into(),
             Some(SubaccountIdentifier(
                 subaccount.unwrap_or(DEFAULT_SUBACCOUNT),
             )),
-        );
-        self.claims
-            .get(&acc)
-            .ok_or(TxError::AccountNotFound)
-            .copied()
+        )
+        .to_address();
+
+        let claim_account = AccountInternal::new(holder, Some(claim_subaccount));
+        self.balances.balance_of(claim_account)
     }
 }
 
@@ -104,31 +102,29 @@ impl Balances {
             .insert(subaccount.unwrap_or(DEFAULT_SUBACCOUNT), token);
     }
 
-    pub fn get_mut(&mut self, account: Account) -> Option<&mut Tokens128> {
-        self.0.get_mut(&account.owner).and_then(|subaccounts| {
-            subaccounts.get_mut(&account.subaccount.unwrap_or(DEFAULT_SUBACCOUNT))
-        })
+    pub fn get_mut(&mut self, account: AccountInternal) -> Option<&mut Tokens128> {
+        self.0
+            .get_mut(&account.owner)
+            .and_then(|subaccounts| subaccounts.get_mut(&account.subaccount))
     }
 
-    pub fn get_mut_or_insert_default(&mut self, account: Account) -> &mut Tokens128 {
+    pub fn get_mut_or_insert_default(&mut self, account: AccountInternal) -> &mut Tokens128 {
         self.0
             .entry(account.owner)
             .or_default()
-            .entry(account.subaccount.unwrap_or(DEFAULT_SUBACCOUNT))
+            .entry(account.subaccount)
             .or_default()
     }
 
-    pub fn balance_of(&self, account: Account) -> Tokens128 {
+    pub fn balance_of(&self, account: AccountInternal) -> Tokens128 {
         self.0
             .get(&account.owner)
-            .and_then(|subaccounts| {
-                subaccounts.get(&account.subaccount.unwrap_or(DEFAULT_SUBACCOUNT))
-            })
+            .and_then(|subaccounts| subaccounts.get(&account.subaccount))
             .copied()
             .unwrap_or_default()
     }
 
-    pub fn get_holders(&self, start: usize, limit: usize) -> Vec<(Account, Tokens128)> {
+    pub fn get_holders(&self, start: usize, limit: usize) -> Vec<(AccountInternal, Tokens128)> {
         let mut holders = self
             .0
             .iter()
@@ -136,7 +132,7 @@ impl Balances {
                 subaccounts
                     .iter()
                     .map(|(subaccount, token)| {
-                        (Account::new(*principal, Some(*subaccount)), *token)
+                        (AccountInternal::new(*principal, Some(*subaccount)), *token)
                     })
                     .collect::<Vec<_>>()
             })
@@ -147,9 +143,9 @@ impl Balances {
         holders
     }
 
-    pub fn remove(&mut self, account: Account) {
+    pub fn remove(&mut self, account: AccountInternal) {
         if let Some(subaccounts) = self.0.get_mut(&account.owner) {
-            subaccounts.remove(&account.subaccount.unwrap_or(DEFAULT_SUBACCOUNT));
+            subaccounts.remove(&account.subaccount);
         }
 
         if self
@@ -162,10 +158,11 @@ impl Balances {
         }
     }
 
-    pub fn set_balance(&mut self, account: Account, token: Tokens128) {
-        self.0.get_mut(&account.owner).map(|subaccounts| {
-            subaccounts.insert(account.subaccount.unwrap_or(DEFAULT_SUBACCOUNT), token)
-        });
+    pub fn set_balance(&mut self, account: AccountInternal, amount: Tokens128) {
+        self.0
+            .entry(account.owner)
+            .or_default()
+            .insert(account.subaccount, amount);
     }
 
     pub fn total_supply(&self) -> Tokens128 {
@@ -174,24 +171,72 @@ impl Balances {
             .flat_map(|(_, subaccounts)| subaccounts.values())
             .fold(Tokens128::ZERO, |a, b| (a + b).unwrap_or(Tokens128::ZERO))
     }
+
+    pub(crate) fn apply_change(&mut self, change: &Balances) {
+        for (principal, subaccounts) in &change.0 {
+            for (subaccount, amount) in subaccounts {
+                self.set_balance(AccountInternal::new(*principal, Some(*subaccount)), *amount);
+            }
+        }
+    }
+
+    pub fn list_subaccounts(&self, account: Principal) -> HashMap<Subaccount, Tokens128> {
+        self.0.get(&account).cloned().unwrap_or_default()
+    }
 }
 
-#[derive(CandidType, Default, Debug, Clone, Deserialize)]
-pub struct BiddingState {
-    pub fee_ratio: f64,
-    pub last_auction: Timestamp,
-    pub auction_period: Timestamp,
-    pub cycles_since_auction: Cycles,
-    pub bids: HashMap<Principal, Cycles>,
+/// A wrapper over stable state that is used only during upgrade process.
+/// Since we have two different stable states (canister and auction), we need
+/// to wrap it in this struct during canister upgrade.
+#[derive(CandidType, Deserialize, Default)]
+pub struct StableState {
+    pub token_state: CanisterState,
+    pub auction_state: AuctionState,
 }
 
-impl BiddingState {
-    pub fn is_auction_due(&self) -> bool {
-        let curr_time = ic_canister::ic_kit::ic::time();
-        let next_auction = self.last_auction + self.auction_period;
-        curr_time >= next_auction
+impl Versioned for StableState {
+    type Previous = ();
+
+    fn upgrade(_prev_state: Self::Previous) -> Self {
+        Self::default()
     }
 }
 
 #[derive(Debug, Default, CandidType, Deserialize)]
 pub struct AuctionHistory(pub Vec<AuctionInfo>);
+
+#[derive(CandidType, Default, Debug, Copy, Clone, Deserialize, PartialEq)]
+pub struct FeeRatio(f64);
+
+impl FeeRatio {
+    pub fn new(value: f64) -> Self {
+        let adj_value = if value < 0.0 {
+            0.0
+        } else if value > 1.0 {
+            1.0
+        } else {
+            value
+        };
+
+        Self(adj_value)
+    }
+
+    /// Returns the tupple (raw_fee, auction_fee). Raw fee is the fee amount to be transferred to
+    /// the canister owner, and auction_fee is the portion of the fee for the cycle auction.
+    pub(crate) fn get_value(&self, fee: Tokens128) -> (Tokens128, Tokens128) {
+        // Both auction fee and owner fee have the same purpose of providing the tokens to pay for
+        // the canister operations. As such we do not care much about rounding errors in this case.
+        // The only important thing to make sure that the sum of auction fee and the owner fee is
+        // equal to the total fee amount.
+        let auction_fee_amount = Tokens128::from((f64::from(fee) * self.0) as u128);
+        let owner_fee_amount = fee.saturating_sub(auction_fee_amount);
+
+        (owner_fee_amount, auction_fee_amount)
+    }
+}
+
+impl From<FeeRatio> for f64 {
+    fn from(v: FeeRatio) -> Self {
+        v.0
+    }
+}

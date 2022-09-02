@@ -25,8 +25,8 @@ pub struct Metadata {
     pub decimals: u8,
     pub owner: Principal,
     pub fee: Tokens128,
-    pub feeTo: Principal,
-    pub isTestToken: Option<bool>,
+    pub fee_to: Principal,
+    pub is_test_token: Option<bool>,
 }
 
 /// Variant type for the metadata endpoint
@@ -94,13 +94,12 @@ impl From<Metadata> for StatsData {
             name: md.name,
             symbol: md.symbol,
             decimals: md.decimals,
-
             owner: md.owner,
             fee: md.fee,
-            fee_to: md.feeTo,
+            fee_to: md.fee_to,
             deploy_time: ic_canister::ic_kit::ic::time(),
             min_cycles: DEFAULT_MIN_CYCLES,
-            is_test_token: md.isTestToken.unwrap_or(false),
+            is_test_token: md.is_test_token.unwrap_or(false),
         }
     }
 }
@@ -109,8 +108,8 @@ impl From<Metadata> for StatsData {
 #[derive(Deserialize, CandidType, Clone, Debug)]
 pub struct TokenInfo {
     pub metadata: Metadata,
-    pub feeTo: Principal,
-    pub historySize: u64,
+    pub fee_to: Principal,
+    pub history_size: u64,
     pub deployTime: Timestamp,
     pub holderNumber: usize,
     pub cycles: u64,
@@ -152,20 +151,10 @@ pub enum Operation {
     TransferFrom,
     Burn,
     Auction,
+    Claim,
 }
 
-#[derive(CandidType, Debug, Clone, Deserialize, PartialEq)]
-pub struct AuctionInfo {
-    pub auction_id: usize,
-    pub auction_time: Timestamp,
-    pub tokens_distributed: Tokens128,
-    pub cycles_collected: Cycles,
-    pub fee_ratio: f64,
-    pub first_transaction_id: TxId,
-    pub last_transaction_id: TxId,
-}
-
-/// `PaginatedResult` is returned by paginated queries i.e `getTransactions`.
+/// `PaginatedResult` is returned by paginated queries i.e `get_transactions`.
 #[derive(Debug, Clone, CandidType, Deserialize)]
 pub struct PaginatedResult {
     /// The result is the transactions which is the `count` transactions starting from `next` if it exists.
@@ -196,18 +185,11 @@ pub struct TransferArgs {
     pub created_at_time: Option<Timestamp>,
 }
 
-/// `BalanceArgs` struct are the arguments which are taken in the `icrc1_balance_of`
-#[derive(Debug, Clone, CandidType, Deserialize)]
-pub struct BalanceArgs {
-    pub of: Principal,
-    pub subaccount: Option<Subaccount>,
-}
-
-impl From<(Principal, Option<Subaccount>)> for BalanceArgs {
-    fn from(from: (Principal, Option<Subaccount>)) -> Self {
-        BalanceArgs {
-            of: from.0,
-            subaccount: from.1,
+impl TransferArgs {
+    pub fn with_amount(&self, amount: Tokens128) -> Self {
+        Self {
+            amount,
+            ..self.clone()
         }
     }
 }

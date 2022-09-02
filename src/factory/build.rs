@@ -12,7 +12,7 @@ fn main() {
         }
         Ok(o) => println!(
             "cargo:warning=Git command exited with error: {}",
-            String::from_utf8_lossy(&o.stderr).to_string()
+            String::from_utf8_lossy(&o.stderr)
         ),
         Err(e) => println!("cargo:warning=Can not extract git tag: {}", e),
     }
