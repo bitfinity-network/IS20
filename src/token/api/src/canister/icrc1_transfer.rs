@@ -1158,7 +1158,7 @@ mod proptests {
                         }
 
                         if amount.is_zero() {
-                            prop_assert_eq!(res, Err(TransferError::GenericError { error_code: 500, message: "Amount too small".into() }));
+                            prop_assert_eq!(res, Err(TransferError::GenericError { error_code: 500, message: "amount too small".into() }));
                             return Ok(());
                         }
                         if from_balance < amount_with_fee {
@@ -1174,7 +1174,7 @@ mod proptests {
 
                         if fee_to == to {
                             prop_assert!(matches!(res, Ok(_)));
-                            prop_assert_eq!((to_balance + amount).unwrap(), canister.icrc1_balance_of(Account::new(to, None)));
+                            prop_assert_eq!(((to_balance + amount).unwrap() + fee).unwrap(), canister.icrc1_balance_of(Account::new(to, None)));
                             return Ok(());
                         }
 
