@@ -5,7 +5,7 @@ version = "0.2.0"
 
 [features]
 default = ["mint_burn", "transfer"]
-no_api = []
+no_api = ["ic-auction/no_api"]
 
 # Enable mint and burn API methods. Enabled by default.
 mint_burn = []
