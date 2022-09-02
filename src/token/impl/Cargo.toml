@@ -25,3 +25,4 @@ async-std = {version = "1.10.0", features = ["attributes"]}
 
 [dev-dependencies]
 tokio = { version = "1.20.1", features = ["rt", "macros"] }
+coverage-helper = "0.1"

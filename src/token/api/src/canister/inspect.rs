@@ -3,27 +3,7 @@ use ic_storage::IcStorage;
 
 use crate::state::CanisterState;
 
-static PUBLIC_METHODS: &[&str] = &[
-    "icrc1_balance_of",
-    "decimals",
-    "get_holders",
-    "get_metadata",
-    "get_token_info",
-    "get_transaction",
-    "get_transactions",
-    "get_user_transaction_amount",
-    "get_user_transactions",
-    "history_size",
-    "logo",
-    "icrc1_name",
-    "owner",
-    "icrc1_symbol",
-    "icrc1_total_supply",
-    "is_test_token",
-];
-
 static OWNER_METHODS: &[&str] = &[
-    "icrc1_mint",
     "set_auction_period",
     "set_fee",
     "set_fee_to",
@@ -34,7 +14,7 @@ static OWNER_METHODS: &[&str] = &[
     "set_owner",
 ];
 
-static TRANSACTION_METHODS: &[&str] = &["burn", "icrc1_transfer", "transferIncludeFee"];
+static TRANSACTION_METHODS: &[&str] = &["burn", "icrc1_transfer"];
 
 /// Reason why the method may be accepted.
 #[derive(Debug, Clone, Copy)]
@@ -58,7 +38,10 @@ pub fn inspect_message(
         // These are query methods, so no checks are needed.
         #[cfg(feature = "mint_burn")]
         "mint" if state.stats.is_test_token => Ok(AcceptReason::Valid),
-        m if PUBLIC_METHODS.contains(&m) => Ok(AcceptReason::Valid),
+        #[cfg(feature = "mint_burn")]
+        "mint" if caller == state.stats.owner => Ok(AcceptReason::Valid),
+        #[cfg(feature = "mint_burn")]
+        "mint" => Err("Only the owner can mint"),
         // Owner
         m if OWNER_METHODS.contains(&m) && caller == state.stats.owner => Ok(AcceptReason::Valid),
         // Not owner
@@ -88,7 +71,7 @@ pub fn inspect_message(
 
             Ok(AcceptReason::Valid)
         }
-        "bidCycles" => {
+        "bid_cycles" => {
             // We reject this message, because a call with cycles cannot be made through ingress,
             // only from the wallet canister.
             Err("Call with cycles cannot be made through ingress.")

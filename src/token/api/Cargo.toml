@@ -23,7 +23,7 @@ serde = "1.0"
 ic-canister = { git = "https://github.com/infinity-swap/canister-sdk", package = "ic-canister", tag = "v0.3.16" }
 ic-helpers = { git = "https://github.com/infinity-swap/canister-sdk", package = "ic-helpers", tag = "v0.3.16" }
 ic-storage = { git = "https://github.com/infinity-swap/canister-sdk", package = "ic-storage", tag = "v0.3.16" }
-ic-auction = { git = "https://github.com/infinity-swap/canister-sdk", package = "ic-auction", tag = "v0.3.16", features = ["no_api"] }
+ic-auction = { git = "https://github.com/infinity-swap/canister-sdk", package = "ic-auction", tag = "v0.3.16" }
 ic-certified-map = "0.3"
 serde_cbor = "0.11"
 thiserror = "1.0"
