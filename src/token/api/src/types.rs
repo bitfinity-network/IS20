@@ -3,16 +3,13 @@ use std::collections::HashMap;
 use candid::{CandidType, Deserialize, Int, Nat, Principal};
 use ic_helpers::{ledger::AccountIdentifier, tokens::Tokens128};
 
-pub use tx_record::*;
-
 use crate::{
     account::{Account, Subaccount},
     error::TxError,
+    tx_record::TxRecord,
 };
 
-mod tx_record;
-
-pub type Timestamp = u64;
+pub(crate) type Timestamp = u64;
 
 pub type Memo = [u8; 32];
 
@@ -133,7 +130,7 @@ impl Default for StatsData {
 }
 
 /// This data structure is used for supporting minting to `AccountIdentifier`, after a claim is saved, We use the `claim` functions to claim the amount and is minted to `Account`.
-pub type Claims = HashMap<AccountIdentifier, Tokens128>;
+pub(crate) type Claims = HashMap<AccountIdentifier, Tokens128>;
 
 pub type TxReceipt = Result<u128, TxError>;
 
@@ -164,8 +161,7 @@ pub struct PaginatedResult {
     pub next: Option<TxId>,
 }
 
-pub type TxId = u64;
-pub type Cycles = u64;
+pub(crate) type TxId = u64;
 
 // Batch transfer arguments.
 #[derive(Debug, Clone, CandidType, Deserialize)]

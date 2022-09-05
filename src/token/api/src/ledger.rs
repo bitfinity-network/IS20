@@ -3,7 +3,8 @@ use ic_canister::ic_kit::ic;
 use ic_helpers::tokens::Tokens128;
 
 use crate::account::AccountInternal;
-use crate::types::{BatchTransferArgs, Memo, PaginatedResult, Timestamp, TxId, TxRecord};
+use crate::tx_record::TxRecord;
+use crate::types::{BatchTransferArgs, Memo, PaginatedResult, Timestamp, TxId};
 
 const MAX_HISTORY_LENGTH: usize = 1_000_000;
 const HISTORY_REMOVAL_BATCH_SIZE: usize = 10_000;

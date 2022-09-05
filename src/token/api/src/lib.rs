@@ -10,3 +10,4 @@ pub mod types;
 pub mod error;
 #[cfg(test)]
 pub mod mock;
+mod tx_record;
