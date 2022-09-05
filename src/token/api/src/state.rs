@@ -2,6 +2,7 @@ use std::collections::HashMap;
 
 use candid::Nat;
 use candid::{CandidType, Deserialize, Principal};
+#[cfg(feature = "auction")]
 use ic_auction::state::{AuctionInfo, AuctionState};
 #[cfg(feature = "claim")]
 use ic_helpers::ledger::{AccountIdentifier, Subaccount as SubaccountIdentifier};
@@ -192,6 +193,7 @@ impl Balances {
 #[derive(CandidType, Deserialize, Default)]
 pub struct StableState {
     pub token_state: CanisterState,
+    #[cfg(feature = "auction")]
     pub auction_state: AuctionState,
 }
 
@@ -203,6 +205,7 @@ impl Versioned for StableState {
     }
 }
 
+#[cfg(feature = "auction")]
 #[derive(Debug, Default, CandidType, Deserialize)]
 pub struct AuctionHistory(pub Vec<AuctionInfo>);
 
