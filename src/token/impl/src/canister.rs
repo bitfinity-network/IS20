@@ -12,7 +12,7 @@ use ic_cdk_macros::inspect_message;
 use ic_canister::query;
 use ic_helpers::{
     candid_header::{candid_header, CandidHeader},
-    metrics::Interval,
+    metrics::{Interval, Metrics},
     tokens::Tokens128,
 };
 use ic_storage::IcStorage;
@@ -121,6 +121,8 @@ fn inspect_message() {
 impl PreUpdate for TokenCanister {
     fn pre_update(&self, method_name: &str, method_type: ic_canister::MethodType) {
         token_api::canister::pre_update(self, method_name, method_type);
+
+        self.update_metrics();
     }
 }
 
@@ -139,6 +141,8 @@ impl Auction for TokenCanister {
         token_api::canister::is20_auction::disburse_rewards(self)
     }
 }
+
+impl Metrics for TokenCanister {}
 
 #[cfg(test)]
 mod test {
