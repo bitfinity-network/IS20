@@ -5,7 +5,13 @@ version = "0.2.0"
 
 [features]
 default = ["mint_burn", "transfer"]
-no_api = ["ic-auction/no_api"]
+no_api = ["ic-auction?/no_api"]
+
+# Enables cycle auctions
+auction = ["dep:ic-auction"]
+
+# Enables claim API related functions
+claim = []
 
 # Enable mint and burn API methods. Enabled by default.
 mint_burn = []
@@ -23,7 +29,7 @@ serde = "1.0"
 ic-canister = { git = "https://github.com/infinity-swap/canister-sdk", package = "ic-canister", tag = "v0.3.16" }
 ic-helpers = { git = "https://github.com/infinity-swap/canister-sdk", package = "ic-helpers", tag = "v0.3.16" }
 ic-storage = { git = "https://github.com/infinity-swap/canister-sdk", package = "ic-storage", tag = "v0.3.16" }
-ic-auction = { git = "https://github.com/infinity-swap/canister-sdk", package = "ic-auction", tag = "v0.3.16" }
+ic-auction = { git = "https://github.com/infinity-swap/canister-sdk", package = "ic-auction", tag = "v0.3.16", optional = true }
 ic-certified-map = "0.3"
 serde_cbor = "0.11"
 thiserror = "1.0"

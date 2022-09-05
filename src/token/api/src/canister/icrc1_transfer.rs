@@ -4,37 +4,28 @@ use crate::types::{TransferArgs, TxReceipt};
 use super::is20_transactions::burn;
 use super::is20_transactions::is20_transfer;
 use super::is20_transactions::mint;
-use super::TokenCanisterAPI;
+use crate::state::CanisterState;
 
 pub const TX_WINDOW: u64 = 60_000_000_000;
 pub const PERMITTED_DRIFT: u64 = 2 * 60_000_000_000;
 
-pub(crate) fn icrc1_transfer(
-    canister: &impl TokenCanisterAPI,
+pub fn icrc1_transfer(
+    state: &mut CanisterState,
     caller: CheckedAccount<WithRecipient>,
     transfer: &TransferArgs,
+    auction_fee_ratio: f64,
 ) -> TxReceipt {
     let amount = transfer.amount;
-    let minter = AccountInternal::new(canister.state().borrow().stats.owner, None);
+    let minter = AccountInternal::new(state.stats.owner, None);
     if caller.inner() == minter {
-        return mint(
-            &mut canister.state().borrow_mut(),
-            caller.inner().owner,
-            transfer.to.into(),
-            amount,
-        );
+        return mint(state, caller.inner().owner, transfer.to.into(), amount);
     }
 
     if caller.recipient() == minter {
-        return burn(
-            &mut canister.state().borrow_mut(),
-            caller.recipient().owner,
-            caller.inner(),
-            amount,
-        );
+        return burn(state, caller.recipient().owner, caller.inner(), amount);
     }
 
-    is20_transfer(canister, caller, transfer)
+    is20_transfer(state, caller, transfer, auction_fee_ratio)
 }
 
 #[cfg(test)]
@@ -49,14 +40,13 @@ mod tests {
     use rand::prelude::*;
 
     use crate::account::{Account, Subaccount};
-    use crate::canister::is20_auction::auction_principal;
+    use crate::canister::{auction_account, TokenCanisterAPI};
     use crate::error::{TransferError, TxError};
     use crate::mock::*;
     use crate::types::{Metadata, Operation, TransactionStatus};
 
     use super::*;
 
-    #[cfg(coverage_nightly)]
     use coverage_helper::test;
 
     // Method for generating random Subaccount.
@@ -301,7 +291,7 @@ mod tests {
             Tokens128::from(1025)
         );
         assert_eq!(
-            canister.icrc1_balance_of(Account::new(auction_principal(), None)),
+            canister.icrc1_balance_of(auction_account().into()),
             Tokens128::from(25)
         );
     }
@@ -953,6 +943,7 @@ mod proptests {
     use proptest::sample::Index;
 
     use crate::account::Account;
+    use crate::canister::TokenCanisterAPI;
     use crate::error::{TransferError, TxError};
     use crate::mock::*;
     use crate::types::Metadata;

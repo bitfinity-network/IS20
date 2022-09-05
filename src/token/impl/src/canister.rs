@@ -120,7 +120,7 @@ fn inspect_message() {
 
 impl PreUpdate for TokenCanister {
     fn pre_update(&self, method_name: &str, method_type: ic_canister::MethodType) {
-        token_api::canister::pre_update(self, method_name, method_type);
+        <Self as Auction>::canister_pre_update(self, method_name, method_type);
     }
 }
 
@@ -136,7 +136,10 @@ impl Auction for TokenCanister {
     }
 
     fn disburse_rewards(&self) -> Result<AuctionInfo, AuctionError> {
-        token_api::canister::is20_auction::disburse_rewards(self)
+        token_api::canister::is20_auction::disburse_rewards(
+            &mut self.state().borrow_mut(),
+            &self.auction_state().borrow(),
+        )
     }
 }
 

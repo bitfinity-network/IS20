@@ -18,7 +18,7 @@ ic-helpers = { git = "https://github.com/infinity-swap/canister-sdk", package = 
 ic-storage = { git = "https://github.com/infinity-swap/canister-sdk", package = "ic-storage", tag = "v0.3.16" }
 ic-auction = { git = "https://github.com/infinity-swap/canister-sdk", package = "ic-auction", tag = "v0.3.16" }
 ic-certified-map = "0.3"
-token-api = { path = "../api", package = "is20-token" }
+token-api = { path = "../api", package = "is20-token", features = ["auction"] }
 
 [target.'cfg(not(target_family = "wasm"))'.dependencies]
 async-std = {version = "1.10.0", features = ["attributes"]}
