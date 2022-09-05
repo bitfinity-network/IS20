@@ -3,8 +3,8 @@ use std::collections::HashMap;
 use candid::Nat;
 use candid::{CandidType, Deserialize, Principal};
 use ic_auction::state::{AuctionInfo, AuctionState};
-use ic_helpers::ledger::AccountIdentifier;
-use ic_helpers::ledger::Subaccount as SubaccountIdentifier;
+#[cfg(feature = "claim")]
+use ic_helpers::ledger::{AccountIdentifier, Subaccount as SubaccountIdentifier};
 use ic_helpers::tokens::Tokens128;
 use ic_storage::stable::Versioned;
 use ic_storage::IcStorage;

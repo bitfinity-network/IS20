@@ -1,5 +1,6 @@
 use candid::Principal;
 use ic_canister::ic_kit::ic;
+#[cfg(feature = "claim")]
 use ic_helpers::ledger::{AccountIdentifier, Subaccount as SubaccountIdentifier};
 use ic_helpers::tokens::Tokens128;
 
@@ -899,6 +900,7 @@ mod tests {
         .unwrap();
     }
 
+    #[cfg(feature = "claim")]
     #[test]
     fn zero_claim_returns_error() {
         let canister = test_canister();
