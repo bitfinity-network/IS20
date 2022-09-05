@@ -19,7 +19,7 @@ impl Account {
     }
 }
 
-// We use internal type separately from `Acccount` to make it semantically more correct. This
+// We use internal type separately from `Account` to make it semantically more correct. This
 // simplifies, for example comparison of accounts with default subaccount.
 #[derive(Debug, Clone, CandidType, Deserialize, Copy, PartialEq, Eq)]
 pub struct AccountInternal {

@@ -264,6 +264,7 @@ pub fn burn_as_owner(
     )
 }
 
+#[cfg(feature = "claim")]
 pub fn get_claim_subaccount(
     claimer: Principal,
     claimer_subaccount: Option<Subaccount>,
@@ -276,6 +277,7 @@ pub fn get_claim_subaccount(
     account_id.to_address()
 }
 
+#[cfg(feature = "claim")]
 pub fn claim(
     state: &mut CanisterState,
     holder: Principal,

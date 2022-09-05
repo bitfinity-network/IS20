@@ -59,6 +59,7 @@ impl CanisterState {
         }
     }
 
+    #[cfg(feature = "claim")]
     pub fn get_claimable_amount(
         &self,
         holder: Principal,
