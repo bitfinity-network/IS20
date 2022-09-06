@@ -27,7 +27,7 @@ pub struct Metadata {
 }
 
 /// Variant type for the metadata endpoint
-#[derive(Deserialize, CandidType, Clone, Debug, PartialEq)]
+#[derive(Deserialize, CandidType, Clone, Debug, PartialEq, Eq)]
 pub enum Value {
     Nat(Nat),
     Int(Int),
@@ -49,7 +49,7 @@ pub struct StatsData {
     pub is_test_token: bool,
 }
 
-#[derive(Debug, CandidType, Deserialize, Clone, PartialEq)]
+#[derive(Debug, CandidType, Deserialize, Clone, PartialEq, Eq)]
 pub struct StandardRecord {
     pub name: String,
     pub url: String,
@@ -134,13 +134,13 @@ pub(crate) type Claims = HashMap<AccountIdentifier, Tokens128>;
 
 pub type TxReceipt = Result<u128, TxError>;
 
-#[derive(CandidType, Debug, Clone, Copy, Deserialize, PartialEq)]
+#[derive(CandidType, Debug, Clone, Copy, Deserialize, PartialEq, Eq)]
 pub enum TransactionStatus {
     Succeeded,
     Failed,
 }
 
-#[derive(CandidType, Debug, Clone, Copy, Deserialize, PartialEq)]
+#[derive(CandidType, Debug, Clone, Copy, Deserialize, PartialEq, Eq)]
 pub enum Operation {
     Approve,
     Mint,
