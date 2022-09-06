@@ -6,7 +6,7 @@ use ic_helpers::{ledger::AccountIdentifier, tokens::Tokens128};
 use crate::{
     account::{Account, Subaccount},
     error::TxError,
-    tx_record::TxRecord,
+    tx_record::{TxId, TxRecord},
 };
 
 pub(crate) type Timestamp = u64;
@@ -160,8 +160,6 @@ pub struct PaginatedResult {
     /// This is  the next `id` of the transaction. The `next` is used as offset for the next query if it exits.
     pub next: Option<TxId>,
 }
-
-pub(crate) type TxId = u64;
 
 // Batch transfer arguments.
 #[derive(Debug, Clone, CandidType, Deserialize)]

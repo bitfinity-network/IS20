@@ -4,9 +4,10 @@ use ic_helpers::tokens::Tokens128;
 
 use crate::{
     account::{Account, AccountInternal},
-    types::{Memo, Operation, Timestamp, TransactionStatus, TxId},
+    types::{Memo, Operation, Timestamp, TransactionStatus},
 };
 
+pub(crate) type TxId = u64;
 // We use `Account` instead of `AccountInternal` in this structure for two reasons:
 // 1. It was there before `AccountInternal` was introduced, so if we want to change this type, we
 //    would need to introduce a new version of the state.

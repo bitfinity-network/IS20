@@ -8,7 +8,8 @@ use crate::account::{AccountInternal, CheckedAccount, Subaccount, WithRecipient}
 use crate::error::TxError;
 use crate::principal::{CheckedPrincipal, Owner, TestNet};
 use crate::state::{Balances, CanisterState, FeeRatio};
-use crate::types::{BatchTransferArgs, StatsData, TransferArgs, TxId, TxReceipt};
+use crate::tx_record::TxId;
+use crate::types::{BatchTransferArgs, StatsData, TransferArgs, TxReceipt};
 
 use super::icrc1_transfer::{PERMITTED_DRIFT, TX_WINDOW};
 use super::is20_auction::auction_account;

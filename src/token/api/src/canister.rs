@@ -16,10 +16,10 @@ use crate::canister::icrc1_transfer::icrc1_transfer;
 use crate::error::{TransferError, TxError};
 use crate::principal::{CheckedPrincipal, Owner};
 use crate::state::CanisterState;
-use crate::tx_record::TxRecord;
+use crate::tx_record::{TxId, TxRecord};
 use crate::types::{
     BatchTransferArgs, PaginatedResult, StandardRecord, StatsData, Timestamp, TokenInfo,
-    TransferArgs, TxId, TxReceipt, Value,
+    TransferArgs, TxReceipt, Value,
 };
 
 use self::is20_transactions::{
