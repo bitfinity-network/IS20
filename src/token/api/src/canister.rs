@@ -53,15 +53,15 @@ pub enum CanisterUpdate {
     MinCycles(u64),
 }
 
-#[cfg(feature = "auction")]
-pub trait TokenCanisterTrait: Canister + Sized + Auction {}
-
 #[cfg(not(feature = "auction"))]
-pub trait TokenCanisterTrait: Canister + Sized {}
+pub trait AuctionCanister {}
 
-impl<T: TokenCanisterAPI> TokenCanisterTrait for T {}
+#[cfg(feature = "auction")]
+pub trait AuctionCanister: Auction {}
 
-pub trait TokenCanisterAPI: TokenCanisterTrait {
+impl<T: TokenCanisterAPI> AuctionCanister for T {}
+
+pub trait TokenCanisterAPI: Canister + Sized + AuctionCanister {
     #[state_getter]
     fn state(&self) -> Rc<RefCell<CanisterState>>;
 
