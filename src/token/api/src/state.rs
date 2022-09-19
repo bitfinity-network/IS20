@@ -190,7 +190,7 @@ impl Balances {
 /// A wrapper over stable state that is used only during upgrade process.
 /// Since we have two different stable states (canister and auction), we need
 /// to wrap it in this struct during canister upgrade.
-#[derive(CandidType, Deserialize, Default)]
+#[derive(CandidType, Deserialize, Default, IcStorage)]
 pub struct StableState {
     pub token_state: CanisterState,
     #[cfg(feature = "auction")]

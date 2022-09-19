@@ -2,11 +2,12 @@ use candid::{CandidType, Deserialize, Principal};
 use ic_canister::ic_kit::ic;
 use ic_helpers::tokens::Tokens128;
 
-use crate::account::{Account, AccountInternal};
-use crate::types::{Operation, Timestamp, TransactionStatus, TxId};
+use crate::{
+    account::{Account, AccountInternal},
+    types::{Memo, Operation, Timestamp, TransactionStatus},
+};
 
-use super::Memo;
-
+pub(crate) type TxId = u64;
 // We use `Account` instead of `AccountInternal` in this structure for two reasons:
 // 1. It was there before `AccountInternal` was introduced, so if we want to change this type, we
 //    would need to introduce a new version of the state.

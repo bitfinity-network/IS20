@@ -23,6 +23,7 @@ jobs:
       gh_login: ${{ secrets.GH_PKG_LOGIN }}
 
   coverage:
+    if: ${{ ! (github.ref_type == 'tag' && endsWith(github.ref_name, '-test')) }}
     runs-on: ubuntu-latest
     env:
       CARGO_TERM_COLOR: always

@@ -13,10 +13,10 @@ candid = "0.7"
 ic-cdk = "0.5"
 ic-cdk-macros = "0.5"
 serde = "1.0"
-ic-canister = { git = "https://github.com/infinity-swap/canister-sdk", package = "ic-canister", tag = "v0.3.16" }
-ic-helpers = { git = "https://github.com/infinity-swap/canister-sdk", package = "ic-helpers", tag = "v0.3.16" }
-ic-storage = { git = "https://github.com/infinity-swap/canister-sdk", package = "ic-storage", tag = "v0.3.16" }
-ic-auction = { git = "https://github.com/infinity-swap/canister-sdk", package = "ic-auction", tag = "v0.3.16" }
+ic-canister = { git = "https://github.com/infinity-swap/canister-sdk", package = "ic-canister", tag = "v0.3.17" }
+ic-helpers = { git = "https://github.com/infinity-swap/canister-sdk", package = "ic-helpers", tag = "v0.3.17" }
+ic-storage = { git = "https://github.com/infinity-swap/canister-sdk", package = "ic-storage", tag = "v0.3.17" }
+ic-auction = { git = "https://github.com/infinity-swap/canister-sdk", package = "ic-auction", tag = "v0.3.17" }
 ic-certified-map = "0.3"
 token-api = { path = "../api", package = "is20-token", features = ["auction", "claim"] }
 
