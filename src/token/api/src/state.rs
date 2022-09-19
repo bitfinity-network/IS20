@@ -2,9 +2,10 @@ use std::collections::HashMap;
 
 use candid::Nat;
 use candid::{CandidType, Deserialize, Principal};
+#[cfg(feature = "auction")]
 use ic_auction::state::{AuctionInfo, AuctionState};
-use ic_helpers::ledger::AccountIdentifier;
-use ic_helpers::ledger::Subaccount as SubaccountIdentifier;
+#[cfg(feature = "claim")]
+use ic_helpers::ledger::{AccountIdentifier, Subaccount as SubaccountIdentifier};
 use ic_helpers::tokens::Tokens128;
 use ic_storage::stable::Versioned;
 use ic_storage::IcStorage;
@@ -59,6 +60,7 @@ impl CanisterState {
         }
     }
 
+    #[cfg(feature = "claim")]
     pub fn get_claimable_amount(
         &self,
         holder: Principal,
@@ -191,6 +193,7 @@ impl Balances {
 #[derive(CandidType, Deserialize, Default, IcStorage)]
 pub struct StableState {
     pub token_state: CanisterState,
+    #[cfg(feature = "auction")]
     pub auction_state: AuctionState,
 }
 
@@ -202,6 +205,7 @@ impl Versioned for StableState {
     }
 }
 
+#[cfg(feature = "auction")]
 #[derive(Debug, Default, CandidType, Deserialize)]
 pub struct AuctionHistory(pub Vec<AuctionInfo>);
 

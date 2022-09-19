@@ -1,34 +1,32 @@
 //! This module contains APIs from IS20 standard providing cycle auction related functionality.
 
-use candid::Principal;
 use ic_auction::error::AuctionError;
 use ic_auction::state::{AuctionInfo, AuctionState};
 use ic_canister::ic_kit::ic;
 use ic_helpers::tokens::Tokens128;
 
-use crate::account::AccountInternal;
+use crate::canister::auction_account;
 use crate::state::{Balances, CanisterState};
 use crate::types::BatchTransferArgs;
 
 use super::is20_transactions::batch_transfer_internal;
-use super::TokenCanisterAPI;
 
-pub fn disburse_rewards(canister: &impl TokenCanisterAPI) -> Result<AuctionInfo, AuctionError> {
-    let canister_state = canister.state();
-    let auction_state = canister.auction_state();
-
+pub fn disburse_rewards(
+    canister_state: &mut CanisterState,
+    auction_state: &AuctionState,
+) -> Result<AuctionInfo, AuctionError> {
     let CanisterState {
         ref mut balances,
         ref mut ledger,
         ref stats,
         ..
-    } = *canister_state.borrow_mut();
+    } = *canister_state;
 
     let AuctionState {
         ref bidding_state,
         ref history,
         ..
-    } = *auction_state.borrow();
+    } = *auction_state;
 
     let total_amount = accumulated_fees(balances);
     let mut transferred_amount = Tokens128::from(0u128);
@@ -57,7 +55,7 @@ pub fn disburse_rewards(canister: &impl TokenCanisterAPI) -> Result<AuctionInfo,
         &transfers,
         balances,
         stats,
-        &auction_state.borrow(),
+        auction_state.bidding_state.fee_ratio,
     ) {
         ic::trap(&format!("Failed to transfer tokens to the bidders: {e}"));
     }
@@ -76,18 +74,6 @@ pub fn disburse_rewards(canister: &impl TokenCanisterAPI) -> Result<AuctionInfo,
     Ok(result)
 }
 
-pub fn auction_principal() -> Principal {
-    // The management canister is not a real canister in IC, so it's usually used as a black hole
-    // principal. In our case, we can use this principal as a balance holder for the auction tokens,
-    // as no requests can ever be made from this principal.
-    Principal::management_canister()
-}
-
-pub fn auction_account() -> AccountInternal {
-    // There are no sub accounts for the auction principal
-    AccountInternal::new(Principal::management_canister(), None)
-}
-
 pub fn accumulated_fees(balances: &Balances) -> Tokens128 {
     balances.balance_of(auction_account())
 }
@@ -101,6 +87,7 @@ mod tests {
     use ic_canister::Canister;
     use ic_helpers::metrics::Interval;
 
+    use crate::canister::TokenCanisterAPI;
     use crate::mock::*;
     use crate::types::Metadata;
 
@@ -181,7 +168,7 @@ mod tests {
         canister.bid_cycles(bob()).unwrap();
 
         canister.state().borrow_mut().balances.insert(
-            auction_principal(),
+            auction_account().owner,
             None,
             Tokens128::from(6000),
         );
