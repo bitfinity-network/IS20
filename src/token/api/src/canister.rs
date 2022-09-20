@@ -1,17 +1,19 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use ic_auction::api::Auction;
-use ic_auction::{error::AuctionError, state::AuctionState};
+#[cfg(feature = "auction")]
+use ic_auction::{api::Auction, error::AuctionError, state::AuctionState};
 use ic_canister::ic_kit::ic;
-use ic_canister::{generate_exports, query, state_getter, update, Canister, MethodType};
+use ic_canister::{generate_exports, query, state_getter, update, Canister};
 use ic_cdk::export::candid::Principal;
 use ic_helpers::tokens::Tokens128;
+
+#[cfg(feature = "auction")]
 use ic_storage::IcStorage;
 
 pub use inspect::AcceptReason;
 
-use crate::account::{Account, CheckedAccount, Subaccount};
+use crate::account::{Account, AccountInternal, CheckedAccount, Subaccount};
 use crate::canister::icrc1_transfer::icrc1_transfer;
 use crate::error::{TransferError, TxError};
 use crate::principal::{CheckedPrincipal, Owner};
@@ -23,24 +25,23 @@ use crate::types::{
 };
 
 use self::is20_transactions::{
-    batch_transfer, burn_as_owner, burn_own_tokens, claim, get_claim_subaccount, is20_transfer,
-    mint_as_owner, mint_test_token,
+    batch_transfer, burn_as_owner, burn_own_tokens, is20_transfer, mint_as_owner, mint_test_token,
 };
+
+#[cfg(feature = "claim")]
+use self::is20_transactions::{claim, get_claim_subaccount};
 
 mod inspect;
 
 pub mod icrc1_transfer;
 
+#[cfg(feature = "auction")]
 pub mod is20_auction;
 pub mod is20_transactions;
 
 pub(crate) const MAX_TRANSACTION_QUERY_LEN: usize = 1000;
 // 1 day in seconds.
 pub const DEFAULT_AUCTION_PERIOD_SECONDS: Timestamp = 60 * 60 * 24;
-
-pub fn pre_update<T: TokenCanisterAPI>(canister: &T, method_name: &str, method_type: MethodType) {
-    <T as Auction>::canister_pre_update(canister, method_name, method_type)
-}
 
 pub enum CanisterUpdate {
     Name(String),
@@ -52,8 +53,15 @@ pub enum CanisterUpdate {
     MinCycles(u64),
 }
 
-#[allow(non_snake_case)]
-pub trait TokenCanisterAPI: Canister + Sized + Auction {
+#[cfg(not(feature = "auction"))]
+pub trait AuctionCanister {}
+
+#[cfg(feature = "auction")]
+pub trait AuctionCanister: Auction {}
+
+impl<T: TokenCanisterAPI> AuctionCanister for T {}
+
+pub trait TokenCanisterAPI: Canister + Sized + AuctionCanister {
     #[state_getter]
     fn state(&self) -> Rc<RefCell<CanisterState>>;
 
@@ -178,6 +186,7 @@ pub trait TokenCanisterAPI: Canister + Sized + Auction {
 
     /********************** CLAIMS ***********************/
 
+    #[cfg(feature = "claim")]
     #[query(trait = true)]
     fn get_claimable_amount(&self, holder: Principal, subaccount: Option<Subaccount>) -> Tokens128 {
         self.state()
@@ -185,6 +194,7 @@ pub trait TokenCanisterAPI: Canister + Sized + Auction {
             .get_claimable_amount(holder, subaccount)
     }
 
+    #[cfg(feature = "claim")]
     #[query(trait = true)]
     fn get_claim_subaccount(
         &self,
@@ -194,6 +204,7 @@ pub trait TokenCanisterAPI: Canister + Sized + Auction {
         get_claim_subaccount(claimer, claimer_subaccount)
     }
 
+    #[cfg(feature = "claim")]
     #[update(trait = true)]
     fn claim(&self, holder: Principal, subaccount: Option<Subaccount>) -> TxReceipt {
         claim(&mut *self.state().borrow_mut(), holder, subaccount)
@@ -244,7 +255,12 @@ pub trait TokenCanisterAPI: Canister + Sized + Auction {
     #[cfg_attr(feature = "transfer", update(trait = true))]
     fn transfer(&self, transfer: TransferArgs) -> Result<u128, TxError> {
         let account = CheckedAccount::with_recipient(transfer.to.into(), transfer.from_subaccount)?;
-        is20_transfer(self, account, &transfer)
+        is20_transfer(
+            &mut self.state().borrow_mut(),
+            account,
+            &transfer,
+            self.fee_ratio(),
+        )
     }
 
     /// Takes a list of transfers, each of which is a pair of `to` and `value` fields, it returns a `TxReceipt` which contains
@@ -262,7 +278,12 @@ pub trait TokenCanisterAPI: Canister + Sized + Auction {
             let recipient = x.receiver;
             CheckedAccount::with_recipient(recipient.into(), from_subaccount)?;
         }
-        batch_transfer(self, from_subaccount, transfers)
+        batch_transfer(
+            &mut self.state().borrow_mut(),
+            from_subaccount,
+            transfers,
+            self.fee_ratio(),
+        )
     }
 
     #[cfg_attr(feature = "mint_burn", update(trait = true))]
@@ -333,7 +354,12 @@ pub trait TokenCanisterAPI: Canister + Sized + Auction {
     fn icrc1_transfer(&self, transfer: TransferArgs) -> Result<u128, TransferError> {
         let account = CheckedAccount::with_recipient(transfer.to.into(), transfer.from_subaccount)?;
 
-        Ok(icrc1_transfer(self, account, &transfer)?)
+        Ok(icrc1_transfer(
+            &mut self.state().borrow_mut(),
+            account,
+            &transfer,
+            self.fee_ratio(),
+        )?)
     }
 
     #[query(trait = true)]
@@ -392,18 +418,35 @@ pub trait TokenCanisterAPI: Canister + Sized + Auction {
             MinCycles(min_cycles) => self.state().borrow_mut().stats.min_cycles = min_cycles,
         }
     }
+
+    fn fee_ratio(&self) -> f64 {
+        #[cfg(feature = "auction")]
+        return self.bidding_info().fee_ratio;
+
+        #[cfg(not(feature = "auction"))]
+        0.0
+    }
 }
 
 generate_exports!(TokenCanisterAPI, TokenCanisterExports);
 
+#[cfg(feature = "auction")]
 impl Auction for TokenCanisterExports {
     fn auction_state(&self) -> Rc<RefCell<AuctionState>> {
         AuctionState::get()
     }
 
     fn disburse_rewards(&self) -> Result<ic_auction::state::AuctionInfo, AuctionError> {
-        is20_auction::disburse_rewards(self)
+        is20_auction::disburse_rewards(
+            &mut self.state().borrow_mut(),
+            &self.auction_state().borrow(),
+        )
     }
+}
+
+pub fn auction_account() -> AccountInternal {
+    // There are no sub accounts for the auction principal
+    AccountInternal::new(Principal::management_canister(), None)
 }
 
 #[cfg(test)]
@@ -411,7 +454,9 @@ mod tests {
     use ic_canister::canister_call;
     use ic_canister::ic_kit::mock_principals::{bob, john};
     use ic_canister::ic_kit::{mock_principals::alice, MockContext};
+    #[cfg(feature = "claim")]
     use ic_helpers::ledger::{AccountIdentifier, Subaccount as SubaccountIdentifier};
+    #[cfg(feature = "claim")]
     use rand::{thread_rng, Rng};
 
     use crate::account::DEFAULT_SUBACCOUNT;
@@ -421,6 +466,7 @@ mod tests {
     use super::*;
 
     // Method for generating random Subaccount.
+    #[cfg(feature = "claim")]
     #[cfg_attr(coverage_nightly, no_coverage)]
     fn gen_subaccount() -> Subaccount {
         let mut subaccount = [0u8; 32];
@@ -545,6 +591,7 @@ mod tests {
         );
     }
 
+    #[cfg(feature = "claim")]
     #[test]
     fn test_claim() {
         let bob_sub = gen_subaccount();

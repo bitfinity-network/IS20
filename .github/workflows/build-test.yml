@@ -6,6 +6,13 @@ on:
   pull_request:
     branches: [main]
 
+concurrency: 
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+
 jobs:
   build-test:
     uses: infinity-swap/ci-wf/.github/workflows/build-n-test.yml@main
@@ -16,31 +23,11 @@ jobs:
       git-fetch-depth: '0'
       test-script: |
         ./scripts/build.sh
-        cargo test
+        cargo llvm-cov --workspace -v
 
     secrets:
       gh_token: ${{ secrets.GH_PKG_TOKEN }}
       gh_login: ${{ secrets.GH_PKG_LOGIN }}
-
-  coverage:
-    if: ${{ ! (github.ref_type == 'tag' && endsWith(github.ref_name, '-test')) }}
-    runs-on: ubuntu-latest
-    env:
-      CARGO_TERM_COLOR: always
-    steps:
-      - uses: actions/checkout@v3
-      - name: Install Rust
-        run: rustup toolchain install nightly --component llvm-tools-preview
-      - name: Install cargo-llvm-cov
-        uses: taiki-e/install-action@cargo-llvm-cov
-      - name: Generate code coverage
-        run: cargo +nightly llvm-cov --workspace -v
-          #       - name: Upload coverage to Codecov
-          #         uses: codecov/codecov-action@v3
-          #         with:
-          #           files: lcov.info
-          #           fail_ci_if_error: true
-
 
   version-bump:
     if: ${{ github.ref_type == 'branch' && github.ref == 'refs/heads/main' }}
