@@ -1,0 +1,4 @@
+# time crate
+# Potential segfault in the time crate
+# Available in several transitive IC dependencies
+RUSTSEC-2020-0071
