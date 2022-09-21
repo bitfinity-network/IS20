@@ -6,7 +6,7 @@ on:
   pull_request:
     branches: [main]
 
-concurrency: 
+concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
@@ -20,10 +20,12 @@ jobs:
       container-image: ghcr.io/infinity-swap/ic-dev-full:rust1.62-dfx0.11
       skip-test: ${{ github.ref_type == 'tag' }}
       audit-allow-warnings: true
-      git-fetch-depth: '0'
+      git-fetch-depth: "0"
       test-script: |
         ./scripts/build.sh
-        cargo llvm-cov --workspace -v
+        cargo llvm-cov -v -p token-factory
+        cargo llvm-cov -v -p is20-token --features auction
+        cargo llvm-cov -v -p is20-token-canister
 
     secrets:
       gh_token: ${{ secrets.GH_PKG_TOKEN }}
@@ -34,12 +36,11 @@ jobs:
     needs: [build-test]
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v3
-      with:
-        fetch-depth: '0'
-    - name: Bump version and push tag
-      uses: anothrNick/github-tag-action@1.36.0
-      env:
-        GITHUB_TOKEN: ${{ secrets.GH_PKG_TOKEN }}
-        WITH_V: true
-
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: "0"
+      - name: Bump version and push tag
+        uses: anothrNick/github-tag-action@1.36.0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GH_PKG_TOKEN }}
+          WITH_V: true
