@@ -5,4 +5,6 @@
 cargo fmt -- --check
 cargo clippy
 
-cargo test
+cargo test -p token-factory 
+cargo test -p is20-token --features auction
+cargo test -p is20-token-canister 

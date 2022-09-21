@@ -72,7 +72,8 @@ mod tests {
         for method in methods {
             assert!(
                 idl.contains(method),
-                "IDL string doesn't contain method \"{method}\""
+                "IDL string doesn't contain method \"{method}\"\nidl: {}",
+                idl
             );
         }
     }

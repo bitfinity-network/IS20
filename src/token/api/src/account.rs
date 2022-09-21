@@ -143,7 +143,7 @@ mod tests {
         );
         assert_eq!(
             format!("{:?}", AccountInternal::new(alice(), None)),
-            "AccountInternal { owner: Principal(PrincipalInner { len: 10, bytes: [0, 0, 0, 0, 0, 0, 0, 16, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0] }), subaccount: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0] }".to_string()
+            "AccountInternal { owner: Principal { len: 10, bytes: [0, 0, 0, 0, 0, 0, 0, 16, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0] }, subaccount: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0] }".to_string()
         );
         assert_eq!(
             format!(
