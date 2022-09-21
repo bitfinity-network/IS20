@@ -41,11 +41,11 @@ pub(crate) fn icrc1_transfer(
 mod tests {
     use std::time::UNIX_EPOCH;
 
-    use ic_auction::api::Auction;
-    use ic_canister::ic_kit::mock_principals::{alice, bob, john, xtc};
-    use ic_canister::ic_kit::MockContext;
-    use ic_canister::Canister;
-    use ic_helpers::tokens::Tokens128;
+    use canister_sdk::ic_auction::api::Auction;
+    use canister_sdk::ic_canister::Canister;
+    use canister_sdk::ic_helpers::tokens::Tokens128;
+    use canister_sdk::ic_kit::mock_principals::{alice, bob, john, xtc};
+    use canister_sdk::ic_kit::MockContext;
     use rand::prelude::*;
 
     use crate::account::{Account, Subaccount};
@@ -414,7 +414,7 @@ mod tests {
         assert_eq!(canister.history_size(), before_history_size);
 
         const COUNT: u64 = 5;
-        let mut ts = ic_canister::ic_kit::ic::time();
+        let mut ts = canister_sdk::ic_kit::ic::time();
         for i in 0..COUNT {
             let transfer1 = TransferArgs {
                 from_subaccount: None,
@@ -519,7 +519,7 @@ mod tests {
         assert_eq!(canister.history_size(), 2);
 
         const COUNT: u64 = 5;
-        let mut ts = ic_canister::ic_kit::ic::time();
+        let mut ts = canister_sdk::ic_kit::ic::time();
         for i in 0..COUNT {
             ctx.add_time(10);
             let id = canister
@@ -647,7 +647,7 @@ mod tests {
         assert_eq!(canister.history_size(), history_size_before);
 
         const COUNT: u64 = 5;
-        let mut ts = ic_canister::ic_kit::ic::time();
+        let mut ts = canister_sdk::ic_kit::ic::time();
         for i in 0..COUNT {
             ctx.add_time(10);
             let id = canister
@@ -945,9 +945,9 @@ mod tests {
 #[cfg(test)]
 mod proptests {
     use candid::Principal;
-    use ic_canister::ic_kit::MockContext;
-    use ic_canister::Canister;
-    use ic_helpers::tokens::Tokens128;
+    use canister_sdk::ic_canister::Canister;
+    use canister_sdk::ic_helpers::tokens::Tokens128;
+    use canister_sdk::ic_kit::MockContext;
     use proptest::collection::vec;
     use proptest::prelude::*;
     use proptest::sample::Index;

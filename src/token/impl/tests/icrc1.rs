@@ -1,12 +1,12 @@
 use candid::Principal;
-use ic_canister::{
+use canister_sdk::{
+    ic_canister::Canister,
+    ic_helpers::tokens::Tokens128,
     ic_kit::{
         mock_principals::{alice, bob, john},
         MockContext,
     },
-    Canister,
 };
-use ic_helpers::tokens::Tokens128;
 use is20_token_canister::canister::TokenCanister;
 use token_api::{
     account::Account,
@@ -17,7 +17,7 @@ use token_api::{
 };
 
 fn init() -> (Metadata, TokenCanister, &'static mut MockContext) {
-    let ctx = ic_canister::ic_kit::MockContext::new().inject();
+    let ctx = canister_sdk::ic_kit::MockContext::new().inject();
     let canister = TokenCanister::init_instance();
     canister.state().replace(CanisterState::default());
     let meta = Metadata {
@@ -147,7 +147,7 @@ fn too_old_transfer() {
     ctx.update_caller(alice());
     transfer(&canister, bob(), 10_000);
 
-    let curr_ts = ic_canister::ic_kit::ic::time();
+    let curr_ts = canister_sdk::ic_kit::ic::time();
     ctx.update_caller(bob());
     let result = canister.icrc1_transfer(TransferArgs {
         from_subaccount: None,
@@ -169,7 +169,7 @@ fn created_in_future() {
     ctx.update_caller(alice());
     transfer(&canister, bob(), 10_000);
 
-    let curr_ts = ic_canister::ic_kit::ic::time();
+    let curr_ts = canister_sdk::ic_kit::ic::time();
     ctx.update_caller(bob());
     let result = canister.icrc1_transfer(TransferArgs {
         from_subaccount: None,
@@ -196,7 +196,7 @@ fn duplicate_check() {
     ctx.update_caller(alice());
     transfer(&canister, bob(), 10_000);
 
-    let curr_ts = ic_canister::ic_kit::ic::time();
+    let curr_ts = canister_sdk::ic_kit::ic::time();
     ctx.update_caller(bob());
     let tx_id = canister
         .icrc1_transfer(TransferArgs {

@@ -1,8 +1,8 @@
 use candid::Principal;
-use ic_auction::state::AuctionState;
-use ic_canister::ic_kit::ic;
-use ic_helpers::ledger::{AccountIdentifier, Subaccount as SubaccountIdentifier};
-use ic_helpers::tokens::Tokens128;
+use canister_sdk::ic_auction::state::AuctionState;
+use canister_sdk::ic_helpers::tokens::Tokens128;
+use canister_sdk::ic_kit::ic;
+use canister_sdk::ledger_canister::{AccountIdentifier, Subaccount as SubaccountIdentifier};
 
 use crate::account::{AccountInternal, CheckedAccount, Subaccount, WithRecipient};
 use crate::error::TxError;
@@ -287,7 +287,7 @@ pub fn claim(
     holder: Principal,
     subaccount: Option<Subaccount>,
 ) -> TxReceipt {
-    let caller = ic_canister::ic_kit::ic::caller();
+    let caller = canister_sdk::ic_kit::ic::caller();
     let claim_subaccount = get_claim_subaccount(caller, subaccount);
     let claim_account = AccountInternal::new(holder, Some(claim_subaccount));
     let amount = state.balances.balance_of(claim_account);
@@ -315,7 +315,7 @@ pub fn batch_transfer(
     from_subaccount: Option<Subaccount>,
     transfers: Vec<BatchTransferArgs>,
 ) -> Result<Vec<TxId>, TxError> {
-    let caller = ic_canister::ic_kit::ic::caller();
+    let caller = canister_sdk::ic_kit::ic::caller();
     let from = AccountInternal::new(caller, from_subaccount);
     let state = canister.state();
     let mut state = state.borrow_mut();
@@ -380,9 +380,9 @@ pub(crate) fn batch_transfer_internal(
 
 #[cfg(test)]
 mod tests {
-    use ic_canister::ic_kit::mock_principals::{alice, bob, john, xtc};
-    use ic_canister::ic_kit::MockContext;
-    use ic_canister::Canister;
+    use canister_sdk::ic_canister::Canister;
+    use canister_sdk::ic_kit::mock_principals::{alice, bob, john, xtc};
+    use canister_sdk::ic_kit::MockContext;
 
     use crate::account::{Account, DEFAULT_SUBACCOUNT};
     use crate::mock::TokenCanisterMock;

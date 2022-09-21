@@ -2,12 +2,12 @@ use std::collections::HashMap;
 
 use candid::Nat;
 use candid::{CandidType, Deserialize, Principal};
-use ic_auction::state::{AuctionInfo, AuctionState};
-use ic_helpers::ledger::AccountIdentifier;
-use ic_helpers::ledger::Subaccount as SubaccountIdentifier;
-use ic_helpers::tokens::Tokens128;
-use ic_storage::stable::Versioned;
-use ic_storage::IcStorage;
+use canister_sdk::ic_auction::state::{AuctionInfo, AuctionState};
+use canister_sdk::ic_helpers::tokens::Tokens128;
+use canister_sdk::ic_storage::stable::Versioned;
+use canister_sdk::ic_storage::IcStorage;
+use canister_sdk::ledger_canister::AccountIdentifier;
+use canister_sdk::ledger_canister::Subaccount as SubaccountIdentifier;
 
 use crate::account::{AccountInternal, Subaccount, DEFAULT_SUBACCOUNT};
 use crate::ledger::Ledger;
@@ -65,7 +65,7 @@ impl CanisterState {
         subaccount: Option<Subaccount>,
     ) -> Tokens128 {
         let claim_subaccount = AccountIdentifier::new(
-            ic_canister::ic_kit::ic::caller().into(),
+            canister_sdk::ic_kit::ic::caller().into(),
             Some(SubaccountIdentifier(
                 subaccount.unwrap_or(DEFAULT_SUBACCOUNT),
             )),

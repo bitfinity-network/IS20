@@ -1,21 +1,21 @@
 use candid::Principal;
-use ic_auction::{
-    api::Auction,
-    error::AuctionError,
-    state::{AuctionInfo, AuctionState},
+#[cfg(feature = "export_api")]
+use canister_sdk::ic_cdk_macros::inspect_message;
+use canister_sdk::{
+    ic_auction::{
+        api::Auction,
+        error::AuctionError,
+        state::{AuctionInfo, AuctionState},
+    },
+    ic_canister::{self, init, post_upgrade, pre_upgrade, query, Canister, PreUpdate},
+    ic_cdk,
+    ic_helpers::{
+        candid_header::{candid_header, CandidHeader},
+        tokens::Tokens128,
+    },
+    ic_metrics::{Interval, Metrics},
+    ic_storage::{self, IcStorage},
 };
-use ic_canister::{init, post_upgrade, pre_upgrade, Canister, PreUpdate};
-
-#[cfg(not(feature = "no_api"))]
-use ic_cdk_macros::inspect_message;
-
-use ic_canister::query;
-use ic_helpers::{
-    candid_header::{candid_header, CandidHeader},
-    metrics::{Interval, Metrics},
-    tokens::Tokens128,
-};
-use ic_storage::IcStorage;
 use std::{cell::RefCell, rc::Rc};
 use token_api::{
     account::AccountInternal,
@@ -66,7 +66,7 @@ impl TokenCanister {
             token_state,
             auction_state,
         }) {
-            ic_canister::ic_kit::ic::trap(&format!(
+            canister_sdk::ic_kit::ic::trap(&format!(
                 "Error while serializing state to the stable storage: {err}"
             ));
         }
@@ -75,7 +75,7 @@ impl TokenCanister {
     #[post_upgrade]
     fn post_upgrade(&self) {
         let stable_state = ic_storage::stable::read::<StableState>().unwrap_or_else(|err| {
-            ic_canister::ic_kit::ic::trap(&format!(
+            canister_sdk::ic_kit::ic::trap(&format!(
                 "Error while deserializing state from the stable storage: {err}"
             ));
         });
@@ -95,10 +95,10 @@ impl TokenCanister {
     }
 }
 
-#[cfg(not(feature = "no_api"))]
+#[cfg(feature = "export_api")]
 #[inspect_message]
 fn inspect_message() {
-    use ic_storage::IcStorage;
+    use canister_sdk::{ic_cdk, ic_storage::IcStorage};
     use token_api::canister::AcceptReason;
 
     let method = ic_cdk::api::call::method_name();
@@ -147,7 +147,7 @@ impl Metrics for TokenCanister {}
 #[cfg(test)]
 mod test {
     use super::*;
-    use ic_canister::ic_kit::MockContext;
+    use canister_sdk::ic_kit::MockContext;
 
     #[test]
     #[cfg_attr(coverage_nightly, no_coverage)]

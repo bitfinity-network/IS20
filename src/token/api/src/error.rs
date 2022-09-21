@@ -1,5 +1,5 @@
 use candid::{CandidType, Deserialize};
-use ic_helpers::tokens::Tokens128;
+use canister_sdk::ic_helpers::tokens::Tokens128;
 use thiserror::Error;
 
 use crate::types::Timestamp;

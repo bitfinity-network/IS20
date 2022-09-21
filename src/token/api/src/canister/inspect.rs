@@ -1,5 +1,5 @@
 use candid::{Nat, Principal};
-use ic_storage::IcStorage;
+use canister_sdk::ic_storage::IcStorage;
 
 use crate::state::CanisterState;
 
@@ -64,7 +64,7 @@ pub fn inspect_message(
             }
 
             // It's the `burn` method and the caller isn't the owner.
-            let from = ic_cdk::api::call::arg_data::<(Option<Principal>, Nat)>().0;
+            let from = canister_sdk::ic_cdk::api::call::arg_data::<(Option<Principal>, Nat)>().0;
             if from.is_some() {
                 return Err("Only the owner can burn other's tokens. Rejecting.");
             }

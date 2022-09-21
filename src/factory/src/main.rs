@@ -9,13 +9,18 @@ fn main() {}
 fn main() {
     use crate::{api::TokenFactoryCanister, error::TokenFactoryError};
     use candid::Principal;
-    use ic_factory::api::FactoryCanister;
-    use ic_factory::error::FactoryError;
-    use ic_helpers::candid_header::CandidHeader;
-    use ic_helpers::tokens::Tokens128;
+    use canister_sdk::{
+        ic_canister::{generate_idl, Idl},
+        ic_factory::{
+            api::{FactoryCanister, UpgradeResult},
+            error::FactoryError,
+        },
+        ic_helpers::{candid_header::CandidHeader, tokens::Tokens128},
+    };
+    use std::collections::HashMap;
     use token::types::Metadata;
 
-    let canister_idl = ic_canister::generate_idl!();
+    let canister_idl = generate_idl!();
     let mut factory_idl = <TokenFactoryCanister as FactoryCanister>::get_idl();
     factory_idl.merge(&canister_idl);
 

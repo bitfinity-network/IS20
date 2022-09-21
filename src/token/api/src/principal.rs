@@ -2,7 +2,7 @@ use candid::Principal;
 
 use crate::error::TxError;
 use crate::types::StatsData;
-use ic_canister::ic_kit::ic;
+use canister_sdk::ic_kit::ic;
 
 /// Canister owner
 pub struct Owner;

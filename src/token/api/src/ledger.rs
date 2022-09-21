@@ -1,6 +1,6 @@
 use candid::{CandidType, Deserialize, Principal};
-use ic_canister::ic_kit::ic;
-use ic_helpers::tokens::Tokens128;
+use canister_sdk::ic_helpers::tokens::Tokens128;
+use canister_sdk::ic_kit::ic;
 
 use crate::account::AccountInternal;
 use crate::tx_record::{TxId, TxRecord};
