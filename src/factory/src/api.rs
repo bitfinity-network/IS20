@@ -12,6 +12,7 @@ use ic_canister::ic_kit::ic;
 use ic_canister::{init, post_upgrade, pre_upgrade, query, update, Canister, PreUpdate};
 use ic_factory::{api::FactoryCanister, error::FactoryError, FactoryConfiguration, FactoryState};
 use ic_helpers::candid_header::{candid_header, CandidHeader};
+use ic_helpers::metrics::Metrics;
 use ic_helpers::tokens::Tokens128;
 use token::types::Metadata;
 
@@ -29,6 +30,13 @@ pub struct TokenFactoryCanister {
 
     #[state]
     pub state: Rc<RefCell<State>>,
+}
+
+impl Metrics for TokenFactoryCanister {}
+impl PreUpdate for TokenFactoryCanister {
+    fn pre_update(&self, _method_name: &str, _method_type: ic_canister::MethodType) {
+        self.update_metrics();
+    }
 }
 
 #[allow(dead_code)]
@@ -180,7 +188,6 @@ impl TokenFactoryCanister {
     }
 }
 
-impl PreUpdate for TokenFactoryCanister {}
 impl FactoryCanister for TokenFactoryCanister {
     fn factory_state(&self) -> Rc<RefCell<FactoryState>> {
         use ic_storage::IcStorage;
