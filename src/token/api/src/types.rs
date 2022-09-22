@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use candid::{CandidType, Deserialize, Int, Nat, Principal};
-use ic_helpers::{ledger::AccountIdentifier, tokens::Tokens128};
+use canister_sdk::{ic_helpers::tokens::Tokens128, ledger_canister::AccountIdentifier};
 
 use crate::{
     account::{Account, Subaccount},
@@ -94,7 +94,7 @@ impl From<Metadata> for StatsData {
             owner: md.owner,
             fee: md.fee,
             fee_to: md.fee_to,
-            deploy_time: ic_canister::ic_kit::ic::time(),
+            deploy_time: canister_sdk::ic_kit::ic::time(),
             min_cycles: DEFAULT_MIN_CYCLES,
             is_test_token: md.is_test_token.unwrap_or(false),
         }

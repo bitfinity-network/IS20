@@ -1,7 +1,9 @@
-use candid::Principal;
-use ic_cdk::export::candid::CandidType;
-use ic_factory::FactoryState;
-use ic_storage::{stable::Versioned, IcStorage};
+use canister_sdk::{
+    candid::Principal,
+    ic_cdk::export::candid::CandidType,
+    ic_factory::{v1::FactoryStateV1, FactoryState},
+    ic_storage::{stable::Versioned, IcStorage},
+};
 use serde::Deserialize;
 use std::collections::HashMap;
 
@@ -32,7 +34,7 @@ impl Versioned for StableState {
 #[derive(CandidType, Deserialize, Default)]
 pub struct StableStateV1 {
     pub token_factory_state: State,
-    pub base_factory_state: ic_factory::v1::FactoryStateV1,
+    pub base_factory_state: FactoryStateV1,
 }
 
 impl Versioned for StableStateV1 {

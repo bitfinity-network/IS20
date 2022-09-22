@@ -1,18 +1,21 @@
 use candid::Principal;
-use ic_canister::ic_kit::ic;
 #[cfg(feature = "claim")]
-use ic_helpers::ledger::{AccountIdentifier, Subaccount as SubaccountIdentifier};
-use ic_helpers::tokens::Tokens128;
+use canister_sdk::ledger_canister::{AccountIdentifier, Subaccount as SubaccountIdentifier};
+use canister_sdk::{ic_helpers::tokens::Tokens128, ic_kit::ic};
 
-use crate::account::{AccountInternal, CheckedAccount, Subaccount, WithRecipient};
-use crate::error::TxError;
-use crate::principal::{CheckedPrincipal, Owner, TestNet};
-use crate::state::{Balances, CanisterState, FeeRatio};
-use crate::tx_record::TxId;
-use crate::types::{BatchTransferArgs, StatsData, TransferArgs, TxReceipt};
+use crate::{
+    account::{AccountInternal, CheckedAccount, Subaccount, WithRecipient},
+    error::TxError,
+    principal::{CheckedPrincipal, Owner, TestNet},
+    state::{Balances, CanisterState, FeeRatio},
+    tx_record::TxId,
+    types::{BatchTransferArgs, StatsData, TransferArgs, TxReceipt},
+};
 
-use super::auction_account;
-use super::icrc1_transfer::{PERMITTED_DRIFT, TX_WINDOW};
+use super::{
+    auction_account,
+    icrc1_transfer::{PERMITTED_DRIFT, TX_WINDOW},
+};
 
 pub fn is20_transfer(
     state: &mut CanisterState,
@@ -285,7 +288,7 @@ pub fn claim(
     holder: Principal,
     subaccount: Option<Subaccount>,
 ) -> TxReceipt {
-    let caller = ic_canister::ic_kit::ic::caller();
+    let caller = canister_sdk::ic_kit::ic::caller();
     let claim_subaccount = get_claim_subaccount(caller, subaccount);
     let claim_account = AccountInternal::new(holder, Some(claim_subaccount));
     let amount = state.balances.balance_of(claim_account);
@@ -314,7 +317,7 @@ pub fn batch_transfer(
     transfers: Vec<BatchTransferArgs>,
     auction_fee_ratio: f64,
 ) -> Result<Vec<TxId>, TxError> {
-    let caller = ic_canister::ic_kit::ic::caller();
+    let caller = canister_sdk::ic_kit::ic::caller();
     let from = AccountInternal::new(caller, from_subaccount);
     let CanisterState {
         ref mut balances,
@@ -374,15 +377,21 @@ pub(crate) fn batch_transfer_internal(
 
 #[cfg(test)]
 mod tests {
-    use ic_canister::ic_kit::mock_principals::{alice, bob, john, xtc};
-    use ic_canister::ic_kit::MockContext;
-    use ic_canister::Canister;
+    use canister_sdk::{
+        ic_auction::api::Auction,
+        ic_canister::Canister,
+        ic_kit::{
+            mock_principals::{alice, bob, john, xtc},
+            MockContext,
+        },
+    };
 
-    use crate::account::{Account, DEFAULT_SUBACCOUNT};
-    use crate::canister::TokenCanisterAPI;
-    use crate::mock::TokenCanisterMock;
     use crate::types::Metadata;
-    use ic_auction::api::Auction;
+    use crate::{
+        account::{Account, DEFAULT_SUBACCOUNT},
+        canister::TokenCanisterAPI,
+        mock::TokenCanisterMock,
+    };
 
     use super::*;
 

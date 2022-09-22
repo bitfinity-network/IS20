@@ -2,15 +2,17 @@ use std::{cell::RefCell, rc::Rc};
 
 use candid::Principal;
 #[cfg(feature = "auction")]
-use ic_auction::{
+use canister_sdk::ic_auction::{
     api::Auction,
     error::AuctionError,
     state::{AuctionInfo, AuctionState},
 };
-use ic_canister::{Canister, PreUpdate};
-use ic_helpers::{metrics::Interval, tokens::Tokens128};
-#[cfg(feature = "auction")]
-use ic_storage::IcStorage;
+use canister_sdk::{
+    ic_canister::{self, Canister, PreUpdate},
+    ic_helpers::tokens::Tokens128,
+    ic_metrics::Interval,
+    ic_storage::{self, IcStorage},
+};
 
 use crate::{canister::TokenCanisterAPI, state::CanisterState, types::Metadata};
 
@@ -45,7 +47,7 @@ impl TokenCanisterMock {
                 Interval::Period {
                     seconds: crate::canister::DEFAULT_AUCTION_PERIOD_SECONDS,
                 },
-                ic_canister::ic_kit::ic::caller(),
+                canister_sdk::ic_kit::ic::caller(),
             ));
         }
     }

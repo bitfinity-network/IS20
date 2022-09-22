@@ -1,6 +1,6 @@
 use std::fmt::{Display, Formatter};
 
-use candid::{CandidType, Principal};
+use canister_sdk::candid::{CandidType, Principal};
 use serde::Deserialize;
 
 use crate::error::TxError;
@@ -106,7 +106,7 @@ impl CheckedAccount<WithRecipient> {
         recipient: AccountInternal,
         from_subaccount: Option<Subaccount>,
     ) -> Result<Self, TxError> {
-        let caller = ic_canister::ic_kit::ic::caller();
+        let caller = canister_sdk::ic_kit::ic::caller();
         let from = AccountInternal::new(caller, from_subaccount);
         if recipient == from {
             Err(TxError::SelfTransfer)
@@ -122,8 +122,8 @@ impl CheckedAccount<WithRecipient> {
 #[cfg(test)]
 mod tests {
     use candid::{Decode, Encode};
+    use canister_sdk::ic_kit::mock_principals::alice;
     use coverage_helper::test;
-    use ic_canister::ic_kit::mock_principals::alice;
 
     use super::*;
 
