@@ -3,8 +3,15 @@ name: Validate and Bump
 on:
   push:
     branches: [main]
+    tags:
+      - "v*"
+    paths-ignore:
+      - "**/README.md"
+
   pull_request:
     branches: [main]
+    paths-ignore:
+      - "**/README.md"
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -26,10 +33,22 @@ jobs:
         cargo llvm-cov -v -p token-factory --features export_api
         cargo llvm-cov -v -p is20-token --features auction --features export_api
         cargo llvm-cov -v -p is20-token-canister --features export_api
+      
+      output-artifact: artifact-is20
+      artifact-script: |
+        cargo build --target wasm32-unknown-unknown -p is20-token-canister --release
+        ic-cdk-optimizer target/wasm32-unknown-unknown/release/is20-token-canister.wasm -o .artifact/is20-token.wasm
+
+        cargo build --target wasm32-unknown-unknown -p token-factory --release
+        ic-cdk-optimizer target/wasm32-unknown-unknown/release/token-factory.wasm -o .artifact/is20-factory.wasm
+
+        cargo run -p is20-token-canister > .artifact/is20-token.did
+        cargo run -p token-factory  > .artifact/is20-factory.did
 
     secrets:
       gh_token: ${{ secrets.GH_PKG_TOKEN }}
       gh_login: ${{ secrets.GH_PKG_LOGIN }}
+
 
   version-bump:
     if: ${{ github.ref_type == 'branch' && github.ref == 'refs/heads/main' }}
@@ -44,3 +63,25 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GH_PKG_TOKEN }}
           WITH_V: true
+
+
+  release:
+    if: ${{github.ref_type == 'tag'}}
+    needs: [build-test]
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: "Getting artifact"
+      uses: actions/download-artifact@v3
+      with:
+        name: artifact-is20
+        path: ./.artifact
+    - name: "Compress"
+      run: |
+        cd .artifact
+        tar -c -f is20-${{ github.ref_name }}.tar.gz --owner=0 --group=0 --no-same-owner --no-same-permissions .
+    - name: Release
+      uses: softprops/action-gh-release@v1
+      with:
+        files: |
+          .artifact/*.tar.gz
