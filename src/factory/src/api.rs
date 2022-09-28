@@ -9,16 +9,11 @@ use std::rc::Rc;
 use crate::state::StableState;
 use crate::{error::TokenFactoryError, state::State};
 use candid::Principal;
-<<<<<<< HEAD
-use ic_canister::ic_kit::ic;
-use ic_canister::{init, post_upgrade, pre_upgrade, query, update, Canister, PreUpdate};
-use ic_factory::{api::FactoryCanister, error::FactoryError, FactoryConfiguration, FactoryState};
-use ic_helpers::candid_header::{candid_header, CandidHeader};
-use ic_helpers::metrics::Metrics;
-use ic_helpers::tokens::Tokens128;
-=======
+use canister_sdk::ic_metrics::Metrics;
 use canister_sdk::{
-    ic_canister::{init, post_upgrade, pre_upgrade, query, update, Canister, PreUpdate},
+    ic_canister::{
+        init, post_upgrade, pre_upgrade, query, update, Canister, MethodType, PreUpdate,
+    },
     ic_factory::{
         api::{FactoryCanister, UpgradeResult},
         error::FactoryError,
@@ -31,7 +26,6 @@ use canister_sdk::{
     ic_kit::ic,
     ic_storage,
 };
->>>>>>> 283b773702b905eb89bbe063cb2c3efcb15cfc5e
 use token::types::Metadata;
 
 const DEFAULT_LEDGER_PRINCIPAL: Principal = Principal::from_slice(&[0, 0, 0, 0, 0, 0, 0, 2, 1, 1]);
@@ -52,7 +46,7 @@ pub struct TokenFactoryCanister {
 
 impl Metrics for TokenFactoryCanister {}
 impl PreUpdate for TokenFactoryCanister {
-    fn pre_update(&self, _method_name: &str, _method_type: ic_canister::MethodType) {
+    fn pre_update(&self, _method_name: &str, _method_type: MethodType) {
         self.update_metrics();
     }
 }
