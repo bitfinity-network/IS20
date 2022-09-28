@@ -5,44 +5,33 @@ version = "0.2.0"
 
 [features]
 default = ["mint_burn", "transfer"]
-no_api = ["ic-auction?/no_api"]
+export_api = ["canister-sdk/auction_api"]
 
 # Enables cycle auctions
-auction = ["dep:ic-auction"]
+auction = ["canister-sdk/auction"]
 
 # Enables claim API related functions
 claim = []
 
-# Enable mint and burn API methods. Enabled by default.
+# Enables mint and burn API methods. Enabled by default.
 mint_burn = []
 
-# Enable API methods for funds transferring. Enabled by default.
+# Enables API methods for funds transferring. Enabled by default.
 transfer = []
 
 [dependencies]
-assert-panic = "1.0"
 candid = "0.7"
-ic-cdk = "0.5"
-ic-cdk-macros = "0.5"
 num-traits = "0.2"
 serde = "1.0"
-ic-canister = { git = "https://github.com/infinity-swap/canister-sdk", package = "ic-canister", tag = "v0.3.20-dev" }
-ic-helpers = { git = "https://github.com/infinity-swap/canister-sdk", package = "ic-helpers", tag = "v0.3.20-dev" }
-ic-storage = { git = "https://github.com/infinity-swap/canister-sdk", package = "ic-storage", tag = "v0.3.20-dev" }
-ic-auction = { git = "https://github.com/infinity-swap/canister-sdk", package = "ic-auction", tag = "v0.3.20-dev", optional = true }
-ic-certified-map = "0.3"
 serde_cbor = "0.11"
+canister-sdk = { git = "https://github.com/infinity-swap/canister-sdk", package = "canister-sdk", tag = "v0.3.21" }
+ic-exports = { git = "https://github.com/infinity-swap/canister-sdk", package = "ic-exports", tag = "v0.3.21" }
 thiserror = "1.0"
-hex = { version = "0.4.2", features = ["serde"] }
-digest = "0.10.3"
-sha2 = "0.10.2"
-crc32fast = "1.3.2"
 
 [target.'cfg(not(target_family = "wasm"))'.dependencies]
 async-std = { version = "1.10.0", features = ["attributes"] }
 
 [dev-dependencies]
-test-case = "1.2.1"
 tokio = { version = "1", features = ["macros", "rt"] }
 proptest = "1.0.0"
 rand = "0.8"

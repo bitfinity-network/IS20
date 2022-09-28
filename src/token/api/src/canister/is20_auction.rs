@@ -1,9 +1,13 @@
 //! This module contains APIs from IS20 standard providing cycle auction related functionality.
 
-use ic_auction::error::AuctionError;
-use ic_auction::state::{AuctionInfo, AuctionState};
-use ic_canister::ic_kit::ic;
-use ic_helpers::tokens::Tokens128;
+use canister_sdk::{
+    ic_auction::{
+        error::AuctionError,
+        state::{AuctionInfo, AuctionState},
+    },
+    ic_helpers::tokens::Tokens128,
+    ic_kit::ic,
+};
 
 use crate::canister::auction_account;
 use crate::state::{Balances, CanisterState};
@@ -63,7 +67,7 @@ pub fn disburse_rewards(
     let last_transaction_id = ledger.len() - 1;
     let result = AuctionInfo {
         auction_id: history.len(),
-        auction_time: ic_canister::ic_kit::ic::time(),
+        auction_time: canister_sdk::ic_kit::ic::time(),
         tokens_distributed: transferred_amount,
         cycles_collected: total_cycles,
         fee_ratio: bidding_state.fee_ratio,
@@ -80,12 +84,15 @@ pub fn accumulated_fees(balances: &Balances) -> Tokens128 {
 
 #[cfg(test)]
 mod tests {
-    use ic_auction::api::Auction;
-    use ic_auction::state::MIN_BIDDING_AMOUNT;
-    use ic_canister::ic_kit::mock_principals::{alice, bob};
-    use ic_canister::ic_kit::MockContext;
-    use ic_canister::Canister;
-    use ic_helpers::metrics::Interval;
+    use canister_sdk::{
+        ic_auction::{api::Auction, state::MIN_BIDDING_AMOUNT},
+        ic_canister::Canister,
+        ic_kit::{
+            mock_principals::{alice, bob},
+            MockContext,
+        },
+        ic_metrics::Interval,
+    };
 
     use crate::canister::TokenCanisterAPI;
     use crate::mock::*;
@@ -213,7 +220,7 @@ mod tests {
         {
             let state = canister.auction_state();
             let state = &mut state.borrow_mut().bidding_state;
-            state.last_auction = ic_canister::ic_kit::ic::time() - 100_000;
+            state.last_auction = canister_sdk::ic_kit::ic::time() - 100_000;
             state.auction_period = 1_000_000_000;
         }
 

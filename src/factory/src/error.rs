@@ -1,5 +1,5 @@
 use candid::CandidType;
-use ic_factory::error::FactoryError;
+use canister_sdk::ic_factory::error::FactoryError;
 use thiserror::Error;
 
 #[derive(Debug, Error, CandidType)]

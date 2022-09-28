@@ -1,6 +1,8 @@
 #![allow(dead_code)]
 #![cfg_attr(coverage_nightly, feature(no_coverage))]
 
+use canister_sdk::ic_canister;
+
 mod canister;
 
 #[cfg(any(target_arch = "wasm32", test))]
@@ -14,11 +16,12 @@ fn main() {
 
 fn get_canister_idl() -> String {
     use crate::canister::TokenCanister;
-    use ic_auction::api::Auction;
-    use ic_helpers::candid_header::CandidHeader;
-    use ic_helpers::tokens::Tokens128;
-    use token_api::canister::TokenCanisterAPI;
-    use token_api::types::Metadata;
+    use canister_sdk::{
+        ic_auction::api::Auction,
+        ic_canister::Idl,
+        ic_helpers::{candid_header::CandidHeader, tokens::Tokens128},
+    };
+    use token_api::{canister::TokenCanisterAPI, types::Metadata};
 
     let canister_idl = ic_canister::generate_idl!();
     let auction_idl = <TokenCanister as Auction>::get_idl();

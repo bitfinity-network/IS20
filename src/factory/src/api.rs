@@ -3,23 +3,41 @@
 //! Stability  : Experimental
 
 use std::cell::RefCell;
+use std::collections::HashMap;
 use std::rc::Rc;
 
 use crate::state::StableState;
 use crate::{error::TokenFactoryError, state::State};
 use candid::Principal;
+<<<<<<< HEAD
 use ic_canister::ic_kit::ic;
 use ic_canister::{init, post_upgrade, pre_upgrade, query, update, Canister, PreUpdate};
 use ic_factory::{api::FactoryCanister, error::FactoryError, FactoryConfiguration, FactoryState};
 use ic_helpers::candid_header::{candid_header, CandidHeader};
 use ic_helpers::metrics::Metrics;
 use ic_helpers::tokens::Tokens128;
+=======
+use canister_sdk::{
+    ic_canister::{init, post_upgrade, pre_upgrade, query, update, Canister, PreUpdate},
+    ic_factory::{
+        api::{FactoryCanister, UpgradeResult},
+        error::FactoryError,
+        FactoryConfiguration, FactoryState,
+    },
+    ic_helpers::{
+        candid_header::{candid_header, CandidHeader},
+        tokens::Tokens128,
+    },
+    ic_kit::ic,
+    ic_storage,
+};
+>>>>>>> 283b773702b905eb89bbe063cb2c3efcb15cfc5e
 use token::types::Metadata;
 
 const DEFAULT_LEDGER_PRINCIPAL: Principal = Principal::from_slice(&[0, 0, 0, 0, 0, 0, 0, 2, 1, 1]);
 const DEFAULT_ICP_FEE: u64 = 10u64.pow(8); // 1 ICP
 
-#[cfg(not(feature = "no_api"))]
+#[cfg(feature = "export_api")]
 mod inspect_message;
 
 #[derive(Clone, Canister)]
@@ -152,7 +170,7 @@ impl TokenFactoryCanister {
             return Err(TokenFactoryError::AlreadyExists);
         }
 
-        let caller = ic_canister::ic_kit::ic::caller();
+        let caller = canister_sdk::ic_kit::ic::caller();
         let principal = self
             .create_canister((info, amount), controller, Some(caller))
             .await?;
@@ -175,10 +193,7 @@ impl TokenFactoryCanister {
     }
 
     #[update]
-    pub async fn upgrade(
-        &mut self,
-    ) -> Result<std::collections::HashMap<Principal, ic_factory::api::UpgradeResult>, FactoryError>
-    {
+    pub async fn upgrade(&mut self) -> Result<HashMap<Principal, UpgradeResult>, FactoryError> {
         self.upgrade_canister::<token::state::CanisterState>().await
     }
 
@@ -190,7 +205,7 @@ impl TokenFactoryCanister {
 
 impl FactoryCanister for TokenFactoryCanister {
     fn factory_state(&self) -> Rc<RefCell<FactoryState>> {
-        use ic_storage::IcStorage;
+        use canister_sdk::ic_storage::IcStorage;
         FactoryState::get()
     }
 }

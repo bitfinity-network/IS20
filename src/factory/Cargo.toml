@@ -5,19 +5,22 @@ version = "0.24.0"
 
 [features]
 default = []
-no_api = []
+export_api = ["canister-sdk/factory_api"]
 
 [dependencies]
 candid = "0.7"
+<<<<<<< HEAD
 ic-cdk = "0.5"
 ic-cdk-macros = "0.5"
 ic-canister = { git = "https://github.com/infinity-swap/canister-sdk", package = "ic-canister", tag = "v0.3.20-dev" }
 ic-helpers = { git = "https://github.com/infinity-swap/canister-sdk", package = "ic-helpers", tag = "v0.3.20-dev" }
 ic-storage = { git = "https://github.com/infinity-swap/canister-sdk", package = "ic-storage", tag = "v0.3.20-dev" }
 ic-factory = { git = "https://github.com/infinity-swap/canister-sdk", package = "ic-factory", tag = "v0.3.20-dev" }
+=======
+>>>>>>> 283b773702b905eb89bbe063cb2c3efcb15cfc5e
 serde = "1.0"
 thiserror = "1.0"
-token = { path = "../token/api", features = ["no_api"], package = "is20-token" }
+canister-sdk = { git = "https://github.com/infinity-swap/canister-sdk", package = "canister-sdk", tag = "v0.3.21", features = ["factory"] }
+ic-exports = { git = "https://github.com/infinity-swap/canister-sdk", package = "ic-exports", tag = "v0.3.21" }
 
-[dev-dependencies]
-tokio = { version = "1", features = ["rt", "macros"] }
+token = { path = "../token/api", package = "is20-token" }
