@@ -23,9 +23,9 @@ jobs:
       git-fetch-depth: "0"
       test-script: |
         ./scripts/build.sh
-        cargo llvm-cov -v -p token-factory --features export_api
-        cargo llvm-cov -v -p is20-token --features auction --features export_api
-        cargo llvm-cov -v -p is20-token-canister --features export_api
+        cargo llvm-cov -v -p token-factory --features export-api
+        cargo llvm-cov -v -p is20-token --features auction --features export-api
+        cargo llvm-cov -v -p is20-token-canister --features export-api
 
     secrets:
       gh_token: ${{ secrets.GH_PKG_TOKEN }}

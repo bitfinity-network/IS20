@@ -28,7 +28,7 @@ use token::types::Metadata;
 const DEFAULT_LEDGER_PRINCIPAL: Principal = Principal::from_slice(&[0, 0, 0, 0, 0, 0, 0, 2, 1, 1]);
 const DEFAULT_ICP_FEE: u64 = 10u64.pow(8); // 1 ICP
 
-#[cfg(feature = "export_api")]
+#[cfg(feature = "export-api")]
 mod inspect_message;
 
 #[derive(Clone, Canister)]
