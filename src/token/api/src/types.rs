@@ -6,7 +6,7 @@ use canister_sdk::{ic_helpers::tokens::Tokens128, ledger_canister::AccountIdenti
 use crate::{
     account::{Account, Subaccount},
     error::TxError,
-    tx_record::{TxId, TxRecord},
+    transaction::{Transaction, TxId},
 };
 
 pub(crate) type Timestamp = u64;
@@ -134,28 +134,17 @@ pub(crate) type Claims = HashMap<AccountIdentifier, Tokens128>;
 
 pub type TxReceipt = Result<u128, TxError>;
 
-#[derive(CandidType, Debug, Clone, Copy, Deserialize, PartialEq, Eq)]
-pub enum TransactionStatus {
-    Succeeded,
-    Failed,
-}
-
-#[derive(CandidType, Debug, Clone, Copy, Deserialize, PartialEq, Eq)]
-pub enum Operation {
-    Approve,
-    Mint,
-    Transfer,
-    TransferFrom,
-    Burn,
-    Auction,
-    Claim,
-}
+// #[derive(CandidType, Debug, Clone, Copy, Deserialize, PartialEq, Eq)]
+// pub enum TransactionStatus {
+//     Succeeded,
+//     Failed,
+// }
 
 /// `PaginatedResult` is returned by paginated queries i.e `get_transactions`.
 #[derive(Debug, Clone, CandidType, Deserialize)]
 pub struct PaginatedResult {
     /// The result is the transactions which is the `count` transactions starting from `next` if it exists.
-    pub result: Vec<TxRecord>,
+    pub result: Vec<Transaction>,
 
     /// This is  the next `id` of the transaction. The `next` is used as offset for the next query if it exits.
     pub next: Option<TxId>,

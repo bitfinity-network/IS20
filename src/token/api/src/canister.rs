@@ -28,7 +28,7 @@ use crate::{
     error::{TransferError, TxError},
     principal::{CheckedPrincipal, Owner},
     state::CanisterState,
-    tx_record::{TxId, TxRecord},
+    transaction::{Transaction, TxId},
     types::{
         BatchTransferArgs, PaginatedResult, StandardRecord, StatsData, Timestamp, TokenInfo,
         TransferArgs, TxReceipt, Value,
@@ -229,7 +229,7 @@ pub trait TokenCanisterAPI: Canister + Sized + AuctionCanister {
     }
 
     #[query(trait = true)]
-    fn get_transaction(&self, id: TxId) -> TxRecord {
+    fn get_transaction(&self, id: TxId) -> Transaction {
         self.state().borrow().ledger.get(id).unwrap_or_else(|| {
             canister_sdk::ic_kit::ic::trap(&format!("Transaction {} does not exist", id))
         })
@@ -239,7 +239,7 @@ pub trait TokenCanisterAPI: Canister + Sized + AuctionCanister {
     /// returned. `count` is the number of transactions to return, `transaction_id` is the transaction index which is used as
     /// the offset of the first transaction to return, any
     ///
-    /// It returns `PaginatedResult` a struct, which contains `result` which is a list of transactions `Vec<TxRecord>` that meet the requirements of the query,
+    /// It returns `PaginatedResult` a struct, which contains `result` which is a list of transactions `Vec<Transaction>` that meet the requirements of the query,
     /// and `next_id` which is the index of the next transaction to return.
     #[query(trait = true)]
     fn get_transactions(

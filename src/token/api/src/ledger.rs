@@ -3,7 +3,7 @@ use canister_sdk::ic_helpers::tokens::Tokens128;
 use canister_sdk::ic_kit::ic;
 
 use crate::account::AccountInternal;
-use crate::tx_record::{TxId, TxRecord};
+use crate::transaction::{Transaction, TxId};
 use crate::types::{BatchTransferArgs, Memo, PaginatedResult, Timestamp};
 
 const MAX_HISTORY_LENGTH: usize = 1_000_000;
@@ -11,7 +11,7 @@ const HISTORY_REMOVAL_BATCH_SIZE: usize = 10_000;
 
 #[derive(Debug, Default, CandidType, Deserialize)]
 pub struct Ledger {
-    history: Vec<TxRecord>,
+    history: Vec<Transaction>,
     vec_offset: u64,
 }
 
@@ -28,7 +28,7 @@ impl Ledger {
         self.vec_offset + self.history.len() as u64
     }
 
-    pub fn get(&self, id: TxId) -> Option<TxRecord> {
+    pub fn get(&self, id: TxId) -> Option<Transaction> {
         self.history.get(self.get_index(id)?).cloned()
     }
 
@@ -61,7 +61,7 @@ impl Ledger {
         }
     }
 
-    pub fn iter(&self) -> impl DoubleEndedIterator<Item = &TxRecord> {
+    pub fn iter(&self) -> impl DoubleEndedIterator<Item = &Transaction> {
         self.history.iter()
     }
 
@@ -87,7 +87,7 @@ impl Ledger {
         created_at_time: Timestamp,
     ) -> TxId {
         let id = self.next_id();
-        self.push(TxRecord::transfer(
+        self.push(Transaction::transfer(
             id,
             from,
             to,
@@ -114,7 +114,7 @@ impl Ledger {
 
     pub fn mint(&mut self, from: AccountInternal, to: AccountInternal, amount: Tokens128) -> TxId {
         let id = self.len();
-        self.push(TxRecord::mint(id, from, to, amount));
+        self.push(Transaction::mint(id, from, to, amount));
 
         id
     }
@@ -126,17 +126,17 @@ impl Ledger {
         amount: Tokens128,
     ) -> TxId {
         let id = self.next_id();
-        self.push(TxRecord::burn(id, caller, from, amount));
+        self.push(Transaction::burn(id, caller, from, amount));
 
         id
     }
 
     pub fn record_auction(&mut self, to: Principal, amount: Tokens128) {
         let id = self.next_id();
-        self.push(TxRecord::auction(id, to.into(), amount))
+        self.push(Transaction::auction(id, to.into(), amount))
     }
 
-    fn push(&mut self, record: TxRecord) {
+    fn push(&mut self, record: Transaction) {
         self.history.push(record);
 
         if self.history.len() > MAX_HISTORY_LENGTH + HISTORY_REMOVAL_BATCH_SIZE {
@@ -157,7 +157,7 @@ impl Ledger {
         amount: Tokens128,
     ) -> TxId {
         let id = self.next_id();
-        self.push(TxRecord::claim(id, claim_account, to, amount));
+        self.push(Transaction::claim(id, claim_account, to, amount));
 
         id
     }

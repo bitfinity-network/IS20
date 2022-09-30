@@ -8,7 +8,7 @@ use crate::{
     error::TxError,
     principal::{CheckedPrincipal, Owner, TestNet},
     state::{Balances, CanisterState, FeeRatio},
-    tx_record::TxId,
+    transaction::TxId,
     types::{BatchTransferArgs, StatsData, TransferArgs, TxReceipt},
 };
 
@@ -109,7 +109,6 @@ pub(crate) fn transfer_internal(
 
     // At this point all the checks are done and no further errors are possible, so we modify the
     // canister state only at this point.
-
     balances.apply_change(&updates);
 
     Ok(())
@@ -137,16 +136,18 @@ fn validate_and_get_tx_ts(
             }
 
             for tx in state.ledger.iter().rev() {
-                if now.saturating_sub(tx.timestamp) > TX_WINDOW + PERMITTED_DRIFT {
+                if now.saturating_sub(tx.created_at_time) > TX_WINDOW + PERMITTED_DRIFT {
                     break;
                 }
 
-                if tx.timestamp == created_at_time
-                    && AccountInternal::from(tx.from) == from
-                    && AccountInternal::from(tx.to) == to
+                let (tx_from, tx_to, tx_amount, tx_fee) = tx.extract();
+
+                if tx.created_at_time == created_at_time
+                    && AccountInternal::from(tx_from) == from
+                    && AccountInternal::from(tx_to) == to
                     && tx.memo == transfer_args.memo
-                    && tx.amount == transfer_args.amount
-                    && tx.fee == transfer_args.fee.unwrap_or(tx.fee)
+                    && tx_amount == transfer_args.amount
+                    && tx_fee == transfer_args.fee.unwrap_or(tx_fee)
                 {
                     return Err(TxError::Duplicate {
                         duplicate_of: tx.index,
@@ -582,13 +583,12 @@ mod tests {
         assert!(validate_and_get_tx_ts(&canister.state().borrow(), alice(), &transfer).is_ok());
 
         let tx_id = canister.icrc1_transfer(transfer.clone()).unwrap();
-
         assert_eq!(
             validate_and_get_tx_ts(&canister.state().borrow(), alice(), &transfer),
             Err(TxError::Duplicate {
                 duplicate_of: tx_id as u64
             })
-        )
+        );
     }
 
     #[test]

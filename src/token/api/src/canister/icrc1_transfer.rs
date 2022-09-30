@@ -43,7 +43,8 @@ mod tests {
     use crate::canister::{auction_account, TokenCanisterAPI};
     use crate::error::{TransferError, TxError};
     use crate::mock::*;
-    use crate::types::{Metadata, Operation, TransactionStatus};
+    use crate::transaction::Operation;
+    use crate::types::Metadata;
 
     use super::*;
 
@@ -418,15 +419,18 @@ mod tests {
             let id = canister.icrc1_transfer(transfer1).unwrap();
             assert_eq!(canister.history_size() - before_history_size, 1 + i);
             let tx = canister.get_transaction(id as u64);
-            assert_eq!(tx.amount, Tokens128::from(100 + i as u128));
-            assert_eq!(tx.fee, Tokens128::from(10));
-            assert_eq!(tx.operation, Operation::Transfer);
-            assert_eq!(tx.status, TransactionStatus::Succeeded);
-            assert_eq!(tx.index, i + before_history_size);
-            assert_eq!(tx.from, alice().into());
-            assert_eq!(tx.to, bob().into());
-            assert!(ts < tx.timestamp);
-            ts = tx.timestamp;
+
+            assert_eq!(
+                tx.operation,
+                Operation::Transfer {
+                    from: Account::new(alice(), None),
+                    to: Account::new(bob(), None),
+                    amount: Tokens128::from(100 + i as u128),
+                    fee: Tokens128::from(10),
+                }
+            );
+            assert!(ts < tx.created_at_time);
+            ts = tx.created_at_time;
         }
     }
 
@@ -517,16 +521,18 @@ mod tests {
                 .unwrap();
             assert_eq!(canister.history_size(), 3 + i);
             let tx = canister.get_transaction(id as u64);
-            assert_eq!(tx.amount, Tokens128::from(100 + i as u128));
-            assert_eq!(tx.fee, Tokens128::from(0));
-            assert_eq!(tx.operation, Operation::Mint);
-            assert_eq!(tx.status, TransactionStatus::Succeeded);
-            assert_eq!(tx.index, i + 2);
-            assert_eq!(tx.from, john().into());
-            assert_eq!(tx.to, bob().into());
 
-            assert!(ts < tx.timestamp);
-            ts = tx.timestamp;
+            assert_eq!(
+                tx.operation,
+                Operation::Mint {
+                    to: Account::new(bob(), None),
+                    amount: Tokens128::from(100 + i as u128),
+                    from: Account::new(john(), None),
+                }
+            );
+
+            assert!(ts < tx.created_at_time);
+            ts = tx.created_at_time;
         }
     }
 
@@ -645,15 +651,17 @@ mod tests {
                 .unwrap();
             assert_eq!(canister.history_size(), history_size_before + 1 + i);
             let tx = canister.get_transaction(id as u64);
-            assert_eq!(tx.amount, Tokens128::from(100 + i as u128));
-            assert_eq!(tx.fee, Tokens128::from(0));
-            assert_eq!(tx.operation, Operation::Burn);
-            assert_eq!(tx.status, TransactionStatus::Succeeded);
-            assert_eq!(tx.index, history_size_before + i);
-            assert_eq!(tx.to, john().into());
-            assert_eq!(tx.from, john().into());
-            assert!(ts < tx.timestamp);
-            ts = tx.timestamp;
+
+            assert_eq!(
+                tx.operation,
+                Operation::Burn {
+                    amount: Tokens128::from(100 + i as u128),
+                    from: Account::new(john(), None),
+                }
+            );
+
+            assert!(ts < tx.created_at_time);
+            ts = tx.created_at_time;
         }
     }
 
