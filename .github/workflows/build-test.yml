@@ -79,7 +79,7 @@ jobs:
     - name: "Compress"
       run: |
         cd .artifact
-        tar -c -f is20-${{ github.ref_name }}.tar.gz --owner=0 --group=0 --no-same-owner --no-same-permissions .
+        tar -czf is20-${{ github.ref_name }}.tar.gz --owner=0 --group=0 --no-same-owner --no-same-permissions .
     - name: Release
       uses: softprops/action-gh-release@v1
       with:
