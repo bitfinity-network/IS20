@@ -9,6 +9,7 @@ use std::rc::Rc;
 use crate::state::StableState;
 use crate::{error::TokenFactoryError, state::State};
 use candid::Principal;
+use canister_sdk::ic_factory::DEFAULT_ICP_FEE;
 use canister_sdk::{
     ic_canister::{init, post_upgrade, pre_upgrade, query, update, Canister, PreUpdate},
     ic_factory::{
@@ -26,7 +27,6 @@ use canister_sdk::{
 use token::types::Metadata;
 
 const DEFAULT_LEDGER_PRINCIPAL: Principal = Principal::from_slice(&[0, 0, 0, 0, 0, 0, 0, 2, 1, 1]);
-const DEFAULT_ICP_FEE: u64 = 10u64.pow(8); // 1 ICP
 
 #[cfg(feature = "export_api")]
 mod inspect_message;
