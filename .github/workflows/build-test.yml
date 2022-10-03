@@ -30,20 +30,20 @@ jobs:
       git-fetch-depth: "0"
       test-script: |
         ./scripts/build.sh
-        cargo llvm-cov -v -p token-factory --features export_api
-        cargo llvm-cov -v -p is20-token --features auction --features export_api
-        cargo llvm-cov -v -p is20-token-canister --features export_api
-      
+        cargo llvm-cov -v -p token-factory --features export-api
+        cargo llvm-cov -v -p is20-token --features auction --features export-api
+        cargo llvm-cov -v -p is20-token-canister --features export-api
+
       output-artifact: artifact-is20
       artifact-script: |
-        cargo build --target wasm32-unknown-unknown -p is20-token-canister --features export_api --release
+        cargo build --target wasm32-unknown-unknown -p is20-token-canister --features export-api --release
         ic-cdk-optimizer target/wasm32-unknown-unknown/release/is20-token-canister.wasm -o .artifact/is20-token.wasm
 
-        cargo build --target wasm32-unknown-unknown -p token-factory --features export_api --release
+        cargo build --target wasm32-unknown-unknown -p token-factory --features export-api --release
         ic-cdk-optimizer target/wasm32-unknown-unknown/release/token-factory.wasm -o .artifact/is20-factory.wasm
 
-        cargo run -p is20-token-canister --features export_api > .artifact/is20-token.did
-        cargo run -p token-factory --features export_api > .artifact/is20-factory.did
+        cargo run -p is20-token-canister --features export-api > .artifact/is20-token.did
+        cargo run -p token-factory --features export-api > .artifact/is20-factory.did
 
     secrets:
       gh_token: ${{ secrets.GH_PKG_TOKEN }}
