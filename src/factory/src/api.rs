@@ -9,8 +9,11 @@ use std::rc::Rc;
 use crate::state::StableState;
 use crate::{error::TokenFactoryError, state::State};
 use candid::Principal;
+use canister_sdk::ic_metrics::Metrics;
 use canister_sdk::{
-    ic_canister::{init, post_upgrade, pre_upgrade, query, update, Canister, PreUpdate},
+    ic_canister::{
+        init, post_upgrade, pre_upgrade, query, update, Canister, MethodType, PreUpdate,
+    },
     ic_factory::{
         api::{FactoryCanister, UpgradeResult},
         error::FactoryError,
@@ -39,6 +42,13 @@ pub struct TokenFactoryCanister {
 
     #[state]
     pub state: Rc<RefCell<State>>,
+}
+
+impl Metrics for TokenFactoryCanister {}
+impl PreUpdate for TokenFactoryCanister {
+    fn pre_update(&self, _method_name: &str, _method_type: MethodType) {
+        self.update_metrics();
+    }
 }
 
 #[allow(dead_code)]
@@ -187,7 +197,6 @@ impl TokenFactoryCanister {
     }
 }
 
-impl PreUpdate for TokenFactoryCanister {}
 impl FactoryCanister for TokenFactoryCanister {
     fn factory_state(&self) -> Rc<RefCell<FactoryState>> {
         use canister_sdk::ic_storage::IcStorage;
