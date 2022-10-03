@@ -8,7 +8,7 @@ use crate::{
     error::TxError,
     principal::{CheckedPrincipal, Owner, TestNet},
     state::{Balances, CanisterState, FeeRatio},
-    transaction::TxId,
+    tx_record::TxId,
     types::{BatchTransferArgs, StatsData, TransferArgs, TxReceipt},
 };
 
@@ -217,12 +217,7 @@ pub fn mint_as_owner(
     )
 }
 
-pub fn burn(
-    state: &mut CanisterState,
-    caller: Principal,
-    from: AccountInternal,
-    amount: Tokens128,
-) -> TxReceipt {
+pub fn burn(state: &mut CanisterState, from: AccountInternal, amount: Tokens128) -> TxReceipt {
     let balance = state.balances.balance_of(from);
 
     if !amount.is_zero() && balance.is_zero() {
@@ -237,7 +232,7 @@ pub fn burn(
         state.balances.set_balance(from, new_balance)
     }
 
-    let id = state.ledger.burn(caller.into(), from, amount);
+    let id = state.ledger.burn(from, amount);
     Ok(id.into())
 }
 
@@ -247,27 +242,16 @@ pub fn burn_own_tokens(
     amount: Tokens128,
 ) -> TxReceipt {
     let caller = ic::caller();
-    burn(
-        state,
-        caller,
-        AccountInternal::new(caller, from_subaccount),
-        amount,
-    )
+    burn(state, AccountInternal::new(caller, from_subaccount), amount)
 }
 
 pub fn burn_as_owner(
     state: &mut CanisterState,
-    caller: CheckedPrincipal<Owner>,
     from: Principal,
     from_subaccount: Option<Subaccount>,
     amount: Tokens128,
 ) -> TxReceipt {
-    burn(
-        state,
-        caller.inner(),
-        AccountInternal::new(from, from_subaccount),
-        amount,
-    )
+    burn(state, AccountInternal::new(from, from_subaccount), amount)
 }
 
 #[cfg(feature = "claim")]

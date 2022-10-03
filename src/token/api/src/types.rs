@@ -6,7 +6,7 @@ use canister_sdk::{ic_helpers::tokens::Tokens128, ledger_canister::AccountIdenti
 use crate::{
     account::{Account, Subaccount},
     error::TxError,
-    transaction::{Transaction, TxId},
+    tx_record::{TxId, TxRecord},
 };
 
 pub(crate) type Timestamp = u64;
@@ -144,7 +144,7 @@ pub type TxReceipt = Result<u128, TxError>;
 #[derive(Debug, Clone, CandidType, Deserialize)]
 pub struct PaginatedResult {
     /// The result is the transactions which is the `count` transactions starting from `next` if it exists.
-    pub result: Vec<Transaction>,
+    pub result: Vec<TxRecord>,
 
     /// This is  the next `id` of the transaction. The `next` is used as offset for the next query if it exits.
     pub next: Option<TxId>,

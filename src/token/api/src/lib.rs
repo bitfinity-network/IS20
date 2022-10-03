@@ -10,4 +10,4 @@ pub mod types;
 pub mod error;
 #[cfg(test)]
 pub mod mock;
-pub mod transaction;
+pub mod tx_record;

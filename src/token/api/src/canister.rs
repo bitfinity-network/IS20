@@ -28,7 +28,7 @@ use crate::{
     error::{TransferError, TxError},
     principal::{CheckedPrincipal, Owner},
     state::CanisterState,
-    transaction::{Transaction, TxId},
+    tx_record::{TxId, TxRecord},
     types::{
         BatchTransferArgs, PaginatedResult, StandardRecord, StatsData, Timestamp, TokenInfo,
         TransferArgs, TxReceipt, Value,
@@ -229,7 +229,7 @@ pub trait TokenCanisterAPI: Canister + Sized + AuctionCanister {
     }
 
     #[query(trait = true)]
-    fn get_transaction(&self, id: TxId) -> Transaction {
+    fn get_transaction(&self, id: TxId) -> TxRecord {
         self.state().borrow().ledger.get(id).unwrap_or_else(|| {
             canister_sdk::ic_kit::ic::trap(&format!("Transaction {} does not exist", id))
         })
@@ -342,10 +342,9 @@ pub trait TokenCanisterAPI: Canister + Sized + AuctionCanister {
                 burn_own_tokens(&mut self.state().borrow_mut(), from_subaccount, amount)
             }
             Some(from) => {
-                let caller = CheckedPrincipal::owner(&self.state().borrow().stats)?;
+                let _ = CheckedPrincipal::owner(&self.state().borrow().stats)?;
                 burn_as_owner(
                     &mut self.state().borrow_mut(),
-                    caller,
                     from,
                     from_subaccount,
                     amount,

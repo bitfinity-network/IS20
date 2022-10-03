@@ -22,7 +22,7 @@ pub fn icrc1_transfer(
     }
 
     if caller.recipient() == minter {
-        return burn(state, caller.recipient().owner, caller.inner(), amount);
+        return burn(state, caller.inner(), amount);
     }
 
     is20_transfer(state, caller, transfer, auction_fee_ratio)
@@ -43,7 +43,7 @@ mod tests {
     use crate::canister::{auction_account, TokenCanisterAPI};
     use crate::error::{TransferError, TxError};
     use crate::mock::*;
-    use crate::transaction::Operation;
+    use crate::tx_record::Operation;
     use crate::types::Metadata;
 
     use super::*;
@@ -429,6 +429,7 @@ mod tests {
                     fee: Tokens128::from(10),
                 }
             );
+            assert_eq!(tx.index, i + 2);
             assert!(ts < tx.created_at_time);
             ts = tx.created_at_time;
         }
@@ -530,7 +531,7 @@ mod tests {
                     from: Account::new(john(), None),
                 }
             );
-
+            assert_eq!(tx.index, i + 2);
             assert!(ts < tx.created_at_time);
             ts = tx.created_at_time;
         }
@@ -659,7 +660,7 @@ mod tests {
                     from: Account::new(john(), None),
                 }
             );
-
+            assert_eq!(tx.index, i + 2);
             assert!(ts < tx.created_at_time);
             ts = tx.created_at_time;
         }
