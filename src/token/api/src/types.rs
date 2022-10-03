@@ -1,7 +1,5 @@
-use std::collections::HashMap;
-
 use candid::{CandidType, Deserialize, Int, Nat, Principal};
-use canister_sdk::{ic_helpers::tokens::Tokens128, ledger_canister::AccountIdentifier};
+use canister_sdk::ic_helpers::tokens::Tokens128;
 
 use crate::{
     account::{Account, Subaccount},
@@ -128,9 +126,6 @@ impl Default for StatsData {
         }
     }
 }
-
-/// This data structure is used for supporting minting to `AccountIdentifier`, after a claim is saved, We use the `claim` functions to claim the amount and is minted to `Account`.
-pub(crate) type Claims = HashMap<AccountIdentifier, Tokens128>;
 
 pub type TxReceipt = Result<u128, TxError>;
 

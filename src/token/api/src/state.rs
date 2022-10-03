@@ -13,17 +13,13 @@ use canister_sdk::{
 
 use crate::account::{AccountInternal, Subaccount, DEFAULT_SUBACCOUNT};
 use crate::ledger::Ledger;
-use crate::types::{Claims, Metadata, StatsData, Value};
+use crate::types::{Metadata, StatsData, Value};
 
 #[derive(Debug, Default, CandidType, Deserialize, IcStorage)]
 pub struct CanisterState {
     pub balances: Balances,
     pub stats: StatsData,
     pub ledger: Ledger,
-
-    // We leave this field here to not introduce a new version of the state.
-    #[deprecated(note = "claims are now stored in owner's subaccounts.")]
-    pub claims: Claims,
 }
 
 impl CanisterState {
