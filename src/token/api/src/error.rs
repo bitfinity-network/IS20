@@ -1,5 +1,5 @@
+use crate::state::stats::Timestamp;
 use candid::{CandidType, Deserialize};
-use canister_sdk::ic_auction::state::Timestamp;
 use canister_sdk::ic_helpers::tokens::Tokens128;
 use thiserror::Error;
 

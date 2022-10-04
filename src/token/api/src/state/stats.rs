@@ -2,7 +2,7 @@ use std::borrow::Cow;
 use std::cell::RefCell;
 
 use candid::{CandidType, Decode, Deserialize, Encode, Int, Nat, Principal};
-use canister_sdk::{ic_auction::state::Timestamp, ic_helpers::tokens::Tokens128};
+use canister_sdk::ic_helpers::tokens::Tokens128;
 use ic_stable_structures::{memory_manager::MemoryId, Storable};
 
 use crate::storage::{self, StableCell};
@@ -146,6 +146,8 @@ pub enum Value {
     Text(String),
     Blob(Vec<u8>),
 }
+
+pub type Timestamp = u64;
 
 const STATS_MEMORY_ID: MemoryId = MemoryId::new(0);
 

@@ -1,9 +1,9 @@
 use candid::{CandidType, Deserialize, Principal};
-use canister_sdk::ic_auction::state::Timestamp;
 use canister_sdk::ic_helpers::tokens::Tokens128;
 use canister_sdk::ic_kit::ic;
 
 use crate::account::AccountInternal;
+use crate::state::stats::Timestamp;
 use crate::tx_record::{TxId, TxRecord};
 use crate::types::{BatchTransferArgs, Memo, PaginatedResult};
 

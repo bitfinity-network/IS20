@@ -1,16 +1,6 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use canister_sdk::{
-    ic_auction::state::Timestamp,
-    ic_canister::{
-        generate_exports, generate_idl, query, state_getter, update, Canister, Idl, PreUpdate,
-    },
-    ic_cdk::export::candid::Principal,
-    ic_helpers::tokens::Tokens128,
-    ic_kit::ic,
-    ic_storage,
-};
 #[cfg(feature = "auction")]
 use canister_sdk::{
     ic_auction::{
@@ -19,6 +9,15 @@ use canister_sdk::{
         state::{AuctionInfo, AuctionState},
     },
     ic_storage::IcStorage,
+};
+use canister_sdk::{
+    ic_canister::{
+        generate_exports, generate_idl, query, state_getter, update, Canister, Idl, PreUpdate,
+    },
+    ic_cdk::export::candid::Principal,
+    ic_helpers::tokens::Tokens128,
+    ic_kit::ic,
+    ic_storage,
 };
 
 pub use inspect::AcceptReason;
@@ -29,7 +28,7 @@ use crate::{
     error::{TransferError, TxError},
     principal::{CheckedPrincipal, Owner},
     state::{
-        stats::{StandardRecord, StatsData, TokenInfo, Value},
+        stats::{StandardRecord, StatsData, Timestamp, TokenInfo, Value},
         CanisterState,
     },
     tx_record::{TxId, TxRecord},

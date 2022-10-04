@@ -1,9 +1,10 @@
 use candid::{CandidType, Deserialize, Principal};
+use canister_sdk::ic_helpers::tokens::Tokens128;
 use canister_sdk::ic_kit::ic;
-use canister_sdk::{ic_auction::state::Timestamp, ic_helpers::tokens::Tokens128};
 
 use crate::{
     account::{Account, AccountInternal},
+    state::stats::Timestamp,
     types::{Memo, Operation, TransactionStatus},
 };
 

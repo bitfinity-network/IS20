@@ -1,9 +1,10 @@
 use candid::{CandidType, Deserialize};
-use canister_sdk::{ic_auction::state::Timestamp, ic_helpers::tokens::Tokens128};
+use canister_sdk::ic_helpers::tokens::Tokens128;
 
 use crate::{
     account::{Account, Subaccount},
     error::TxError,
+    state::stats::Timestamp,
     tx_record::{TxId, TxRecord},
 };
 
