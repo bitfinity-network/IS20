@@ -1,4 +1,6 @@
+pub mod balances;
 pub mod stats;
+
 use std::collections::HashMap;
 
 use candid::Nat;

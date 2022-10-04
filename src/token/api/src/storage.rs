@@ -4,7 +4,7 @@ use ic_stable_structures::{btreemap, cell, log, DefaultMemoryImpl};
 pub type Memory = VirtualMemory<DefaultMemoryImpl>;
 
 pub type StableCell<T> = cell::Cell<T, Memory>;
-pub type StableBTreeMap<K, V> = btreemap::BTreeMap<K, V, Memory>;
+pub type StableBTreeMap<K, V> = btreemap::BTreeMap<Memory, K, V>;
 pub type StableLog = log::Log<Memory, Memory>;
 
 thread_local! {
