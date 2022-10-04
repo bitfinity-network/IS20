@@ -14,7 +14,13 @@ use canister_sdk::{
     ic_storage::{self, IcStorage},
 };
 
-use crate::{canister::TokenCanisterAPI, state::CanisterState, types::Metadata};
+use crate::{
+    canister::TokenCanisterAPI,
+    state::{
+        stats::{Metadata, StatsData},
+        CanisterState,
+    },
+};
 
 #[derive(Debug, Clone, Canister)]
 pub struct TokenCanisterMock {
@@ -38,7 +44,7 @@ impl TokenCanisterMock {
             .ledger
             .mint(metadata.owner.into(), metadata.owner.into(), amount);
 
-        self.state.borrow_mut().stats = metadata.into();
+        StatsData::set_stable(metadata.into());
 
         #[cfg(feature = "auction")]
         {

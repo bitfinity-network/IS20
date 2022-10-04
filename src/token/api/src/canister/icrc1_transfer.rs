@@ -1,4 +1,5 @@
 use crate::account::{AccountInternal, CheckedAccount, WithRecipient};
+use crate::state::stats::StatsData;
 use crate::types::{TransferArgs, TxReceipt};
 
 use super::is20_transactions::burn;
@@ -16,7 +17,8 @@ pub fn icrc1_transfer(
     auction_fee_ratio: f64,
 ) -> TxReceipt {
     let amount = transfer.amount;
-    let minter = AccountInternal::new(state.stats.owner, None);
+    let owner = StatsData::get_stable().owner;
+    let minter = AccountInternal::new(owner, None);
     if caller.inner() == minter {
         return mint(state, caller.inner().owner, transfer.to.into(), amount);
     }
@@ -43,7 +45,8 @@ mod tests {
     use crate::canister::{auction_account, TokenCanisterAPI};
     use crate::error::{TransferError, TxError};
     use crate::mock::*;
-    use crate::types::{Metadata, Operation, TransactionStatus};
+    use crate::state::stats::{Metadata, DEFAULT_MIN_CYCLES};
+    use crate::types::{Operation, TransactionStatus};
 
     use super::*;
 
@@ -80,7 +83,9 @@ mod tests {
         // pass, because since we are running auction state on each
         // endpoint call, it affects `BiddingInfo.fee_ratio` that is
         // used for charging fees in `approve` endpoint.
-        canister.state.borrow_mut().stats.min_cycles = 0;
+        let mut stats = StatsData::get_stable();
+        stats.min_cycles = 0;
+        StatsData::set_stable(stats);
 
         canister.mint(alice(), None, 1000.into()).unwrap();
         context.update_caller(alice());
@@ -155,8 +160,11 @@ mod tests {
         let (ctx, canister) = test_context();
         let alice_sub = gen_subaccount();
         let bob_sub = gen_subaccount();
-        canister.state().borrow_mut().stats.fee = Tokens128::from(100);
-        canister.state().borrow_mut().stats.fee_to = john();
+
+        let mut stats = StatsData::get_stable();
+        stats.fee = Tokens128::from(100);
+        stats.fee_to = john();
+        StatsData::set_stable(stats);
 
         let transfer1 = TransferArgs {
             from_subaccount: None,
@@ -211,8 +219,11 @@ mod tests {
     #[test]
     fn transfer_fee_exceeded() {
         let canister = test_canister();
-        canister.state().borrow_mut().stats.fee = Tokens128::from(100);
-        canister.state().borrow_mut().stats.fee_to = john();
+
+        let mut stats = StatsData::get_stable();
+        stats.fee = Tokens128::from(100);
+        stats.fee_to = john();
+        StatsData::set_stable(stats);
 
         let transfer1 = TransferArgs {
             from_subaccount: None,
@@ -259,9 +270,13 @@ mod tests {
     #[test]
     fn fees_with_auction_enabled() {
         let canister = test_canister();
-        canister.state().borrow_mut().stats.fee = Tokens128::from(50);
-        canister.state().borrow_mut().stats.fee_to = john();
-        canister.state().borrow_mut().stats.min_cycles = crate::types::DEFAULT_MIN_CYCLES;
+
+        let mut stats = StatsData::get_stable();
+        stats.fee = Tokens128::from(50);
+        stats.fee_to = john();
+        stats.min_cycles = DEFAULT_MIN_CYCLES;
+        StatsData::set_stable(stats);
+
         canister
             .auction_state()
             .borrow_mut()
@@ -326,8 +341,11 @@ mod tests {
     #[test]
     fn transfer_with_fee_insufficient_balance() {
         let canister = test_canister();
-        canister.state().borrow_mut().stats.fee = Tokens128::from(100);
-        canister.state().borrow_mut().stats.fee_to = john();
+
+        let mut stats = StatsData::get_stable();
+        stats.fee = Tokens128::from(100);
+        stats.fee_to = john();
+        StatsData::set_stable(stats);
 
         let transfer1 = TransferArgs {
             from_subaccount: None,
@@ -388,7 +406,11 @@ mod tests {
     #[test]
     fn transfer_saved_into_history() {
         let (ctx, canister) = test_context();
-        canister.state().borrow_mut().stats.fee = Tokens128::from(10);
+
+        let mut stats = StatsData::get_stable();
+        stats.fee = Tokens128::from(10);
+        StatsData::set_stable(stats);
+
         let before_history_size = canister.history_size();
 
         let transfer1 = TransferArgs {
@@ -441,7 +463,9 @@ mod tests {
             Err(TxError::Unauthorized)
         );
 
-        canister.state().borrow_mut().stats.is_test_token = true;
+        let mut stats = StatsData::get_stable();
+        stats.is_test_token = true;
+        StatsData::set_stable(stats);
 
         assert!(canister.mint(alice(), None, Tokens128::from(2000)).is_ok());
         assert!(canister.mint(bob(), None, Tokens128::from(5000)).is_ok());
@@ -503,7 +527,11 @@ mod tests {
     #[test]
     fn mint_saved_into_history() {
         let (ctx, canister) = test_context();
-        canister.state().borrow_mut().stats.fee = Tokens128::from(10);
+
+        let mut stats = StatsData::get_stable();
+        stats.fee = Tokens128::from(10);
+        StatsData::set_stable(stats);
+
         ctx.update_caller(john());
 
         assert_eq!(canister.history_size(), 2);
@@ -627,7 +655,11 @@ mod tests {
     #[test]
     fn burn_saved_into_history() {
         let (ctx, canister) = test_context();
-        canister.state().borrow_mut().stats.fee = Tokens128::from(10);
+
+        let mut stats = StatsData::get_stable();
+        stats.fee = Tokens128::from(10);
+        StatsData::set_stable(stats);
+
         let history_size_before = canister.history_size();
 
         ctx.update_caller(john());
@@ -946,7 +978,7 @@ mod proptests {
     use crate::canister::TokenCanisterAPI;
     use crate::error::{TransferError, TxError};
     use crate::mock::*;
-    use crate::types::Metadata;
+    use crate::state::stats::Metadata;
 
     use super::*;
 
@@ -1064,7 +1096,11 @@ mod proptests {
             // pass, because since we are running auction state on each
             // endpoint call, it affects `BiddingInfo.fee_ratio` that is
             // used for charging fees in `approve` endpoint.
-            canister.state.borrow_mut().stats.min_cycles = 0;
+
+        let mut stats = StatsData::get_stable();
+            stats.min_cycles = 0;
+        StatsData::set_stable(stats);
+
             (canister, principals)
         }
     }
@@ -1124,7 +1160,7 @@ mod proptests {
                         MockContext::new().with_caller(from).inject();
                         let from_balance = canister.icrc1_balance_of(Account::new(from, None));
                         let to_balance = canister.icrc1_balance_of(Account::new(to, None));
-                        let (fee , fee_to) = canister.state().borrow().stats.fee_info();
+                        let (fee , fee_to) = StatsData::get_stable().fee_info();
                         let amount_with_fee = (amount + fee).unwrap();
                         let transfer1 = TransferArgs {
                             from_subaccount: None,

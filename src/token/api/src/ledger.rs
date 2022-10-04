@@ -1,10 +1,11 @@
 use candid::{CandidType, Deserialize, Principal};
+use canister_sdk::ic_auction::state::Timestamp;
 use canister_sdk::ic_helpers::tokens::Tokens128;
 use canister_sdk::ic_kit::ic;
 
 use crate::account::AccountInternal;
 use crate::tx_record::{TxId, TxRecord};
-use crate::types::{BatchTransferArgs, Memo, PaginatedResult, Timestamp};
+use crate::types::{BatchTransferArgs, Memo, PaginatedResult};
 
 const MAX_HISTORY_LENGTH: usize = 1_000_000;
 const HISTORY_REMOVAL_BATCH_SIZE: usize = 10_000;

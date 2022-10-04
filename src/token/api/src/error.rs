@@ -1,8 +1,7 @@
 use candid::{CandidType, Deserialize};
+use canister_sdk::ic_auction::state::Timestamp;
 use canister_sdk::ic_helpers::tokens::Tokens128;
 use thiserror::Error;
-
-use crate::types::Timestamp;
 
 #[derive(CandidType, Debug, PartialEq, Deserialize, Error, Eq)]
 pub enum TxError {

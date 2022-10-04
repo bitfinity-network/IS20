@@ -1,7 +1,6 @@
 use candid::Principal;
 
-use crate::error::TxError;
-use crate::types::StatsData;
+use crate::{error::TxError, state::stats::StatsData};
 use canister_sdk::ic_kit::ic;
 
 /// Canister owner

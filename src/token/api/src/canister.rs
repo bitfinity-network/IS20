@@ -1,6 +1,16 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
+use canister_sdk::{
+    ic_auction::state::Timestamp,
+    ic_canister::{
+        generate_exports, generate_idl, query, state_getter, update, Canister, Idl, PreUpdate,
+    },
+    ic_cdk::export::candid::Principal,
+    ic_helpers::tokens::Tokens128,
+    ic_kit::ic,
+    ic_storage,
+};
 #[cfg(feature = "auction")]
 use canister_sdk::{
     ic_auction::{
@@ -10,15 +20,6 @@ use canister_sdk::{
     },
     ic_storage::IcStorage,
 };
-use canister_sdk::{
-    ic_canister::{
-        generate_exports, generate_idl, query, state_getter, update, Canister, Idl, PreUpdate,
-    },
-    ic_cdk::export::candid::Principal,
-    ic_helpers::tokens::Tokens128,
-    ic_kit::ic,
-    ic_storage,
-};
 
 pub use inspect::AcceptReason;
 
@@ -27,12 +28,12 @@ use crate::{
     canister::icrc1_transfer::icrc1_transfer,
     error::{TransferError, TxError},
     principal::{CheckedPrincipal, Owner},
-    state::CanisterState,
-    tx_record::{TxId, TxRecord},
-    types::{
-        BatchTransferArgs, PaginatedResult, StandardRecord, StatsData, Timestamp, TokenInfo,
-        TransferArgs, TxReceipt, Value,
+    state::{
+        stats::{StandardRecord, StatsData, TokenInfo, Value},
+        CanisterState,
     },
+    tx_record::{TxId, TxRecord},
+    types::{BatchTransferArgs, PaginatedResult, TransferArgs, TxReceipt},
 };
 
 use self::is20_transactions::{
@@ -78,24 +79,20 @@ pub trait TokenCanisterAPI: Canister + Sized + AuctionCanister {
 
     /// The `inspect_message()` call is not exported by default. Add your custom #[inspect_message]
     /// function and use this method there to export the `inspect_message()` call.
-    fn inspect_message(
-        state: &CanisterState,
-        method: &str,
-        caller: Principal,
-    ) -> Result<AcceptReason, &'static str> {
-        inspect::inspect_message(state, method, caller)
+    fn inspect_message(method: &str, caller: Principal) -> Result<AcceptReason, &'static str> {
+        inspect::inspect_message(method, caller)
     }
 
     /********************** METADATA ***********************/
 
     #[query(trait = true)]
     fn is_test_token(&self) -> bool {
-        self.state().borrow().stats.is_test_token
+        StatsData::get_stable().is_test_token
     }
 
     #[query(trait = true)]
     fn logo(&self) -> String {
-        self.state().borrow().stats.logo.clone()
+        StatsData::get_stable().logo
     }
 
     #[query(trait = true)]
@@ -105,7 +102,7 @@ pub trait TokenCanisterAPI: Canister + Sized + AuctionCanister {
 
     #[query(trait = true)]
     fn owner(&self) -> Principal {
-        self.state().borrow().stats.owner
+        StatsData::get_stable().owner
     }
 
     #[query(trait = true)]
@@ -114,7 +111,7 @@ pub trait TokenCanisterAPI: Canister + Sized + AuctionCanister {
             fee_to,
             deploy_time,
             ..
-        } = self.state().borrow().stats;
+        } = StatsData::get_stable();
         TokenInfo {
             metadata: self.state().borrow().get_metadata(),
             fee_to,
@@ -127,42 +124,42 @@ pub trait TokenCanisterAPI: Canister + Sized + AuctionCanister {
 
     #[update(trait = true)]
     fn set_name(&self, name: String) -> Result<(), TxError> {
-        let caller = CheckedPrincipal::owner(&self.state().borrow_mut().stats)?;
+        let caller = CheckedPrincipal::owner(&StatsData::get_stable())?;
         self.update_stats(caller, CanisterUpdate::Name(name));
         Ok(())
     }
 
     #[update(trait = true)]
     fn set_symbol(&self, symbol: String) -> Result<(), TxError> {
-        let caller = CheckedPrincipal::owner(&self.state().borrow_mut().stats)?;
+        let caller = CheckedPrincipal::owner(&StatsData::get_stable())?;
         self.update_stats(caller, CanisterUpdate::Symbol(symbol));
         Ok(())
     }
 
     #[update(trait = true)]
     fn set_logo(&self, logo: String) -> Result<(), TxError> {
-        let caller = CheckedPrincipal::owner(&self.state().borrow_mut().stats)?;
+        let caller = CheckedPrincipal::owner(&StatsData::get_stable())?;
         self.update_stats(caller, CanisterUpdate::Logo(logo));
         Ok(())
     }
 
     #[update(trait = true)]
     fn set_fee(&self, fee: Tokens128) -> Result<(), TxError> {
-        let caller = CheckedPrincipal::owner(&self.state().borrow_mut().stats)?;
+        let caller = CheckedPrincipal::owner(&StatsData::get_stable())?;
         self.update_stats(caller, CanisterUpdate::Fee(fee));
         Ok(())
     }
 
     #[update(trait = true)]
     fn set_fee_to(&self, fee_to: Principal) -> Result<(), TxError> {
-        let caller = CheckedPrincipal::owner(&self.state().borrow_mut().stats)?;
+        let caller = CheckedPrincipal::owner(&StatsData::get_stable())?;
         self.update_stats(caller, CanisterUpdate::FeeTo(fee_to));
         Ok(())
     }
 
     #[update(trait = true)]
     fn set_owner(&self, owner: Principal) -> Result<(), TxError> {
-        let caller = CheckedPrincipal::owner(&self.state().borrow_mut().stats)?;
+        let caller = CheckedPrincipal::owner(&StatsData::get_stable())?;
         self.update_stats(caller, CanisterUpdate::Owner(owner));
         Ok(())
     }
@@ -305,7 +302,7 @@ pub trait TokenCanisterAPI: Canister + Sized + AuctionCanister {
         amount: Tokens128,
     ) -> TxReceipt {
         if self.is_test_token() {
-            let test_user = CheckedPrincipal::test_user(&self.state().borrow().stats)?;
+            let test_user = CheckedPrincipal::test_user(&StatsData::get_stable())?;
             mint_test_token(
                 &mut self.state().borrow_mut(),
                 test_user,
@@ -314,7 +311,7 @@ pub trait TokenCanisterAPI: Canister + Sized + AuctionCanister {
                 amount,
             )
         } else {
-            let owner = CheckedPrincipal::owner(&self.state().borrow().stats)?;
+            let owner = CheckedPrincipal::owner(&StatsData::get_stable())?;
             mint_as_owner(
                 &mut self.state().borrow_mut(),
                 owner,
@@ -342,7 +339,7 @@ pub trait TokenCanisterAPI: Canister + Sized + AuctionCanister {
                 burn_own_tokens(&mut self.state().borrow_mut(), from_subaccount, amount)
             }
             Some(from) => {
-                let caller = CheckedPrincipal::owner(&self.state().borrow().stats)?;
+                let caller = CheckedPrincipal::owner(&StatsData::get_stable())?;
                 burn_as_owner(
                     &mut self.state().borrow_mut(),
                     caller,
@@ -375,23 +372,23 @@ pub trait TokenCanisterAPI: Canister + Sized + AuctionCanister {
 
     #[query(trait = true)]
     fn icrc1_name(&self) -> String {
-        self.state().borrow().stats.name.clone()
+        StatsData::get_stable().name
     }
 
     #[query(trait = true)]
     fn icrc1_symbol(&self) -> String {
-        self.state().borrow().stats.symbol.clone()
+        StatsData::get_stable().symbol
     }
 
     #[query(trait = true)]
     fn icrc1_decimals(&self) -> u8 {
-        self.state().borrow().stats.decimals
+        StatsData::get_stable().decimals
     }
 
     /// Returns the default transfer fee.
     #[query(trait = true)]
     fn icrc1_fee(&self) -> Tokens128 {
-        self.state().borrow().stats.fee
+        StatsData::get_stable().fee
     }
     #[query(trait = true)]
     fn icrc1_metadata(&self) -> Vec<(String, Value)> {
@@ -400,12 +397,12 @@ pub trait TokenCanisterAPI: Canister + Sized + AuctionCanister {
 
     #[query(trait = true)]
     fn icrc1_supported_standards(&self) -> Vec<StandardRecord> {
-        self.state().borrow().stats.supported_standards()
+        StatsData::get_stable().supported_standards()
     }
 
     #[query(trait = true)]
     fn icrc1_minting_account(&self) -> Option<Account> {
-        Some(self.state().borrow().stats.owner.into())
+        Some(StatsData::get_stable().owner.into())
     }
 
     /********************** INTERNAL METHODS ***********************/
@@ -419,15 +416,17 @@ pub trait TokenCanisterAPI: Canister + Sized + AuctionCanister {
 
     fn update_stats(&self, _caller: CheckedPrincipal<Owner>, update: CanisterUpdate) {
         use CanisterUpdate::*;
+        let mut stats = StatsData::get_stable();
         match update {
-            Name(name) => self.state().borrow_mut().stats.name = name,
-            Symbol(symbol) => self.state().borrow_mut().stats.symbol = symbol,
-            Logo(logo) => self.state().borrow_mut().stats.logo = logo,
-            Fee(fee) => self.state().borrow_mut().stats.fee = fee,
-            FeeTo(fee_to) => self.state().borrow_mut().stats.fee_to = fee_to,
-            Owner(owner) => self.state().borrow_mut().stats.owner = owner,
-            MinCycles(min_cycles) => self.state().borrow_mut().stats.min_cycles = min_cycles,
+            Name(name) => stats.name = name,
+            Symbol(symbol) => stats.symbol = symbol,
+            Logo(logo) => stats.logo = logo,
+            Fee(fee) => stats.fee = fee,
+            FeeTo(fee_to) => stats.fee_to = fee_to,
+            Owner(owner) => stats.owner = owner,
+            MinCycles(min_cycles) => stats.min_cycles = min_cycles,
         }
+        StatsData::set_stable(stats)
     }
 
     fn fee_ratio(&self) -> f64 {
@@ -473,9 +472,8 @@ mod tests {
     };
     use rand::{thread_rng, Rng};
 
-    use crate::account::DEFAULT_SUBACCOUNT;
     use crate::mock::TokenCanisterMock;
-    use crate::types::Metadata;
+    use crate::{account::DEFAULT_SUBACCOUNT, state::stats::Metadata};
 
     use super::*;
 
@@ -512,7 +510,9 @@ mod tests {
         // pass, because since we are running auction state on each
         // endpoint call, it affects `BiddingInfo.fee_ratio` that is
         // used for charging fees in `approve` endpoint.
-        canister.state.borrow_mut().stats.min_cycles = 0;
+        let mut stats = StatsData::get_stable();
+        stats.min_cycles = 0;
+        StatsData::set_stable(stats);
 
         canister.mint(alice(), None, 1000.into()).unwrap();
         context.update_caller(alice());
@@ -538,7 +538,9 @@ mod tests {
             Tokens128::from(1000),
         );
 
-        canister.state.borrow_mut().stats.min_cycles = 0;
+        let mut stats = StatsData::get_stable();
+        stats.min_cycles = 0;
+        StatsData::set_stable(stats);
 
         canister
     }

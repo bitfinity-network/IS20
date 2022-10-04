@@ -5,13 +5,13 @@ use canister_sdk::{
         error::AuctionError,
         state::{AuctionInfo, AuctionState},
     },
-    ic_canister::{self, init, post_upgrade, pre_upgrade, query, Canister, PreUpdate},
+    ic_canister::{self, init, query, Canister, PreUpdate},
     ic_helpers::{
         candid_header::{candid_header, CandidHeader},
         tokens::Tokens128,
     },
     ic_metrics::{Interval, Metrics},
-    ic_storage::{self, IcStorage},
+    ic_storage::IcStorage,
 };
 #[cfg(feature = "export_api")]
 use canister_sdk::{ic_cdk, ic_cdk_macros::inspect_message};
@@ -19,8 +19,10 @@ use std::{cell::RefCell, rc::Rc};
 use token_api::{
     account::AccountInternal,
     canister::{TokenCanisterAPI, DEFAULT_AUCTION_PERIOD_SECONDS},
-    state::{CanisterState, StableState},
-    types::Metadata,
+    state::{
+        stats::{Metadata, StatsData},
+        CanisterState,
+    },
 };
 
 #[derive(Debug, Clone, Canister)]
@@ -45,7 +47,7 @@ impl TokenCanister {
             amount,
         );
 
-        self.state().borrow_mut().stats = metadata.into();
+        StatsData::set_stable(metadata.into());
 
         let auction_state = self.auction_state();
         auction_state.replace(AuctionState::new(
@@ -56,37 +58,37 @@ impl TokenCanister {
         ));
     }
 
-    #[pre_upgrade]
-    fn pre_upgrade(&self) {
-        let token_state = self.state().replace(CanisterState::default());
-        let auction_state = self.auction_state().replace(AuctionState::default());
+    // #[pre_upgrade]
+    // fn pre_upgrade(&self) {
+    //     let token_state = self.state().replace(CanisterState::default());
+    //     let auction_state = self.auction_state().replace(AuctionState::default());
 
-        if let Err(err) = ic_storage::stable::write(&StableState {
-            token_state,
-            auction_state,
-        }) {
-            canister_sdk::ic_kit::ic::trap(&format!(
-                "Error while serializing state to the stable storage: {err}"
-            ));
-        }
-    }
+    //     if let Err(err) = ic_storage::stable::write(&StableState {
+    //         token_state,
+    //         auction_state,
+    //     }) {
+    //         canister_sdk::ic_kit::ic::trap(&format!(
+    //             "Error while serializing state to the stable storage: {err}"
+    //         ));
+    //     }
+    // }
 
-    #[post_upgrade]
-    fn post_upgrade(&self) {
-        let stable_state = ic_storage::stable::read::<StableState>().unwrap_or_else(|err| {
-            canister_sdk::ic_kit::ic::trap(&format!(
-                "Error while deserializing state from the stable storage: {err}"
-            ));
-        });
+    // #[post_upgrade]
+    // fn post_upgrade(&self) {
+    //     let stable_state = ic_storage::stable::read::<StableState>().unwrap_or_else(|err| {
+    //         canister_sdk::ic_kit::ic::trap(&format!(
+    //             "Error while deserializing state from the stable storage: {err}"
+    //         ));
+    //     });
 
-        let StableState {
-            token_state,
-            auction_state,
-        } = stable_state;
+    //     let StableState {
+    //         token_state,
+    //         auction_state,
+    //     } = stable_state;
 
-        self.state().replace(token_state);
-        self.auction_state().replace(auction_state);
-    }
+    //     self.state().replace(token_state);
+    //     self.auction_state().replace(auction_state);
+    // }
 
     #[query]
     pub fn state_check(&self) -> CandidHeader {
@@ -97,16 +99,13 @@ impl TokenCanister {
 #[cfg(feature = "export_api")]
 #[inspect_message]
 fn inspect_message() {
-    use canister_sdk::{ic_cdk, ic_storage::IcStorage};
+    use canister_sdk::ic_cdk;
     use token_api::canister::AcceptReason;
 
     let method = ic_cdk::api::call::method_name();
-
-    let state = CanisterState::get();
-    let state = state.borrow();
     let caller = ic_cdk::api::caller();
 
-    let accept_reason = match TokenCanister::inspect_message(&state, &method, caller) {
+    let accept_reason = match TokenCanister::inspect_message(&method, caller) {
         Ok(accept_reason) => accept_reason,
         Err(msg) => ic_cdk::trap(msg),
     };
@@ -144,32 +143,3 @@ impl Auction for TokenCanister {
 }
 
 impl Metrics for TokenCanister {}
-
-#[cfg(test)]
-mod test {
-    use super::*;
-    use canister_sdk::ic_kit::MockContext;
-
-    #[test]
-    #[cfg_attr(coverage_nightly, no_coverage)]
-    fn test_upgrade_from_current() {
-        MockContext::new().inject();
-
-        // Set a value on the state...
-        let canister = TokenCanister::init_instance();
-        canister.state().borrow_mut().stats.name = "To Kill a Mockingbird".to_string();
-        // ... write the state to stable storage
-        canister.__pre_upgrade();
-
-        // Update the value without writing it to stable storage
-        canister.state().borrow_mut().stats.name = "David Copperfield".to_string();
-
-        // Upgrade the canister should have the state
-        // written before pre_upgrade
-        canister.__post_upgrade();
-        assert_eq!(
-            canister.state().borrow().stats.name,
-            "To Kill a Mockingbird".to_string()
-        );
-    }
-}

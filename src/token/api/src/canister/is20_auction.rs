@@ -9,9 +9,9 @@ use canister_sdk::{
     ic_kit::ic,
 };
 
-use crate::canister::auction_account;
 use crate::state::{Balances, CanisterState};
 use crate::types::BatchTransferArgs;
+use crate::{canister::auction_account, state::stats::StatsData};
 
 use super::is20_transactions::batch_transfer_internal;
 
@@ -22,7 +22,6 @@ pub fn disburse_rewards(
     let CanisterState {
         ref mut balances,
         ref mut ledger,
-        ref stats,
         ..
     } = *canister_state;
 
@@ -54,11 +53,12 @@ pub fn disburse_rewards(
             .unwrap();
     }
 
+    let stats = StatsData::get_stable();
     if let Err(e) = batch_transfer_internal(
         auction_account(),
         &transfers,
         balances,
-        stats,
+        &stats,
         auction_state.bidding_state.fee_ratio,
     ) {
         ic::trap(&format!("Failed to transfer tokens to the bidders: {e}"));
@@ -94,9 +94,8 @@ mod tests {
         ic_metrics::Interval,
     };
 
-    use crate::canister::TokenCanisterAPI;
     use crate::mock::*;
-    use crate::types::Metadata;
+    use crate::{canister::TokenCanisterAPI, state::stats::Metadata};
 
     use super::*;
 

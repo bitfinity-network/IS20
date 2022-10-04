@@ -26,7 +26,7 @@ use canister_sdk::{
     ic_kit::ic,
     ic_storage,
 };
-use token::types::Metadata;
+use token::state::stats::Metadata;
 
 const DEFAULT_LEDGER_PRINCIPAL: Principal = Principal::from_slice(&[0, 0, 0, 0, 0, 0, 0, 2, 1, 1]);
 const DEFAULT_ICP_FEE: u64 = 10u64.pow(8); // 1 ICP

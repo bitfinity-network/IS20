@@ -7,9 +7,9 @@ use crate::{
     account::{AccountInternal, CheckedAccount, Subaccount, WithRecipient},
     error::TxError,
     principal::{CheckedPrincipal, Owner, TestNet},
-    state::{Balances, CanisterState, FeeRatio},
+    state::{stats::StatsData, Balances, CanisterState, FeeRatio},
     tx_record::TxId,
-    types::{BatchTransferArgs, StatsData, TransferArgs, TxReceipt},
+    types::{BatchTransferArgs, TransferArgs, TxReceipt},
 };
 
 use super::{
@@ -29,11 +29,10 @@ pub fn is20_transfer(
     let TransferArgs { amount, memo, .. } = transfer;
 
     let CanisterState {
-        ref mut balances,
-        ref stats,
-        ..
+        ref mut balances, ..
     } = state;
 
+    let stats = StatsData::get_stable();
     let (fee, fee_to) = stats.fee_info();
 
     if let Some(requested_fee) = transfer.fee {
@@ -296,13 +295,14 @@ pub fn claim(
         return Err(TxError::NothingToClaim);
     }
 
+    let stats = StatsData::get_stable();
     transfer_internal(
         &mut state.balances,
         claim_account,
         caller.into(),
         amount,
         0.into(),
-        state.stats.owner.into(),
+        stats.owner.into(),
         FeeRatio::default(),
     )?;
     let id = state
@@ -321,12 +321,12 @@ pub fn batch_transfer(
     let from = AccountInternal::new(caller, from_subaccount);
     let CanisterState {
         ref mut balances,
-        ref stats,
         ref mut ledger,
         ..
     } = state;
 
-    batch_transfer_internal(from, &transfers, balances, stats, auction_fee_ratio)?;
+    let stats = StatsData::get_stable();
+    batch_transfer_internal(from, &transfers, balances, &stats, auction_fee_ratio)?;
     let (fee, _) = stats.fee_info();
     let id = ledger.batch_transfer(from, transfers, fee);
     Ok(id)
@@ -386,11 +386,11 @@ mod tests {
         },
     };
 
-    use crate::types::Metadata;
     use crate::{
         account::{Account, DEFAULT_SUBACCOUNT},
         canister::TokenCanisterAPI,
         mock::TokenCanisterMock,
+        state::stats::Metadata,
     };
 
     use super::*;
@@ -419,7 +419,9 @@ mod tests {
         // pass, because since we are running auction state on each
         // endpoint call, it affects `BiddingInfo.fee_ratio` that is
         // used for charging fees in `approve` endpoint.
-        canister.state.borrow_mut().stats.min_cycles = 0;
+        let mut stats = StatsData::get_stable();
+        stats.min_cycles = 0;
+        StatsData::set_stable(stats);
 
         canister
     }
@@ -460,10 +462,12 @@ mod tests {
     #[test]
     fn batch_transfer_with_fee() {
         let canister = test_canister();
-        let mut state = canister.state.borrow_mut();
-        state.stats.fee = Tokens128::from(50);
-        state.stats.fee_to = john();
-        drop(state);
+
+        let mut stats = StatsData::get_stable();
+        stats.fee = Tokens128::from(50);
+        stats.fee_to = john();
+        StatsData::set_stable(stats);
+
         assert_eq!(
             Tokens128::from(1000),
             canister.icrc1_balance_of(Account::new(alice(), None))
@@ -696,7 +700,11 @@ mod tests {
     #[test]
     fn transfer_with_overflow() {
         let canister = test_canister();
-        canister.state().borrow_mut().stats.fee = 100500.into();
+
+        let mut stats = StatsData::get_stable();
+        stats.fee = 100500.into();
+        StatsData::set_stable(stats);
+
         let transfer = TransferArgs {
             from_subaccount: None,
             to: bob().into(),

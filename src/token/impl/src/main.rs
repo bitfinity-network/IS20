@@ -21,7 +21,8 @@ fn get_canister_idl() -> String {
         ic_canister::Idl,
         ic_helpers::{candid_header::CandidHeader, tokens::Tokens128},
     };
-    use token_api::{canister::TokenCanisterAPI, types::Metadata};
+    use token_api::canister::TokenCanisterAPI;
+    use token_api::state::stats::Metadata;
 
     let canister_idl = ic_canister::generate_idl!();
     let auction_idl = <TokenCanister as Auction>::get_idl();

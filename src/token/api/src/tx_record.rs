@@ -1,10 +1,10 @@
 use candid::{CandidType, Deserialize, Principal};
-use canister_sdk::ic_helpers::tokens::Tokens128;
 use canister_sdk::ic_kit::ic;
+use canister_sdk::{ic_auction::state::Timestamp, ic_helpers::tokens::Tokens128};
 
 use crate::{
     account::{Account, AccountInternal},
-    types::{Memo, Operation, Timestamp, TransactionStatus},
+    types::{Memo, Operation, TransactionStatus},
 };
 
 pub type TxId = u64;

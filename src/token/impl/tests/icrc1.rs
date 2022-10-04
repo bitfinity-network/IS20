@@ -12,8 +12,11 @@ use token_api::{
     account::Account,
     canister::TokenCanisterAPI,
     error::TransferError,
-    state::CanisterState,
-    types::{Metadata, StandardRecord, TransferArgs, Value},
+    state::{
+        stats::{Metadata, StandardRecord, Value},
+        CanisterState,
+    },
+    types::TransferArgs,
 };
 
 fn init() -> (Metadata, TokenCanister, &'static mut MockContext) {

@@ -1,3 +1,4 @@
+pub mod stats;
 use std::collections::HashMap;
 
 use candid::Nat;
@@ -13,47 +14,45 @@ use canister_sdk::{
 
 use crate::account::{AccountInternal, Subaccount, DEFAULT_SUBACCOUNT};
 use crate::ledger::Ledger;
-use crate::types::{Metadata, StatsData, Value};
+
+use stats::Value;
+
+use self::stats::{Metadata, StatsData};
 
 #[derive(Debug, Default, CandidType, Deserialize, IcStorage)]
 pub struct CanisterState {
     pub balances: Balances,
-    pub stats: StatsData,
     pub ledger: Ledger,
 }
 
 impl CanisterState {
     pub fn icrc1_metadata(&self) -> Vec<(String, Value)> {
+        let stats = StatsData::get_stable();
         vec![
             (
                 "icrc1:symbol".to_string(),
-                Value::Text(self.stats.symbol.clone()),
+                Value::Text(stats.symbol.clone()),
             ),
-            (
-                "icrc1:name".to_string(),
-                Value::Text(self.stats.name.clone()),
-            ),
+            ("icrc1:name".to_string(), Value::Text(stats.name.clone())),
             (
                 "icrc1:decimals".to_string(),
-                Value::Nat(Nat::from(self.stats.decimals)),
+                Value::Nat(Nat::from(stats.decimals)),
             ),
-            (
-                "icrc1:fee".to_string(),
-                Value::Nat(self.stats.fee.amount.into()),
-            ),
+            ("icrc1:fee".to_string(), Value::Nat(stats.fee.amount.into())),
         ]
     }
 
     pub fn get_metadata(&self) -> Metadata {
+        let stats = StatsData::get_stable();
         Metadata {
-            logo: self.stats.logo.clone(),
-            name: self.stats.name.clone(),
-            symbol: self.stats.symbol.clone(),
-            decimals: self.stats.decimals,
-            owner: self.stats.owner,
-            fee: self.stats.fee,
-            fee_to: self.stats.fee_to,
-            is_test_token: Some(self.stats.is_test_token),
+            logo: stats.logo.clone(),
+            name: stats.name.clone(),
+            symbol: stats.symbol.clone(),
+            decimals: stats.decimals,
+            owner: stats.owner,
+            fee: stats.fee,
+            fee_to: stats.fee_to,
+            is_test_token: Some(stats.is_test_token),
         }
     }
 
