@@ -5,7 +5,7 @@ version = "0.2.0"
 
 [features]
 default = ["mint_burn", "transfer"]
-export_api = ["canister-sdk/auction_api"]
+export-api = ["canister-sdk/auction-api","canister-sdk/metrics-api"]
 
 # Enables cycle auctions
 auction = ["canister-sdk/auction"]
