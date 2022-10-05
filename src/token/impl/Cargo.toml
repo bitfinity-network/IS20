@@ -5,7 +5,7 @@ version = "0.2.0"
 
 [features]
 default = []
-export-api = ["token-api/export-api","canister-sdk/metrics-api"]
+export_api = ["token-api/export_api","canister-sdk/metrics_api"]
 
 [dependencies]
 candid = "0.7"
