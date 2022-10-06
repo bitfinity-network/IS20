@@ -13,7 +13,7 @@ use canister_sdk::{
     ic_metrics::{Interval, Metrics},
     ic_storage::IcStorage,
 };
-#[cfg(feature = "export_api")]
+#[cfg(feature = "export-api")]
 use canister_sdk::{ic_cdk, ic_cdk_macros::inspect_message};
 use std::{cell::RefCell, rc::Rc};
 use token_api::{
@@ -74,7 +74,7 @@ impl TokenCanister {
     }
 }
 
-#[cfg(feature = "export_api")]
+#[cfg(feature = "export-api")]
 #[inspect_message]
 fn inspect_message() {
     use canister_sdk::ic_cdk;
