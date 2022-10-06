@@ -15,8 +15,10 @@ use canister_sdk::{
 };
 
 use crate::{
+    account::AccountInternal,
     canister::TokenCanisterAPI,
     state::{
+        balances::{Balances, StableBalances},
         stats::{Metadata, StatsData},
         CanisterState,
     },
@@ -34,10 +36,8 @@ pub struct TokenCanisterMock {
 impl TokenCanisterMock {
     #[cfg_attr(coverage_nightly, no_coverage)]
     pub fn init(&self, metadata: Metadata, amount: Tokens128) {
-        self.state
-            .borrow_mut()
-            .balances
-            .insert(metadata.owner, None, amount);
+        let owner_account = AccountInternal::new(metadata.owner, None);
+        StableBalances.insert(owner_account, amount);
 
         self.state
             .borrow_mut()

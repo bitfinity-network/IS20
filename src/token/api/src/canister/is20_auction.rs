@@ -1,5 +1,6 @@
 //! This module contains APIs from IS20 standard providing cycle auction related functionality.
 
+use candid::Principal;
 use canister_sdk::{
     ic_auction::{
         error::AuctionError,
@@ -9,8 +10,14 @@ use canister_sdk::{
     ic_kit::ic,
 };
 
-use crate::state::{Balances, CanisterState};
 use crate::types::BatchTransferArgs;
+use crate::{
+    account::AccountInternal,
+    state::{
+        balances::{Balances, StableBalances},
+        CanisterState,
+    },
+};
 use crate::{canister::auction_account, state::stats::StatsData};
 
 use super::is20_transactions::batch_transfer_internal;
@@ -19,11 +26,7 @@ pub fn disburse_rewards(
     canister_state: &mut CanisterState,
     auction_state: &AuctionState,
 ) -> Result<AuctionInfo, AuctionError> {
-    let CanisterState {
-        ref mut balances,
-        ref mut ledger,
-        ..
-    } = *canister_state;
+    let CanisterState { ref mut ledger, .. } = *canister_state;
 
     let AuctionState {
         ref bidding_state,
@@ -31,7 +34,7 @@ pub fn disburse_rewards(
         ..
     } = *auction_state;
 
-    let total_amount = accumulated_fees(balances);
+    let total_amount = accumulated_fees();
     let mut transferred_amount = Tokens128::from(0u128);
     let total_cycles = bidding_state.cycles_since_auction;
 
@@ -54,11 +57,14 @@ pub fn disburse_rewards(
     }
 
     let stats = StatsData::get_stable();
+    let (fee, fee_to) = stats.fee_info();
+
     if let Err(e) = batch_transfer_internal(
         auction_account(),
         &transfers,
-        balances,
-        &stats,
+        &mut StableBalances,
+        fee,
+        fee_to,
         auction_state.bidding_state.fee_ratio,
     ) {
         ic::trap(&format!("Failed to transfer tokens to the bidders: {e}"));
@@ -78,8 +84,9 @@ pub fn disburse_rewards(
     Ok(result)
 }
 
-pub fn accumulated_fees(balances: &Balances) -> Tokens128 {
-    balances.balance_of(auction_account())
+pub fn accumulated_fees() -> Tokens128 {
+    let account = AccountInternal::new(Principal::management_canister(), None);
+    StableBalances.balance_of(&account)
 }
 
 #[cfg(test)]
@@ -95,7 +102,7 @@ mod tests {
     };
 
     use crate::mock::*;
-    use crate::{canister::TokenCanisterAPI, state::stats::Metadata};
+    use crate::state::stats::Metadata;
 
     use super::*;
 
@@ -173,17 +180,9 @@ mod tests {
         context.update_msg_cycles(4_000_000);
         canister.bid_cycles(bob()).unwrap();
 
-        canister.state().borrow_mut().balances.insert(
-            auction_account().owner,
-            None,
-            Tokens128::from(6000),
-        );
-
-        canister
-            .state()
-            .borrow()
-            .balances
-            .balance_of(auction_account());
+        let auction_account = auction_account();
+        StableBalances.insert(auction_account, Tokens128::from(6000));
+        StableBalances.balance_of(&auction_account);
 
         context.add_time(10u64.pow(9) * 60 * 60 * 300);
 
@@ -194,7 +193,7 @@ mod tests {
         assert_eq!(result.tokens_distributed, Tokens128::from(6_000));
 
         assert_eq!(
-            canister.state().borrow().balances.balance_of(bob().into()),
+            StableBalances.balance_of(&bob().into()),
             Tokens128::from(4_000)
         );
 

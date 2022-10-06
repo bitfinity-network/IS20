@@ -28,6 +28,8 @@ use crate::{
     error::{TransferError, TxError},
     principal::{CheckedPrincipal, Owner},
     state::{
+        balances::Balances,
+        balances::StableBalances,
         stats::{StandardRecord, StatsData, Timestamp, TokenInfo, Value},
         CanisterState,
     },
@@ -96,7 +98,7 @@ pub trait TokenCanisterAPI: Canister + Sized + AuctionCanister {
 
     #[query(trait = true)]
     fn icrc1_total_supply(&self) -> Tokens128 {
-        self.state().borrow().balances.total_supply()
+        StableBalances.total_supply()
     }
 
     #[query(trait = true)]
@@ -116,7 +118,7 @@ pub trait TokenCanisterAPI: Canister + Sized + AuctionCanister {
             fee_to,
             history_size: self.state().borrow().ledger.len(),
             deployTime: deploy_time,
-            holderNumber: self.state().borrow().balances.0.len(),
+            holderNumber: StableBalances.get_holders().len(),
             cycles: canister_sdk::ic_kit::ic::balance(),
         }
     }
@@ -168,10 +170,8 @@ pub trait TokenCanisterAPI: Canister + Sized + AuctionCanister {
     /// This method retreieves holders of `Account` and their amounts.
     #[query(trait = true)]
     fn get_holders(&self, start: usize, limit: usize) -> Vec<(Account, Tokens128)> {
-        self.state()
-            .borrow()
-            .balances
-            .get_holders(start, limit)
+        StableBalances
+            .list_balances(start, limit)
             .into_iter()
             .map(|(acc, amount)| (acc.into(), amount))
             .collect()
@@ -185,10 +185,7 @@ pub trait TokenCanisterAPI: Canister + Sized + AuctionCanister {
     /// So only own subaccounts can be listed safely.
     #[query(trait = true)]
     fn list_subaccounts(&self) -> std::collections::HashMap<Subaccount, Tokens128> {
-        self.state()
-            .borrow()
-            .balances
-            .list_subaccounts(ic::caller())
+        StableBalances.get_subaccounts(ic::caller())
     }
 
     /********************** CLAIMS ***********************/
@@ -354,7 +351,7 @@ pub trait TokenCanisterAPI: Canister + Sized + AuctionCanister {
 
     #[query(trait = true)]
     fn icrc1_balance_of(&self, account: Account) -> Tokens128 {
-        self.state().borrow().balances.balance_of(account.into())
+        StableBalances.balance_of(&account.into())
     }
 
     #[cfg_attr(feature = "transfer", update(trait = true))]
@@ -469,7 +466,6 @@ mod tests {
             MockContext,
         },
     };
-    use rand::{thread_rng, Rng};
 
     use crate::mock::TokenCanisterMock;
     use crate::{account::DEFAULT_SUBACCOUNT, state::stats::Metadata};
@@ -480,6 +476,8 @@ mod tests {
     #[cfg(feature = "claim")]
     #[cfg_attr(coverage_nightly, no_coverage)]
     fn gen_subaccount() -> Subaccount {
+        use rand::{thread_rng, Rng};
+
         let mut subaccount = [0u8; 32];
         thread_rng().fill(&mut subaccount);
         subaccount

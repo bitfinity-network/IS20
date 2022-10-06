@@ -7,7 +7,11 @@ use crate::{
     account::{AccountInternal, CheckedAccount, Subaccount, WithRecipient},
     error::TxError,
     principal::{CheckedPrincipal, Owner, TestNet},
-    state::{stats::StatsData, Balances, CanisterState, FeeRatio},
+    state::{
+        balances::{Balances, LocalBalances, StableBalances},
+        stats::StatsData,
+        CanisterState, FeeRatio,
+    },
     tx_record::TxId,
     types::{BatchTransferArgs, TransferArgs, TxReceipt},
 };
@@ -28,10 +32,6 @@ pub fn is20_transfer(
     let created_at_time = validate_and_get_tx_ts(state, from.owner, transfer)?;
     let TransferArgs { amount, memo, .. } = transfer;
 
-    let CanisterState {
-        ref mut balances, ..
-    } = state;
-
     let stats = StatsData::get_stable();
     let (fee, fee_to) = stats.fee_info();
 
@@ -42,7 +42,7 @@ pub fn is20_transfer(
     }
 
     transfer_internal(
-        balances,
+        &mut StableBalances,
         from,
         to,
         *amount,
@@ -58,7 +58,7 @@ pub fn is20_transfer(
 }
 
 pub(crate) fn transfer_internal(
-    balances: &mut Balances,
+    balances: &mut impl Balances,
     from: AccountInternal,
     to: AccountInternal,
     amount: Tokens128,
@@ -72,44 +72,44 @@ pub(crate) fn transfer_internal(
 
     // We use `updates` structure because sometimes from or to can be equal to fee_to or even to
     // auction_account, so we must take a carefull approach.
-    let mut updates = Balances::default();
-    updates.set_balance(from, balances.balance_of(from));
-    updates.set_balance(to, balances.balance_of(to));
-    updates.set_balance(fee_to, balances.balance_of(fee_to));
-    updates.set_balance(auction_account(), balances.balance_of(auction_account()));
-
-    let from_balance = updates.balance_of(from);
+    let mut updates = LocalBalances::from_iter(
+        [
+            (from, balances.balance_of(&from)),
+            (to, balances.balance_of(&to)),
+            (fee_to, balances.balance_of(&fee_to)),
+            (auction_account(), balances.balance_of(&auction_account())),
+        ]
+        .into_iter(),
+    );
 
     // If `amount + fee` overflows max `Tokens128` value, the balance cannot be larger than this
     // value, so we can safely return `InsufficientFunds` error.
     let amount_with_fee = (amount + fee).ok_or(TxError::InsufficientFunds {
-        balance: from_balance,
+        balance: updates.balance_of(&from),
     })?;
 
     let updated_from_balance =
-        (from_balance - amount_with_fee).ok_or(TxError::InsufficientFunds {
-            balance: from_balance,
+        (updates.balance_of(&from) - amount_with_fee).ok_or(TxError::InsufficientFunds {
+            balance: updates.balance_of(&from),
         })?;
-    updates.set_balance(from, updated_from_balance);
+    updates.insert(from, updated_from_balance);
 
-    let to_balance = updates.balance_of(to);
-    let updated_to_balance = (to_balance + amount).ok_or(TxError::AmountOverflow)?;
-    updates.set_balance(to, updated_to_balance);
+    let updated_to_balance = (updates.balance_of(&to) + amount).ok_or(TxError::AmountOverflow)?;
+    updates.insert(to, updated_to_balance);
 
     let (owner_fee, auction_fee) = auction_fee_ratio.get_value(fee);
 
-    let fee_to_balance = updates.balance_of(fee_to);
-    let updated_fee_to_balance = (fee_to_balance + owner_fee).ok_or(TxError::AmountOverflow)?;
-    updates.set_balance(fee_to, updated_fee_to_balance);
+    let updated_fee_to_balance =
+        (updates.balance_of(&fee_to) + owner_fee).ok_or(TxError::AmountOverflow)?;
+    updates.insert(fee_to, updated_fee_to_balance);
 
-    let auction_balance = updates.balance_of(auction_account());
-    let updated_auction_balance = (auction_balance + auction_fee).ok_or(TxError::AmountOverflow)?;
-    updates.set_balance(auction_account(), updated_auction_balance);
+    let updated_auction_balance =
+        (updates.balance_of(&auction_account()) + auction_fee).ok_or(TxError::AmountOverflow)?;
+    updates.insert(auction_account(), updated_auction_balance);
 
     // At this point all the checks are done and no further errors are possible, so we modify the
     // canister state only at this point.
-
-    balances.apply_change(&updates);
+    balances.apply_updates(updates.list_balances(0, usize::MAX).into_iter());
 
     Ok(())
 }
@@ -168,17 +168,16 @@ pub fn mint(
     to: AccountInternal,
     amount: Tokens128,
 ) -> TxReceipt {
-    let total_supply = state.balances.total_supply();
+    let total_supply = StableBalances.total_supply();
     if (total_supply + amount).is_none() {
         // If we allow to mint more then Tokens128::MAX then simple operations such as getting
         // total supply or token stats will panic, So we add this check to prevent this.
         return Err(TxError::AmountOverflow);
     }
 
-    let balance = state.balances.get_mut_or_insert_default(to);
-
-    let new_balance = (*balance + amount).ok_or(TxError::AmountOverflow)?;
-    *balance = new_balance;
+    let balance = StableBalances.balance_of(&to);
+    let new_balance = (balance + amount).ok_or(TxError::AmountOverflow)?;
+    StableBalances.insert(to, new_balance);
 
     let id = state.ledger.mint(caller.into(), to, amount);
 
@@ -221,7 +220,7 @@ pub fn burn(
     from: AccountInternal,
     amount: Tokens128,
 ) -> TxReceipt {
-    let balance = state.balances.balance_of(from);
+    let balance = StableBalances.balance_of(&from);
 
     if !amount.is_zero() && balance.is_zero() {
         return Err(TxError::InsufficientFunds { balance });
@@ -230,9 +229,9 @@ pub fn burn(
     let new_balance = (balance - amount).ok_or(TxError::InsufficientFunds { balance })?;
 
     if new_balance == Tokens128::ZERO {
-        state.balances.remove(from)
+        StableBalances.remove(&from);
     } else {
-        state.balances.set_balance(from, new_balance)
+        StableBalances.insert(from, new_balance)
     }
 
     let id = state.ledger.burn(caller.into(), from, amount);
@@ -290,14 +289,14 @@ pub fn claim(
     let caller = canister_sdk::ic_kit::ic::caller();
     let claim_subaccount = get_claim_subaccount(caller, subaccount);
     let claim_account = AccountInternal::new(holder, Some(claim_subaccount));
-    let amount = state.balances.balance_of(claim_account);
+    let amount = StableBalances.balance_of(&claim_account);
     if amount.is_zero() {
         return Err(TxError::NothingToClaim);
     }
 
     let stats = StatsData::get_stable();
     transfer_internal(
-        &mut state.balances,
+        &mut StableBalances,
         claim_account,
         caller.into(),
         amount,
@@ -319,15 +318,19 @@ pub fn batch_transfer(
 ) -> Result<Vec<TxId>, TxError> {
     let caller = canister_sdk::ic_kit::ic::caller();
     let from = AccountInternal::new(caller, from_subaccount);
-    let CanisterState {
-        ref mut balances,
-        ref mut ledger,
-        ..
-    } = state;
+    let CanisterState { ref mut ledger, .. } = state;
 
     let stats = StatsData::get_stable();
-    batch_transfer_internal(from, &transfers, balances, &stats, auction_fee_ratio)?;
-    let (fee, _) = stats.fee_info();
+    let (fee, fee_to) = stats.fee_info();
+
+    batch_transfer_internal(
+        from,
+        &transfers,
+        &mut StableBalances,
+        fee,
+        fee_to,
+        auction_fee_ratio,
+    )?;
     let id = ledger.batch_transfer(from, transfers, fee);
     Ok(id)
 }
@@ -335,27 +338,32 @@ pub fn batch_transfer(
 pub(crate) fn batch_transfer_internal(
     from: AccountInternal,
     transfers: &Vec<BatchTransferArgs>,
-    balances: &mut Balances,
-    stats: &StatsData,
+    balances: &mut impl Balances,
+    fee: Tokens128,
+    fee_to: Principal,
     auction_fee_ratio: f64,
 ) -> Result<(), TxError> {
-    let (fee, fee_to) = stats.fee_info();
     let fee_to = AccountInternal::new(fee_to, None);
+    let auction_acc = auction_account();
 
-    let mut updated_balances = Balances::default();
-    updated_balances.set_balance(from, balances.balance_of(from));
-    updated_balances.set_balance(fee_to, balances.balance_of(fee_to));
-    updated_balances.set_balance(auction_account(), balances.balance_of(auction_account()));
+    let mut updates = LocalBalances::from_iter(
+        [
+            (from, balances.balance_of(&from)),
+            (fee_to, balances.balance_of(&fee_to)),
+            (auction_acc, balances.balance_of(&auction_acc)),
+        ]
+        .into_iter(),
+    );
 
     for transfer in transfers {
         let receiver = transfer.receiver.into();
-        updated_balances.set_balance(receiver, balances.balance_of(receiver));
+        updates.insert(receiver, balances.balance_of(&receiver));
     }
 
     for transfer in transfers {
         let receiver = transfer.receiver.into();
         transfer_internal(
-            &mut updated_balances,
+            &mut updates,
             from,
             receiver,
             transfer.amount,
@@ -365,13 +373,13 @@ pub(crate) fn batch_transfer_internal(
         )
         .map_err(|err| match err {
             TxError::InsufficientFunds { .. } => TxError::InsufficientFunds {
-                balance: balances.balance_of(from),
+                balance: balances.balance_of(&from),
             },
             other => other,
         })?;
     }
 
-    balances.apply_change(&updated_balances);
+    balances.apply_updates(updates.list_balances(0, usize::MAX).into_iter());
     Ok(())
 }
 

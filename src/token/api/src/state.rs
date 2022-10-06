@@ -1,10 +1,12 @@
 pub mod balances;
 pub mod stats;
 
-use std::collections::HashMap;
-
+#[cfg(feature = "claim")]
+use crate::account::{Subaccount, DEFAULT_SUBACCOUNT};
 use candid::Nat;
-use candid::{CandidType, Deserialize, Principal};
+#[cfg(feature = "claim")]
+use candid::Principal;
+use candid::{CandidType, Deserialize};
 #[cfg(feature = "auction")]
 use canister_sdk::ic_auction::state::{AuctionInfo, AuctionState};
 #[cfg(feature = "claim")]
@@ -14,7 +16,6 @@ use canister_sdk::{
     ic_storage::{stable::Versioned, IcStorage},
 };
 
-use crate::account::{AccountInternal, Subaccount, DEFAULT_SUBACCOUNT};
 use crate::ledger::Ledger;
 
 use stats::Value;
@@ -23,7 +24,6 @@ use self::stats::{Metadata, StatsData};
 
 #[derive(Debug, Default, CandidType, Deserialize, IcStorage)]
 pub struct CanisterState {
-    pub balances: Balances,
     pub ledger: Ledger,
 }
 
@@ -64,6 +64,11 @@ impl CanisterState {
         holder: Principal,
         subaccount: Option<Subaccount>,
     ) -> Tokens128 {
+        use crate::{
+            account::AccountInternal,
+            state::balances::{Balances, StableBalances},
+        };
+
         let claim_subaccount = AccountIdentifier::new(
             canister_sdk::ic_kit::ic::caller().into(),
             Some(SubaccountIdentifier(
@@ -72,8 +77,8 @@ impl CanisterState {
         )
         .to_address();
 
-        let claim_account = AccountInternal::new(holder, Some(claim_subaccount));
-        self.balances.balance_of(claim_account)
+        let account = AccountInternal::new(holder, Some(claim_subaccount));
+        StableBalances.balance_of(&account)
     }
 }
 
@@ -82,106 +87,6 @@ impl Versioned for CanisterState {
 
     fn upgrade((): ()) -> Self {
         Self::default()
-    }
-}
-
-/// We are saving the `Balances` in this format, as we want to support `Principal` supporting `Subaccount`.
-#[derive(Debug, Default, CandidType, Deserialize)]
-pub struct Balances(pub HashMap<Principal, HashMap<Subaccount, Tokens128>>);
-
-impl Balances {
-    pub fn insert(
-        &mut self,
-        principal: Principal,
-        subaccount: Option<Subaccount>,
-        token: Tokens128,
-    ) {
-        self.0
-            .entry(principal)
-            .or_default()
-            .insert(subaccount.unwrap_or(DEFAULT_SUBACCOUNT), token);
-    }
-
-    pub fn get_mut(&mut self, account: AccountInternal) -> Option<&mut Tokens128> {
-        self.0
-            .get_mut(&account.owner)
-            .and_then(|subaccounts| subaccounts.get_mut(&account.subaccount))
-    }
-
-    pub fn get_mut_or_insert_default(&mut self, account: AccountInternal) -> &mut Tokens128 {
-        self.0
-            .entry(account.owner)
-            .or_default()
-            .entry(account.subaccount)
-            .or_default()
-    }
-
-    pub fn balance_of(&self, account: AccountInternal) -> Tokens128 {
-        self.0
-            .get(&account.owner)
-            .and_then(|subaccounts| subaccounts.get(&account.subaccount))
-            .copied()
-            .unwrap_or_default()
-    }
-
-    pub fn get_holders(&self, start: usize, limit: usize) -> Vec<(AccountInternal, Tokens128)> {
-        let mut holders = self
-            .0
-            .iter()
-            .flat_map(|(principal, subaccounts)| {
-                subaccounts
-                    .iter()
-                    .map(|(subaccount, token)| {
-                        (AccountInternal::new(*principal, Some(*subaccount)), *token)
-                    })
-                    .collect::<Vec<_>>()
-            })
-            .skip(start)
-            .take(limit)
-            .collect::<Vec<_>>();
-        holders.sort_by(|a, b| b.1.cmp(&a.1));
-        holders
-    }
-
-    pub fn remove(&mut self, account: AccountInternal) {
-        if let Some(subaccounts) = self.0.get_mut(&account.owner) {
-            subaccounts.remove(&account.subaccount);
-        }
-
-        if self
-            .0
-            .get(&account.owner)
-            .map(|subaccounts| subaccounts.is_empty())
-            .unwrap_or(true)
-        {
-            self.0.remove(&account.owner);
-        }
-    }
-
-    pub fn set_balance(&mut self, account: AccountInternal, amount: Tokens128) {
-        self.0
-            .entry(account.owner)
-            .or_default()
-            .insert(account.subaccount, amount);
-    }
-
-    pub fn total_supply(&self) -> Tokens128 {
-        self.0
-            .iter()
-            .flat_map(|(_, subaccounts)| subaccounts.values())
-            .fold(Tokens128::ZERO, |a, b| (a + b).unwrap_or(Tokens128::ZERO))
-    }
-
-    pub(crate) fn apply_change(&mut self, change: &Balances) {
-        for (principal, subaccounts) in &change.0 {
-            for (subaccount, amount) in subaccounts {
-                self.set_balance(AccountInternal::new(*principal, Some(*subaccount)), *amount);
-            }
-        }
-    }
-
-    pub fn list_subaccounts(&self, account: Principal) -> HashMap<Subaccount, Tokens128> {
-        self.0.get(&account).cloned().unwrap_or_default()
     }
 }
 

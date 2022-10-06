@@ -1,7 +1,9 @@
 use candid::{Nat, Principal};
-use canister_sdk::ic_storage::IcStorage;
 
-use crate::state::{stats::StatsData, CanisterState};
+use crate::state::{
+    balances::{Balances, StableBalances},
+    stats::StatsData,
+};
 
 static OWNER_METHODS: &[&str] = &[
     "set_auction_period",
@@ -48,10 +50,8 @@ pub fn inspect_message(method: &str, caller: Principal) -> Result<AcceptReason, 
         #[cfg(any(feature = "transfer", feature = "mint_burn"))]
         m if TRANSACTION_METHODS.contains(&m) => {
             // These methods requires that the caller have tokens.
-            let state = CanisterState::get();
-            let state = state.borrow();
-            let balances = &state.balances;
-            if !balances.0.contains_key(&caller) {
+
+            if StableBalances.get_subaccounts(caller).is_empty() {
                 return Err("Transaction method is not called by a stakeholder. Rejecting.");
             }
 

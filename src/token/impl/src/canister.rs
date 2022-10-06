@@ -5,7 +5,7 @@ use canister_sdk::{
         error::AuctionError,
         state::{AuctionInfo, AuctionState},
     },
-    ic_canister::{self, init, query, Canister, PreUpdate},
+    ic_canister::{self, init, post_upgrade, pre_upgrade, query, Canister, PreUpdate},
     ic_helpers::{
         candid_header::{candid_header, CandidHeader},
         tokens::Tokens128,
@@ -20,6 +20,7 @@ use token_api::{
     account::AccountInternal,
     canister::{TokenCanisterAPI, DEFAULT_AUCTION_PERIOD_SECONDS},
     state::{
+        balances::{Balances, StableBalances},
         stats::{Metadata, StatsData},
         CanisterState,
     },
@@ -36,10 +37,9 @@ impl TokenCanister {
     #[init]
     pub fn init(&self, metadata: Metadata, amount: Tokens128) {
         let owner = metadata.owner;
-        self.state()
-            .borrow_mut()
-            .balances
-            .insert(owner, None, amount);
+        let owner_account = AccountInternal::new(owner, None);
+
+        StableBalances.insert(owner_account, amount);
 
         self.state().borrow_mut().ledger.mint(
             AccountInternal::from(owner),
@@ -58,37 +58,15 @@ impl TokenCanister {
         ));
     }
 
-    // #[pre_upgrade]
-    // fn pre_upgrade(&self) {
-    //     let token_state = self.state().replace(CanisterState::default());
-    //     let auction_state = self.auction_state().replace(AuctionState::default());
+    #[pre_upgrade]
+    fn pre_upgrade(&self) {
+        // All required canister state stored in stable memory, so no need to save/load anything.
+    }
 
-    //     if let Err(err) = ic_storage::stable::write(&StableState {
-    //         token_state,
-    //         auction_state,
-    //     }) {
-    //         canister_sdk::ic_kit::ic::trap(&format!(
-    //             "Error while serializing state to the stable storage: {err}"
-    //         ));
-    //     }
-    // }
-
-    // #[post_upgrade]
-    // fn post_upgrade(&self) {
-    //     let stable_state = ic_storage::stable::read::<StableState>().unwrap_or_else(|err| {
-    //         canister_sdk::ic_kit::ic::trap(&format!(
-    //             "Error while deserializing state from the stable storage: {err}"
-    //         ));
-    //     });
-
-    //     let StableState {
-    //         token_state,
-    //         auction_state,
-    //     } = stable_state;
-
-    //     self.state().replace(token_state);
-    //     self.auction_state().replace(auction_state);
-    // }
+    #[post_upgrade]
+    fn post_upgrade(&self) {
+        // All required canister state stored in stable memory, so no need to save/load anything.
+    }
 
     #[query]
     pub fn state_check(&self) -> CandidHeader {

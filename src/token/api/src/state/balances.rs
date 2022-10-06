@@ -1,55 +1,151 @@
-use std::{borrow::Cow, cell::RefCell};
+use std::{borrow::Cow, cell::RefCell, collections::HashMap};
 
-use candid::Principal;
+use candid::{CandidType, Deserialize, Principal};
 use canister_sdk::ic_helpers::tokens::Tokens128;
 use ic_stable_structures::{memory_manager::MemoryId, Storable};
 
 use crate::{
-    account::{Subaccount, DEFAULT_SUBACCOUNT},
+    account::{AccountInternal, Subaccount},
     storage::{self, StableBTreeMap},
 };
 
+pub trait Balances {
+    /// Write or re-write amount of tokens for specified account.
+    fn insert(&mut self, account: AccountInternal, token: Tokens128);
+
+    /// Get amount of tokens for the specified account.
+    fn get(&self, account: &AccountInternal) -> Option<Tokens128>;
+
+    /// Remove specified account balance.
+    fn remove(&mut self, account: &AccountInternal) -> Option<Tokens128>;
+
+    /// Get list of `limit` balances, starting with `start`.
+    fn list_balances(&self, start: usize, limit: usize) -> Vec<(AccountInternal, Tokens128)>;
+
+    /// Get amount of tokens for the specified account.
+    /// If account is not present, return zero.
+    fn balance_of(&self, account: &AccountInternal) -> Tokens128 {
+        self.get(account).unwrap_or_default()
+    }
+
+    /// Update balances according to `updates` iterator.
+    fn apply_updates(&mut self, updates: impl Iterator<Item = (AccountInternal, Tokens128)>) {
+        for (account, amount) in updates {
+            self.insert(account, amount);
+        }
+    }
+
+    /// List subaccounts for the given principal.
+    fn get_subaccounts(&self, owner: Principal) -> HashMap<Subaccount, Tokens128> {
+        self.list_balances(0, usize::MAX)
+            .into_iter()
+            .filter(|(account, _)| account.owner == owner)
+            .map(|(account, amount)| (account.subaccount, amount))
+            .collect()
+    }
+
+    /// Return sum of all balances.
+    fn total_supply(&self) -> Tokens128 {
+        self.list_balances(0, usize::MAX)
+            .into_iter()
+            .fold(Tokens128::ZERO, |a, b| (a + b.1).unwrap_or(Tokens128::ZERO))
+    }
+
+    /// Get balances map: holder -> subaccount -> tokens.
+    fn get_holders(&self) -> HashMap<Principal, HashMap<Subaccount, Tokens128>> {
+        let mut holders: HashMap<Principal, HashMap<Subaccount, Tokens128>> = HashMap::new();
+        for (account, amount) in self.list_balances(0, usize::MAX) {
+            holders
+                .entry(account.owner)
+                .or_default()
+                .insert(account.subaccount, amount);
+        }
+        holders
+    }
+}
+
 /// Store balances in stable memory.
-pub struct Balances;
+pub struct StableBalances;
 
-impl Balances {
+impl Balances for StableBalances {
     /// Write or re-write amount of tokens for specified account to stable memory.
-    pub fn insert(principal: Principal, subaccount: Option<Subaccount>, token: Tokens128) {
-        let subaccount = subaccount.unwrap_or(DEFAULT_SUBACCOUNT);
-        let key = Key {
-            principal,
-            subaccount,
-        };
-
+    fn insert(&mut self, account: AccountInternal, token: Tokens128) {
         MAP.with(|map| {
             map.borrow_mut()
-                .insert(key, token.amount)
+                .insert(account.into(), token.amount)
                 .expect("balance insert failed") // key and value bytes len always less then MAX size
         });
     }
 
     /// Get amount of tokens for the specified account from stable memory.
-    pub fn get(principal: Principal, subaccount: Option<Subaccount>) -> Option<Tokens128> {
-        let subaccount = subaccount.unwrap_or(DEFAULT_SUBACCOUNT);
-        let key = Key {
-            principal,
-            subaccount,
-        };
-
-        let amount = MAP.with(|map| map.borrow_mut().get(&key));
+    fn get(&self, account: &AccountInternal) -> Option<Tokens128> {
+        let amount = MAP.with(|map| map.borrow_mut().get(&(*account).into()));
         amount.map(Tokens128::from)
     }
 
     /// Remove specified account balance from the stable memory.
-    pub fn remove(principal: Principal, subaccount: Option<Subaccount>) -> Option<Tokens128> {
-        let subaccount = subaccount.unwrap_or(DEFAULT_SUBACCOUNT);
-        let key = Key {
-            principal,
-            subaccount,
-        };
-
-        let amount = MAP.with(|map| map.borrow_mut().remove(&key));
+    fn remove(&mut self, account: &AccountInternal) -> Option<Tokens128> {
+        let amount = MAP.with(|map| map.borrow_mut().remove(&(*account).into()));
         amount.map(Tokens128::from)
+    }
+
+    fn list_balances(&self, start: usize, limit: usize) -> Vec<(AccountInternal, Tokens128)> {
+        MAP.with(|map| {
+            map.borrow()
+                .iter()
+                .skip(start)
+                .take(limit)
+                .map(|(key, amount)| (key.into(), Tokens128::from(amount)))
+                .collect()
+        })
+    }
+}
+
+/// We are saving the `Balances` in this format, as we want to support `Principal` supporting `Subaccount`.
+#[derive(Debug, Default, CandidType, Deserialize)]
+pub struct LocalBalances(HashMap<AccountInternal, Tokens128>);
+
+impl LocalBalances {
+    pub fn new() -> Self {
+        Self(HashMap::new())
+    }
+}
+
+impl FromIterator<(AccountInternal, Tokens128)> for LocalBalances {
+    fn from_iter<T: IntoIterator<Item = (AccountInternal, Tokens128)>>(iter: T) -> Self {
+        Self(HashMap::from_iter(iter))
+    }
+}
+
+impl Balances for LocalBalances {
+    fn insert(&mut self, account: AccountInternal, token: Tokens128) {
+        self.0.insert(account, token);
+    }
+
+    fn get(&self, account: &AccountInternal) -> Option<Tokens128> {
+        self.0.get(account).copied()
+    }
+
+    fn list_balances(&self, start: usize, limit: usize) -> Vec<(AccountInternal, Tokens128)> {
+        let mut holders = self
+            .0
+            .iter()
+            .skip(start)
+            .take(limit)
+            .map(|(account, tokens)| (*account, *tokens))
+            .collect::<Vec<_>>();
+        holders.sort_by(|a, b| b.1.cmp(&a.1));
+        holders
+    }
+
+    fn remove(&mut self, account: &AccountInternal) -> Option<Tokens128> {
+        self.0.remove(account)
+    }
+
+    fn total_supply(&self) -> Tokens128 {
+        self.0
+            .iter()
+            .fold(Tokens128::ZERO, |a, b| (a + b.1).unwrap_or(Tokens128::ZERO))
     }
 }
 
@@ -58,6 +154,24 @@ const BALANCES_MEMORY_ID: MemoryId = MemoryId::new(1);
 struct Key {
     pub principal: Principal,
     pub subaccount: Subaccount,
+}
+
+impl From<AccountInternal> for Key {
+    fn from(account: AccountInternal) -> Self {
+        Self {
+            principal: account.owner,
+            subaccount: account.subaccount,
+        }
+    }
+}
+
+impl From<Key> for AccountInternal {
+    fn from(key: Key) -> Self {
+        Self {
+            owner: key.principal,
+            subaccount: key.subaccount,
+        }
+    }
 }
 
 const SUBACCOUNT_LEN: usize = 32;
@@ -71,7 +185,7 @@ impl Storable for Key {
     /// | principal len (1 byte) | principal data (31 byte) | subaccount (32 bytes) |
     /// Principal data maximum len is 29;
     fn to_bytes(&self) -> Cow<[u8]> {
-        let mut buffer = Vec::with_capacity(KEY_BYTES_LEN);
+        let mut buffer = vec![0u8; KEY_BYTES_LEN];
         let principal_bytes = self.principal.as_slice();
 
         buffer[0] = principal_bytes.len() as u8;
