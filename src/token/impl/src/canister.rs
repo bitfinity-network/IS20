@@ -10,7 +10,7 @@ use canister_sdk::{
         candid_header::{candid_header, CandidHeader},
         tokens::Tokens128,
     },
-    ic_metrics::{Interval, Metrics},
+    ic_metrics::{Interval, Metrics, MetricsStorage},
     ic_storage::{self, IcStorage},
 };
 #[cfg(feature = "export_api")]
@@ -143,7 +143,11 @@ impl Auction for TokenCanister {
     }
 }
 
-impl Metrics for TokenCanister {}
+impl Metrics for TokenCanister {
+    fn metrics(&self) -> Rc<RefCell<MetricsStorage>> {
+        MetricsStorage::get()
+    }
+}
 
 #[cfg(test)]
 mod test {
