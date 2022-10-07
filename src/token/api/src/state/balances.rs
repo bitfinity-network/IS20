@@ -1,4 +1,4 @@
-use std::{borrow::Cow, cell::RefCell, collections::HashMap};
+use std::{borrow::Cow, collections::HashMap};
 
 use candid::{CandidType, Deserialize, Principal};
 use canister_sdk::ic_helpers::tokens::Tokens128;
@@ -67,37 +67,40 @@ pub trait Balances {
 /// Store balances in stable memory.
 pub struct StableBalances;
 
+impl StableBalances {
+    fn stable_map() -> StableBTreeMap<Key, u128> {
+        let memory = storage::get_memory_by_id(BALANCES_MEMORY_ID);
+        StableBTreeMap::init(memory, KEY_BYTES_LEN as u32, VALUE_BYTES_LEN as u32)
+    }
+}
+
 impl Balances for StableBalances {
     /// Write or re-write amount of tokens for specified account to stable memory.
     fn insert(&mut self, account: AccountInternal, token: Tokens128) {
-        MAP.with(|map| {
-            map.borrow_mut()
-                .insert(account.into(), token.amount)
-                .expect("balance insert failed") // key and value bytes len always less then MAX size
-        });
+        Self::stable_map()
+            .insert(account.into(), token.amount)
+            .expect("balance insert failed"); // key and value bytes len always less then MAX size
     }
 
     /// Get amount of tokens for the specified account from stable memory.
     fn get(&self, account: &AccountInternal) -> Option<Tokens128> {
-        let amount = MAP.with(|map| map.borrow_mut().get(&(*account).into()));
+        let amount = Self::stable_map().get(&(*account).into());
         amount.map(Tokens128::from)
     }
 
     /// Remove specified account balance from the stable memory.
     fn remove(&mut self, account: &AccountInternal) -> Option<Tokens128> {
-        let amount = MAP.with(|map| map.borrow_mut().remove(&(*account).into()));
+        let amount = Self::stable_map().remove(&(*account).into());
         amount.map(Tokens128::from)
     }
 
     fn list_balances(&self, start: usize, limit: usize) -> Vec<(AccountInternal, Tokens128)> {
-        MAP.with(|map| {
-            map.borrow()
-                .iter()
-                .skip(start)
-                .take(limit)
-                .map(|(key, amount)| (key.into(), Tokens128::from(amount)))
-                .collect()
-        })
+        Self::stable_map()
+            .iter()
+            .skip(start)
+            .take(limit)
+            .map(|(key, amount)| (key.into(), Tokens128::from(amount)))
+            .collect()
     }
 }
 
@@ -204,13 +207,5 @@ impl Storable for Key {
             principal: account,
             subaccount,
         }
-    }
-}
-
-thread_local! {
-    static MAP: RefCell<StableBTreeMap<Key, u128>> = {
-            let memory = storage::get_memory_by_id(BALANCES_MEMORY_ID);
-            let map = StableBTreeMap::init(memory, KEY_BYTES_LEN as u32, VALUE_BYTES_LEN as u32);
-            RefCell::new(map)
     }
 }
