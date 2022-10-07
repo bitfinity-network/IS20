@@ -1,4 +1,4 @@
-use std::borrow::Cow;
+use std::{borrow::Cow, cell::RefCell};
 
 use candid::{CandidType, Decode, Deserialize, Encode, Int, Nat, Principal};
 use canister_sdk::ic_helpers::tokens::Tokens128;
@@ -23,14 +23,16 @@ pub struct StatsData {
 impl StatsData {
     /// Get stats data stored in stable memory.
     pub fn get_stable() -> StatsData {
-        Self::read_stable_cell().get().clone()
+        CELL.with(|c| c.borrow().get().clone())
     }
 
     /// Store stats data in stable memory.
     pub fn set_stable(stats: StatsData) {
-        Self::read_stable_cell()
-            .set(stats)
-            .expect("failed to set stats data to stable memory");
+        CELL.with(|c| {
+            c.borrow_mut()
+                .set(stats)
+                .expect("failed to set stats data to stable memory");
+        })
     }
 
     pub fn fee_info(&self) -> (Tokens128, Principal) {
@@ -48,12 +50,6 @@ impl StatsData {
                 "https://github.com/infinity-swap/is20".to_string(),
             ),
         ]
-    }
-
-    fn read_stable_cell() -> StableCell<StatsData> {
-        let memory = storage::get_memory_by_id(STATS_MEMORY_ID);
-        let default_data = StatsData::default();
-        StableCell::init(memory, default_data).expect("stats cell initialization failed")
     }
 }
 
@@ -153,3 +149,12 @@ pub enum Value {
 pub type Timestamp = u64;
 
 const STATS_MEMORY_ID: MemoryId = MemoryId::new(0);
+
+thread_local! {
+    static CELL: RefCell<StableCell<StatsData>> = {
+            let memory = storage::get_memory_by_id(STATS_MEMORY_ID);
+            let default_data = StatsData::default();
+            let cell = StableCell::init(memory, default_data).expect("stats cell initialization failed");
+            RefCell::new(cell)
+    }
+}

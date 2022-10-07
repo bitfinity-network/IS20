@@ -20,7 +20,10 @@ use crate::ledger::Ledger;
 
 use stats::Value;
 
-use self::stats::{Metadata, StatsData};
+use self::{
+    balances::StableBalances,
+    stats::{Metadata, StatsData},
+};
 
 #[derive(Debug, Default, CandidType, Deserialize, IcStorage)]
 pub struct CanisterState {
@@ -64,10 +67,7 @@ impl CanisterState {
         holder: Principal,
         subaccount: Option<Subaccount>,
     ) -> Tokens128 {
-        use crate::{
-            account::AccountInternal,
-            state::balances::{Balances, StableBalances},
-        };
+        use crate::{account::AccountInternal, state::balances::Balances};
 
         let claim_subaccount = AccountIdentifier::new(
             canister_sdk::ic_kit::ic::caller().into(),
@@ -146,4 +146,12 @@ impl From<FeeRatio> for f64 {
     fn from(v: FeeRatio) -> Self {
         v.0
     }
+}
+
+/// Clear all canister stable memory state.
+///
+/// May be useful to refresh global state between tests, for example.
+pub fn clear() {
+    StableBalances::clear();
+    StatsData::set_stable(StatsData::default());
 }

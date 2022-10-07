@@ -398,7 +398,7 @@ mod tests {
         account::{Account, DEFAULT_SUBACCOUNT},
         canister::TokenCanisterAPI,
         mock::TokenCanisterMock,
-        state::stats::Metadata,
+        state::{self, stats::Metadata},
     };
 
     use super::*;
@@ -406,6 +406,9 @@ mod tests {
     use coverage_helper::test;
 
     fn test_canister() -> TokenCanisterMock {
+        // Refresh global stable memory.
+        state::clear();
+
         MockContext::new().with_caller(alice()).inject();
 
         let canister = TokenCanisterMock::init_instance();

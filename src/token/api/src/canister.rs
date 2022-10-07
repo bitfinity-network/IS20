@@ -467,8 +467,8 @@ mod tests {
         },
     };
 
-    use crate::mock::TokenCanisterMock;
     use crate::{account::DEFAULT_SUBACCOUNT, state::stats::Metadata};
+    use crate::{mock::TokenCanisterMock, state};
 
     use super::*;
 
@@ -518,6 +518,9 @@ mod tests {
     }
 
     fn test_canister() -> TokenCanisterMock {
+        // Refresh global stable memory.
+        state::clear();
+
         MockContext::new().with_caller(alice()).inject();
 
         let canister = TokenCanisterMock::init_instance();
