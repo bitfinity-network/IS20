@@ -13,6 +13,7 @@ use token_api::{
     canister::TokenCanisterAPI,
     error::TransferError,
     state::{
+        self,
         stats::{Metadata, StandardRecord, Value},
         CanisterState,
     },
@@ -20,6 +21,9 @@ use token_api::{
 };
 
 fn init() -> (Metadata, TokenCanister, &'static mut MockContext) {
+    // Refresh global stable memory.
+    state::clear();
+    
     let ctx = canister_sdk::ic_kit::MockContext::new().inject();
     let canister = TokenCanister::init_instance();
     canister.state().replace(CanisterState::default());

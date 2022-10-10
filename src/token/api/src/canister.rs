@@ -485,6 +485,9 @@ mod tests {
 
     #[cfg_attr(coverage_nightly, no_coverage)]
     fn test_context() -> (&'static MockContext, TokenCanisterMock) {
+        // Refresh global stable memory.
+        state::clear();
+
         let context = MockContext::new().with_caller(john()).inject();
 
         let canister = TokenCanisterMock::init_instance();
