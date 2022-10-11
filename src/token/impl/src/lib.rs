@@ -9,7 +9,7 @@ pub fn idl() -> String {
         ic_helpers::{candid_header::CandidHeader, tokens::Tokens128},
     };
     use token_api::canister::TokenCanisterAPI;
-    use token_api::state::stats::Metadata;
+    use token_api::state::config::Metadata;
 
     let canister_idl = canister_sdk::ic_canister::generate_idl!();
     let auction_idl = <TokenCanister as Auction>::get_idl();

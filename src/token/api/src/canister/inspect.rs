@@ -2,7 +2,7 @@ use candid::{Nat, Principal};
 
 use crate::state::{
     balances::{Balances, StableBalances},
-    stats::StatsData,
+    config::TokenConfig,
 };
 
 static OWNER_METHODS: &[&str] = &[
@@ -32,7 +32,7 @@ pub enum AcceptReason {
 /// canister cycles on accepting this call. Check the comments in this method for details on
 /// the checks for different methods.
 pub fn inspect_message(method: &str, caller: Principal) -> Result<AcceptReason, &'static str> {
-    let stats = StatsData::get_stable();
+    let stats = TokenConfig::get_stable();
     match method {
         // These are query methods, so no checks are needed.
         #[cfg(feature = "mint_burn")]

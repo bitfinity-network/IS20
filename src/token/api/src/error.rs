@@ -1,4 +1,4 @@
-use crate::state::stats::Timestamp;
+use crate::state::config::Timestamp;
 use candid::{CandidType, Deserialize};
 use canister_sdk::ic_helpers::tokens::Tokens128;
 use thiserror::Error;

@@ -17,7 +17,7 @@ pub fn idl() -> String {
         ic_helpers::{candid_header::CandidHeader, tokens::Tokens128},
     };
     use std::collections::HashMap;
-    use token::state::stats::Metadata;
+    use token::state::config::Metadata;
 
     let canister_idl = generate_idl!();
     let mut factory_idl = <TokenFactoryCanister as FactoryCanister>::get_idl();

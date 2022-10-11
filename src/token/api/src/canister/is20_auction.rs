@@ -10,24 +10,16 @@ use canister_sdk::{
     ic_kit::ic,
 };
 
-use crate::types::BatchTransferArgs;
+use crate::state::ledger::{BatchTransferArgs, LedgerData};
 use crate::{
     account::AccountInternal,
-    state::{
-        balances::{Balances, StableBalances},
-        CanisterState,
-    },
+    state::balances::{Balances, StableBalances},
 };
-use crate::{canister::auction_account, state::stats::StatsData};
+use crate::{canister::auction_account, state::config::TokenConfig};
 
 use super::is20_transactions::batch_transfer_internal;
 
-pub fn disburse_rewards(
-    canister_state: &mut CanisterState,
-    auction_state: &AuctionState,
-) -> Result<AuctionInfo, AuctionError> {
-    let CanisterState { ref mut ledger, .. } = *canister_state;
-
+pub fn disburse_rewards(auction_state: &AuctionState) -> Result<AuctionInfo, AuctionError> {
     let AuctionState {
         ref bidding_state,
         ref history,
@@ -38,7 +30,7 @@ pub fn disburse_rewards(
     let mut transferred_amount = Tokens128::from(0u128);
     let total_cycles = bidding_state.cycles_since_auction;
 
-    let first_transaction_id = ledger.len();
+    let first_transaction_id = LedgerData::len();
 
     let mut transfers = vec![];
     for (bidder, cycles) in &bidding_state.bids {
@@ -50,13 +42,13 @@ pub fn disburse_rewards(
             receiver: (*bidder).into(),
             amount,
         });
-        ledger.record_auction(*bidder, amount);
+        LedgerData::record_auction(*bidder, amount);
         transferred_amount = (transferred_amount + amount)
             .ok_or_else(|| ic::trap("Token amount overflow on auction bids distribution."))
             .unwrap();
     }
 
-    let stats = StatsData::get_stable();
+    let stats = TokenConfig::get_stable();
     let (fee, fee_to) = stats.fee_info();
 
     if let Err(e) = batch_transfer_internal(
@@ -70,7 +62,7 @@ pub fn disburse_rewards(
         ic::trap(&format!("Failed to transfer tokens to the bidders: {e}"));
     }
 
-    let last_transaction_id = ledger.len() - 1;
+    let last_transaction_id = LedgerData::len() - 1;
     let result = AuctionInfo {
         auction_id: history.len(),
         auction_time: canister_sdk::ic_kit::ic::time(),
@@ -101,7 +93,7 @@ mod tests {
         ic_metrics::Interval,
     };
 
-    use crate::state::stats::Metadata;
+    use crate::state::config::Metadata;
     use crate::{mock::*, state};
 
     use super::*;

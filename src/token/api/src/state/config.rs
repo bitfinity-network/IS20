@@ -7,7 +7,7 @@ use ic_stable_structures::{memory_manager::MemoryId, Storable};
 use crate::storage::{self, StableCell};
 
 #[derive(Deserialize, CandidType, Clone, Debug)]
-pub struct StatsData {
+pub struct TokenConfig {
     pub logo: String,
     pub name: String,
     pub symbol: String,
@@ -20,18 +20,18 @@ pub struct StatsData {
     pub is_test_token: bool,
 }
 
-impl StatsData {
-    /// Get stats data stored in stable memory.
-    pub fn get_stable() -> StatsData {
+impl TokenConfig {
+    /// Get config data stored in stable memory.
+    pub fn get_stable() -> TokenConfig {
         CELL.with(|c| c.borrow().get().clone())
     }
 
-    /// Store stats data in stable memory.
-    pub fn set_stable(stats: StatsData) {
+    /// Store config data in stable memory.
+    pub fn set_stable(config: TokenConfig) {
         CELL.with(|c| {
             c.borrow_mut()
-                .set(stats)
-                .expect("failed to set stats data to stable memory");
+                .set(config)
+                .expect("failed to set config data to stable memory");
         })
     }
 
@@ -51,11 +51,36 @@ impl StatsData {
             ),
         ]
     }
+
+    pub fn icrc1_metadata(&self) -> Vec<(String, Value)> {
+        vec![
+            ("icrc1:symbol".to_string(), Value::Text(self.symbol.clone())),
+            ("icrc1:name".to_string(), Value::Text(self.name.clone())),
+            (
+                "icrc1:decimals".to_string(),
+                Value::Nat(Nat::from(self.decimals)),
+            ),
+            ("icrc1:fee".to_string(), Value::Nat(self.fee.amount.into())),
+        ]
+    }
+
+    pub fn get_metadata(&self) -> Metadata {
+        Metadata {
+            logo: self.logo.clone(),
+            name: self.name.clone(),
+            symbol: self.symbol.clone(),
+            decimals: self.decimals,
+            owner: self.owner,
+            fee: self.fee,
+            fee_to: self.fee_to,
+            is_test_token: Some(self.is_test_token),
+        }
+    }
 }
 
-impl Default for StatsData {
+impl Default for TokenConfig {
     fn default() -> Self {
-        StatsData {
+        TokenConfig {
             logo: "".to_string(),
             name: "".to_string(),
             symbol: "".to_string(),
@@ -70,7 +95,7 @@ impl Default for StatsData {
     }
 }
 
-impl Storable for StatsData {
+impl Storable for TokenConfig {
     fn to_bytes(&self) -> Cow<[u8]> {
         Cow::Owned(Encode!(self).unwrap())
     }
@@ -109,7 +134,7 @@ pub struct Metadata {
 // for the default auction cycle, which is 1 day.
 pub const DEFAULT_MIN_CYCLES: u64 = 10_000_000_000_000;
 
-impl From<Metadata> for StatsData {
+impl From<Metadata> for TokenConfig {
     fn from(md: Metadata) -> Self {
         Self {
             logo: md.logo,
@@ -148,13 +173,49 @@ pub enum Value {
 
 pub type Timestamp = u64;
 
-const STATS_MEMORY_ID: MemoryId = MemoryId::new(0);
+#[derive(CandidType, Default, Debug, Copy, Clone, Deserialize, PartialEq)]
+pub struct FeeRatio(f64);
+
+impl FeeRatio {
+    pub fn new(value: f64) -> Self {
+        let adj_value = if value < 0.0 {
+            0.0
+        } else if value > 1.0 {
+            1.0
+        } else {
+            value
+        };
+
+        Self(adj_value)
+    }
+
+    /// Returns the tupple (raw_fee, auction_fee). Raw fee is the fee amount to be transferred to
+    /// the canister owner, and auction_fee is the portion of the fee for the cycle auction.
+    pub(crate) fn get_value(&self, fee: Tokens128) -> (Tokens128, Tokens128) {
+        // Both auction fee and owner fee have the same purpose of providing the tokens to pay for
+        // the canister operations. As such we do not care much about rounding errors in this case.
+        // The only important thing to make sure that the sum of auction fee and the owner fee is
+        // equal to the total fee amount.
+        let auction_fee_amount = Tokens128::from((f64::from(fee) * self.0) as u128);
+        let owner_fee_amount = fee.saturating_sub(auction_fee_amount);
+
+        (owner_fee_amount, auction_fee_amount)
+    }
+}
+
+impl From<FeeRatio> for f64 {
+    fn from(v: FeeRatio) -> Self {
+        v.0
+    }
+}
+
+const CONFIG_MEMORY_ID: MemoryId = MemoryId::new(0);
 
 thread_local! {
-    static CELL: RefCell<StableCell<StatsData>> = {
-            let memory = storage::get_memory_by_id(STATS_MEMORY_ID);
-            let default_data = StatsData::default();
-            let cell = StableCell::init(memory, default_data).expect("stats cell initialization failed");
+    static CELL: RefCell<StableCell<TokenConfig>> = {
+            let memory = storage::get_memory_by_id(CONFIG_MEMORY_ID);
+            let default_data = TokenConfig::default();
+            let cell = StableCell::init(memory, default_data).expect("config cell initialization failed");
             RefCell::new(cell)
     }
 }

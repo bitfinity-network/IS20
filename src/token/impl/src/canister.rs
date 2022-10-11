@@ -18,11 +18,11 @@ use canister_sdk::{ic_cdk, ic_cdk_macros::inspect_message};
 use std::{cell::RefCell, rc::Rc};
 use token_api::{
     account::AccountInternal,
-    canister::{TokenCanisterAPI, DEFAULT_AUCTION_PERIOD_SECONDS},
+    canister::{DummyState, TokenCanisterAPI, DEFAULT_AUCTION_PERIOD_SECONDS},
     state::{
         balances::{Balances, StableBalances},
-        stats::{Metadata, StatsData},
-        CanisterState,
+        config::{Metadata, TokenConfig},
+        ledger::LedgerData,
     },
 };
 
@@ -41,13 +41,13 @@ impl TokenCanister {
 
         StableBalances.insert(owner_account, amount);
 
-        self.state().borrow_mut().ledger.mint(
+        LedgerData::mint(
             AccountInternal::from(owner),
             AccountInternal::from(owner),
             amount,
         );
 
-        StatsData::set_stable(metadata.into());
+        TokenConfig::set_stable(metadata.into());
 
         let auction_state = self.auction_state();
         auction_state.replace(AuctionState::new(
@@ -70,7 +70,7 @@ impl TokenCanister {
 
     #[query]
     pub fn state_check(&self) -> CandidHeader {
-        candid_header::<CanisterState>()
+        candid_header::<DummyState>()
     }
 }
 
@@ -102,8 +102,8 @@ impl PreUpdate for TokenCanister {
 }
 
 impl TokenCanisterAPI for TokenCanister {
-    fn state(&self) -> Rc<RefCell<CanisterState>> {
-        CanisterState::get()
+    fn state(&self) -> Rc<RefCell<DummyState>> {
+        DummyState::get()
     }
 }
 
@@ -113,10 +113,7 @@ impl Auction for TokenCanister {
     }
 
     fn disburse_rewards(&self) -> Result<AuctionInfo, AuctionError> {
-        token_api::canister::is20_auction::disburse_rewards(
-            &mut self.state().borrow_mut(),
-            &self.auction_state().borrow(),
-        )
+        token_api::canister::is20_auction::disburse_rewards(&self.auction_state().borrow())
     }
 }
 
@@ -138,9 +135,9 @@ mod test {
 
         // Set a value on the state and write it to stable storage.
         let canister = TokenCanister::init_instance();
-        let mut stats = StatsData::get_stable();
+        let mut stats = TokenConfig::get_stable();
         stats.name = "To Kill a Mockingbird".to_string();
-        StatsData::set_stable(stats);
+        TokenConfig::set_stable(stats);
 
         canister.__pre_upgrade();
         canister.__post_upgrade();
@@ -148,7 +145,7 @@ mod test {
         // Upgrade the canister should have the state
         // written before pre_upgrade
         assert_eq!(
-            StatsData::get_stable().name,
+            TokenConfig::get_stable().name,
             "To Kill a Mockingbird".to_string()
         );
     }

@@ -7,13 +7,13 @@ use crate::{
     account::{AccountInternal, CheckedAccount, Subaccount, WithRecipient},
     error::TxError,
     principal::{CheckedPrincipal, Owner, TestNet},
+    state::ledger::{BatchTransferArgs, TransferArgs, TxReceipt},
     state::{
         balances::{Balances, LocalBalances, StableBalances},
-        stats::StatsData,
-        CanisterState, FeeRatio,
+        config::{FeeRatio, TokenConfig},
+        ledger::LedgerData,
     },
     tx_record::TxId,
-    types::{BatchTransferArgs, TransferArgs, TxReceipt},
 };
 
 use super::{
@@ -22,17 +22,16 @@ use super::{
 };
 
 pub fn is20_transfer(
-    state: &mut CanisterState,
     caller: CheckedAccount<WithRecipient>,
     transfer: &TransferArgs,
     auction_fee_ratio: f64,
 ) -> TxReceipt {
     let from = caller.inner();
     let to = caller.recipient();
-    let created_at_time = validate_and_get_tx_ts(state, from.owner, transfer)?;
+    let created_at_time = validate_and_get_tx_ts(from.owner, transfer)?;
     let TransferArgs { amount, memo, .. } = transfer;
 
-    let stats = StatsData::get_stable();
+    let stats = TokenConfig::get_stable();
     let (fee, fee_to) = stats.fee_info();
 
     if let Some(requested_fee) = transfer.fee {
@@ -51,9 +50,7 @@ pub fn is20_transfer(
         FeeRatio::new(auction_fee_ratio),
     )?;
 
-    let id = state
-        .ledger
-        .transfer(from, to, *amount, fee, *memo, created_at_time);
+    let id = LedgerData::transfer(from, to, *amount, fee, *memo, created_at_time);
     Ok(id.into())
 }
 
@@ -114,11 +111,7 @@ pub(crate) fn transfer_internal(
     Ok(())
 }
 
-fn validate_and_get_tx_ts(
-    state: &CanisterState,
-    caller: Principal,
-    transfer_args: &TransferArgs,
-) -> Result<u64, TxError> {
+fn validate_and_get_tx_ts(caller: Principal, transfer_args: &TransferArgs) -> Result<u64, TxError> {
     let now = ic::time();
     let from = AccountInternal::new(caller, transfer_args.from_subaccount);
     let to = transfer_args.to.into();
@@ -135,7 +128,8 @@ fn validate_and_get_tx_ts(
                 return Err(TxError::CreatedInFuture { ledger_time: now });
             }
 
-            for tx in state.ledger.iter().rev() {
+            let txs = LedgerData::list_transactions();
+            for tx in txs.iter().rev() {
                 if now.saturating_sub(tx.timestamp) > TX_WINDOW + PERMITTED_DRIFT {
                     break;
                 }
@@ -162,12 +156,7 @@ fn validate_and_get_tx_ts(
     Ok(created_at_time)
 }
 
-pub fn mint(
-    state: &mut CanisterState,
-    caller: Principal,
-    to: AccountInternal,
-    amount: Tokens128,
-) -> TxReceipt {
+pub fn mint(caller: Principal, to: AccountInternal, amount: Tokens128) -> TxReceipt {
     let total_supply = StableBalances.total_supply();
     if (total_supply + amount).is_none() {
         // If we allow to mint more then Tokens128::MAX then simple operations such as getting
@@ -179,20 +168,18 @@ pub fn mint(
     let new_balance = (balance + amount).ok_or(TxError::AmountOverflow)?;
     StableBalances.insert(to, new_balance);
 
-    let id = state.ledger.mint(caller.into(), to, amount);
+    let id = LedgerData::mint(caller.into(), to, amount);
 
     Ok(id.into())
 }
 
 pub fn mint_test_token(
-    state: &mut CanisterState,
     caller: CheckedPrincipal<TestNet>,
     to: Principal,
     to_subaccount: Option<Subaccount>,
     amount: Tokens128,
 ) -> TxReceipt {
     mint(
-        state,
         caller.inner(),
         AccountInternal::new(to, to_subaccount),
         amount,
@@ -200,26 +187,19 @@ pub fn mint_test_token(
 }
 
 pub fn mint_as_owner(
-    state: &mut CanisterState,
     caller: CheckedPrincipal<Owner>,
     to: Principal,
     to_subaccount: Option<Subaccount>,
     amount: Tokens128,
 ) -> TxReceipt {
     mint(
-        state,
         caller.inner(),
         AccountInternal::new(to, to_subaccount),
         amount,
     )
 }
 
-pub fn burn(
-    state: &mut CanisterState,
-    caller: Principal,
-    from: AccountInternal,
-    amount: Tokens128,
-) -> TxReceipt {
+pub fn burn(caller: Principal, from: AccountInternal, amount: Tokens128) -> TxReceipt {
     let balance = StableBalances.balance_of(&from);
 
     if !amount.is_zero() && balance.is_zero() {
@@ -234,18 +214,13 @@ pub fn burn(
         StableBalances.insert(from, new_balance)
     }
 
-    let id = state.ledger.burn(caller.into(), from, amount);
+    let id = LedgerData::burn(caller.into(), from, amount);
     Ok(id.into())
 }
 
-pub fn burn_own_tokens(
-    state: &mut CanisterState,
-    from_subaccount: Option<Subaccount>,
-    amount: Tokens128,
-) -> TxReceipt {
+pub fn burn_own_tokens(from_subaccount: Option<Subaccount>, amount: Tokens128) -> TxReceipt {
     let caller = ic::caller();
     burn(
-        state,
         caller,
         AccountInternal::new(caller, from_subaccount),
         amount,
@@ -253,14 +228,12 @@ pub fn burn_own_tokens(
 }
 
 pub fn burn_as_owner(
-    state: &mut CanisterState,
     caller: CheckedPrincipal<Owner>,
     from: Principal,
     from_subaccount: Option<Subaccount>,
     amount: Tokens128,
 ) -> TxReceipt {
     burn(
-        state,
         caller.inner(),
         AccountInternal::new(from, from_subaccount),
         amount,
@@ -281,11 +254,7 @@ pub fn get_claim_subaccount(
 }
 
 #[cfg(feature = "claim")]
-pub fn claim(
-    state: &mut CanisterState,
-    holder: Principal,
-    subaccount: Option<Subaccount>,
-) -> TxReceipt {
+pub fn claim(holder: Principal, subaccount: Option<Subaccount>) -> TxReceipt {
     let caller = canister_sdk::ic_kit::ic::caller();
     let claim_subaccount = get_claim_subaccount(caller, subaccount);
     let claim_account = AccountInternal::new(holder, Some(claim_subaccount));
@@ -294,7 +263,7 @@ pub fn claim(
         return Err(TxError::NothingToClaim);
     }
 
-    let stats = StatsData::get_stable();
+    let stats = TokenConfig::get_stable();
     transfer_internal(
         &mut StableBalances,
         claim_account,
@@ -304,23 +273,19 @@ pub fn claim(
         stats.owner.into(),
         FeeRatio::default(),
     )?;
-    let id = state
-        .ledger
-        .claim(claim_account, AccountInternal::new(caller, None), amount);
+    let id = LedgerData::claim(claim_account, AccountInternal::new(caller, None), amount);
     Ok(id.into())
 }
 
 pub fn batch_transfer(
-    state: &mut CanisterState,
     from_subaccount: Option<Subaccount>,
     transfers: Vec<BatchTransferArgs>,
     auction_fee_ratio: f64,
 ) -> Result<Vec<TxId>, TxError> {
     let caller = canister_sdk::ic_kit::ic::caller();
     let from = AccountInternal::new(caller, from_subaccount);
-    let CanisterState { ref mut ledger, .. } = state;
 
-    let stats = StatsData::get_stable();
+    let stats = TokenConfig::get_stable();
     let (fee, fee_to) = stats.fee_info();
 
     batch_transfer_internal(
@@ -331,7 +296,7 @@ pub fn batch_transfer(
         fee_to,
         auction_fee_ratio,
     )?;
-    let id = ledger.batch_transfer(from, transfers, fee);
+    let id = LedgerData::batch_transfer(from, transfers, fee);
     Ok(id)
 }
 
@@ -398,7 +363,7 @@ mod tests {
         account::{Account, DEFAULT_SUBACCOUNT},
         canister::TokenCanisterAPI,
         mock::TokenCanisterMock,
-        state::{self, stats::Metadata},
+        state::{self, config::Metadata},
     };
 
     use super::*;
@@ -430,9 +395,9 @@ mod tests {
         // pass, because since we are running auction state on each
         // endpoint call, it affects `BiddingInfo.fee_ratio` that is
         // used for charging fees in `approve` endpoint.
-        let mut stats = StatsData::get_stable();
+        let mut stats = TokenConfig::get_stable();
         stats.min_cycles = 0;
-        StatsData::set_stable(stats);
+        TokenConfig::set_stable(stats);
 
         canister
     }
@@ -474,10 +439,10 @@ mod tests {
     fn batch_transfer_with_fee() {
         let canister = test_canister();
 
-        let mut stats = StatsData::get_stable();
+        let mut stats = TokenConfig::get_stable();
         stats.fee = Tokens128::from(50);
         stats.fee_to = john();
-        StatsData::set_stable(stats);
+        TokenConfig::set_stable(stats);
 
         assert_eq!(
             Tokens128::from(1000),
@@ -594,12 +559,12 @@ mod tests {
             created_at_time: Some(curr_time),
         };
 
-        assert!(validate_and_get_tx_ts(&canister.state().borrow(), alice(), &transfer).is_ok());
+        assert!(validate_and_get_tx_ts(alice(), &transfer).is_ok());
 
         let tx_id = canister.icrc1_transfer(transfer.clone()).unwrap();
 
         assert_eq!(
-            validate_and_get_tx_ts(&canister.state().borrow(), alice(), &transfer),
+            validate_and_get_tx_ts(alice(), &transfer),
             Err(TxError::Duplicate {
                 duplicate_of: tx_id as u64
             })
@@ -621,31 +586,31 @@ mod tests {
         };
 
         let _ = canister.icrc1_transfer(transfer.clone()).unwrap();
-        assert!(validate_and_get_tx_ts(&canister.state().borrow(), john(), &transfer).is_ok());
+        assert!(validate_and_get_tx_ts(john(), &transfer).is_ok());
 
         let mut tx = transfer.clone();
         tx.from_subaccount = Some([0; 32]);
-        assert!(validate_and_get_tx_ts(&canister.state().borrow(), john(), &tx).is_ok());
+        assert!(validate_and_get_tx_ts(john(), &tx).is_ok());
 
         let mut tx = transfer.clone();
         tx.amount = 10_001.into();
-        assert!(validate_and_get_tx_ts(&canister.state().borrow(), john(), &tx).is_ok());
+        assert!(validate_and_get_tx_ts(john(), &tx).is_ok());
 
         let mut tx = transfer.clone();
         tx.fee = Some(0.into());
-        assert!(validate_and_get_tx_ts(&canister.state().borrow(), john(), &tx).is_ok());
+        assert!(validate_and_get_tx_ts(john(), &tx).is_ok());
 
         let mut tx = transfer.clone();
         tx.memo = Some([0; 32]);
-        assert!(validate_and_get_tx_ts(&canister.state().borrow(), john(), &tx).is_ok());
+        assert!(validate_and_get_tx_ts(john(), &tx).is_ok());
 
         let mut tx = transfer.clone();
         tx.created_at_time = None;
-        assert!(validate_and_get_tx_ts(&canister.state().borrow(), john(), &tx).is_ok());
+        assert!(validate_and_get_tx_ts(john(), &tx).is_ok());
 
         let mut tx = transfer;
         tx.created_at_time = Some(curr_time + 1);
-        assert!(validate_and_get_tx_ts(&canister.state().borrow(), john(), &tx).is_ok());
+        assert!(validate_and_get_tx_ts(john(), &tx).is_ok());
 
         let transfer = TransferArgs {
             from_subaccount: None,
@@ -657,15 +622,15 @@ mod tests {
         };
 
         let _ = canister.icrc1_transfer(transfer.clone()).unwrap();
-        assert!(validate_and_get_tx_ts(&canister.state().borrow(), john(), &transfer).is_ok());
+        assert!(validate_and_get_tx_ts(john(), &transfer).is_ok());
 
         let mut tx = transfer.clone();
         tx.memo = None;
-        assert!(validate_and_get_tx_ts(&canister.state().borrow(), john(), &tx).is_ok());
+        assert!(validate_and_get_tx_ts(john(), &tx).is_ok());
 
         let mut tx = transfer;
         tx.memo = Some([2; 32]);
-        assert!(validate_and_get_tx_ts(&canister.state().borrow(), john(), &tx).is_ok());
+        assert!(validate_and_get_tx_ts(john(), &tx).is_ok());
     }
 
     #[test]
@@ -682,7 +647,7 @@ mod tests {
         };
 
         let _ = canister.icrc1_transfer(transfer.clone()).unwrap();
-        assert!(validate_and_get_tx_ts(&canister.state().borrow(), alice(), &transfer).is_ok());
+        assert!(validate_and_get_tx_ts(alice(), &transfer).is_ok());
     }
 
     #[test]
@@ -699,12 +664,7 @@ mod tests {
 
         let caller = CheckedAccount::with_recipient(transfer.to.into(), None).unwrap();
 
-        let res = is20_transfer(
-            &mut canister.state().borrow_mut(),
-            caller,
-            &transfer,
-            canister.bidding_info().fee_ratio,
-        );
+        let res = is20_transfer(caller, &transfer, canister.bidding_info().fee_ratio);
         assert_eq!(res, Err(TxError::AmountTooSmall));
     }
 
@@ -712,9 +672,9 @@ mod tests {
     fn transfer_with_overflow() {
         let canister = test_canister();
 
-        let mut stats = StatsData::get_stable();
+        let mut stats = TokenConfig::get_stable();
         stats.fee = 100500.into();
-        StatsData::set_stable(stats);
+        TokenConfig::set_stable(stats);
 
         let transfer = TransferArgs {
             from_subaccount: None,
@@ -727,12 +687,7 @@ mod tests {
 
         let caller = CheckedAccount::with_recipient(transfer.to.into(), None).unwrap();
 
-        let res = is20_transfer(
-            &mut canister.state().borrow_mut(),
-            caller,
-            &transfer,
-            canister.bidding_info().fee_ratio,
-        );
+        let res = is20_transfer(caller, &transfer, canister.bidding_info().fee_ratio);
         assert_eq!(
             res,
             Err(TxError::InsufficientFunds {
@@ -743,20 +698,10 @@ mod tests {
 
     #[test]
     fn mint_too_much() {
-        let canister = test_canister();
-        mint(
-            &mut canister.state().borrow_mut(),
-            alice(),
-            bob().into(),
-            Tokens128::from(u128::MAX - 2000),
-        )
-        .unwrap();
-        let res = mint(
-            &mut canister.state().borrow_mut(),
-            alice(),
-            john().into(),
-            Tokens128::from(2000),
-        );
+        let _ = test_canister(); // initialize context
+
+        mint(alice(), bob().into(), Tokens128::from(u128::MAX - 2000)).unwrap();
+        let res = mint(alice(), john().into(), Tokens128::from(2000));
         assert_eq!(res, Err(TxError::AmountOverflow));
     }
 
@@ -773,13 +718,7 @@ mod tests {
         };
         let caller = CheckedAccount::with_recipient(transfer.to.into(), None).unwrap();
 
-        is20_transfer(
-            &mut canister.state().borrow_mut(),
-            caller,
-            &transfer,
-            canister.bidding_info().fee_ratio,
-        )
-        .unwrap();
+        is20_transfer(caller, &transfer, canister.bidding_info().fee_ratio).unwrap();
         assert_eq!(canister.icrc1_balance_of(alice().into()), 800.into());
         assert_eq!(canister.icrc1_balance_of(transfer.to), 200.into());
     }
@@ -797,13 +736,7 @@ mod tests {
         };
         let caller = CheckedAccount::with_recipient(transfer.to.into(), None).unwrap();
 
-        is20_transfer(
-            &mut canister.state().borrow_mut(),
-            caller,
-            &transfer,
-            canister.bidding_info().fee_ratio,
-        )
-        .unwrap();
+        is20_transfer(caller, &transfer, canister.bidding_info().fee_ratio).unwrap();
         assert_eq!(canister.icrc1_balance_of(bob().into()), 200.into());
     }
 
@@ -823,12 +756,7 @@ mod tests {
             created_at_time: Some(now + 121_000_000_000),
         };
         let caller = CheckedAccount::with_recipient(bob().into(), None).unwrap();
-        let result = is20_transfer(
-            &mut canister.state().borrow_mut(),
-            caller,
-            &delayed_transfer,
-            canister.bidding_info().fee_ratio,
-        );
+        let result = is20_transfer(caller, &delayed_transfer, canister.bidding_info().fee_ratio);
         assert_eq!(result, Err(TxError::CreatedInFuture { ledger_time: now }));
 
         let transfer = TransferArgs {
@@ -841,33 +769,17 @@ mod tests {
         };
 
         let caller = CheckedAccount::with_recipient(bob().into(), None).unwrap();
-        is20_transfer(
-            &mut canister.state().borrow_mut(),
-            caller,
-            &transfer,
-            canister.bidding_info().fee_ratio,
-        )
-        .unwrap();
+        is20_transfer(caller, &transfer, canister.bidding_info().fee_ratio).unwrap();
 
         let context = MockContext::new().with_caller(alice()).inject();
         context.add_time(61_000_000_000);
 
         let caller = CheckedAccount::with_recipient(bob().into(), None).unwrap();
-        let tx_id = is20_transfer(
-            &mut canister.state().borrow_mut(),
-            caller,
-            &delayed_transfer,
-            canister.bidding_info().fee_ratio,
-        )
-        .unwrap();
+        let tx_id =
+            is20_transfer(caller, &delayed_transfer, canister.bidding_info().fee_ratio).unwrap();
 
         let caller = CheckedAccount::with_recipient(bob().into(), None).unwrap();
-        let result = is20_transfer(
-            &mut canister.state().borrow_mut(),
-            caller,
-            &delayed_transfer,
-            canister.bidding_info().fee_ratio,
-        );
+        let result = is20_transfer(caller, &delayed_transfer, canister.bidding_info().fee_ratio);
         assert_eq!(
             result,
             Err(TxError::Duplicate {
@@ -878,12 +790,7 @@ mod tests {
         context.add_time(60_000_000_000);
 
         let caller = CheckedAccount::with_recipient(bob().into(), None).unwrap();
-        let result = is20_transfer(
-            &mut canister.state().borrow_mut(),
-            caller,
-            &delayed_transfer,
-            canister.bidding_info().fee_ratio,
-        );
+        let result = is20_transfer(caller, &delayed_transfer, canister.bidding_info().fee_ratio);
         assert_eq!(
             result,
             Err(TxError::Duplicate {
@@ -894,12 +801,7 @@ mod tests {
         context.add_time(180_000_000_000);
 
         let caller = CheckedAccount::with_recipient(bob().into(), None).unwrap();
-        let result = is20_transfer(
-            &mut canister.state().borrow_mut(),
-            caller,
-            &delayed_transfer,
-            canister.bidding_info().fee_ratio,
-        );
+        let result = is20_transfer(caller, &delayed_transfer, canister.bidding_info().fee_ratio);
         assert_eq!(
             result,
             Err(TxError::TooOld {
@@ -920,22 +822,18 @@ mod tests {
         };
 
         let caller = CheckedAccount::with_recipient(bob().into(), None).unwrap();
-        is20_transfer(
-            &mut canister.state().borrow_mut(),
-            caller,
-            &transfer,
-            canister.bidding_info().fee_ratio,
-        )
-        .unwrap();
+        is20_transfer(caller, &transfer, canister.bidding_info().fee_ratio).unwrap();
     }
 
     #[cfg(feature = "claim")]
     #[test]
     fn zero_claim_returns_error() {
-        let canister = test_canister();
+        // Refresh global stable memory.
+        state::clear();
+
         MockContext::new().with_caller(john()).inject();
 
-        let res = claim(&mut canister.state.borrow_mut(), alice(), None);
+        let res = claim(alice(), None);
         assert_eq!(res, Err(TxError::NothingToClaim));
     }
 }

@@ -76,6 +76,25 @@ impl StableBalances {
                 StableBTreeMap::new(memory, KEY_BYTES_LEN as u32, VALUE_BYTES_LEN as u32);
         });
     }
+
+    #[cfg(feature = "claim")]
+    pub fn get_claimable_amount(holder: Principal, subaccount: Option<Subaccount>) -> Tokens128 {
+        use crate::account::DEFAULT_SUBACCOUNT;
+        use canister_sdk::ledger_canister::{
+            AccountIdentifier, Subaccount as SubaccountIdentifier,
+        };
+
+        let claim_subaccount = AccountIdentifier::new(
+            canister_sdk::ic_kit::ic::caller().into(),
+            Some(SubaccountIdentifier(
+                subaccount.unwrap_or(DEFAULT_SUBACCOUNT),
+            )),
+        )
+        .to_address();
+
+        let account = AccountInternal::new(holder, Some(claim_subaccount));
+        Self.balance_of(&account)
+    }
 }
 
 impl Balances for StableBalances {

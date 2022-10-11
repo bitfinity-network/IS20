@@ -27,7 +27,8 @@ use canister_sdk::{
     ic_kit::ic,
     ic_storage,
 };
-use token::state::stats::Metadata;
+use token::canister::DummyState;
+use token::state::config::Metadata;
 
 const DEFAULT_LEDGER_PRINCIPAL: Principal = Principal::from_slice(&[0, 0, 0, 0, 0, 0, 0, 2, 1, 1]);
 
@@ -112,9 +113,9 @@ impl TokenFactoryCanister {
 
     #[update]
     pub async fn set_token_bytecode(&self, bytecode: Vec<u8>) -> Result<u32, FactoryError> {
-        let state_header = candid_header::<token::state::CanisterState>();
+        let state_header = candid_header::<DummyState>();
         self.state.borrow_mut().token_wasm = Some(bytecode.clone());
-        self.set_canister_code::<token::state::CanisterState>(bytecode, state_header)
+        self.set_canister_code::<DummyState>(bytecode, state_header)
     }
 
     /// Creates a new token.
@@ -192,7 +193,7 @@ impl TokenFactoryCanister {
 
     #[update]
     pub async fn upgrade(&mut self) -> Result<HashMap<Principal, UpgradeResult>, FactoryError> {
-        self.upgrade_canister::<token::state::CanisterState>().await
+        self.upgrade_canister::<DummyState>().await
     }
 
     #[query]

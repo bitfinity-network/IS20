@@ -11,16 +11,16 @@ use canister_sdk::{
     ic_canister::{self, Canister, PreUpdate},
     ic_helpers::tokens::Tokens128,
     ic_metrics::Interval,
-    ic_storage::{self, IcStorage},
+    ic_storage::IcStorage,
 };
 
 use crate::{
     account::AccountInternal,
-    canister::TokenCanisterAPI,
+    canister::{DummyState, TokenCanisterAPI},
     state::{
         balances::{Balances, StableBalances},
-        stats::{Metadata, StatsData},
-        CanisterState,
+        config::{Metadata, TokenConfig},
+        ledger::LedgerData,
     },
 };
 
@@ -28,9 +28,6 @@ use crate::{
 pub struct TokenCanisterMock {
     #[id]
     principal: Principal,
-
-    #[state]
-    pub(crate) state: Rc<RefCell<CanisterState>>,
 }
 
 impl TokenCanisterMock {
@@ -39,12 +36,9 @@ impl TokenCanisterMock {
         let owner_account = AccountInternal::new(metadata.owner, None);
         StableBalances.insert(owner_account, amount);
 
-        self.state
-            .borrow_mut()
-            .ledger
-            .mint(metadata.owner.into(), metadata.owner.into(), amount);
+        LedgerData::mint(metadata.owner.into(), metadata.owner.into(), amount);
 
-        StatsData::set_stable(metadata.into());
+        TokenConfig::set_stable(metadata.into());
 
         #[cfg(feature = "auction")]
         {
@@ -74,16 +68,13 @@ impl Auction for TokenCanisterMock {
     }
 
     fn disburse_rewards(&self) -> Result<AuctionInfo, AuctionError> {
-        crate::canister::is20_auction::disburse_rewards(
-            &mut self.state().borrow_mut(),
-            &self.auction_state().borrow(),
-        )
+        crate::canister::is20_auction::disburse_rewards(&self.auction_state().borrow())
     }
 }
 
 impl TokenCanisterAPI for TokenCanisterMock {
     #[cfg_attr(coverage_nightly, no_coverage)]
-    fn state(&self) -> Rc<RefCell<CanisterState>> {
-        self.state.clone()
+    fn state(&self) -> Rc<RefCell<DummyState>> {
+        Rc::new(RefCell::new(DummyState))
     }
 }
