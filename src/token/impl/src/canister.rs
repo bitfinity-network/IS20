@@ -1,24 +1,21 @@
-use candid::Principal;
 use canister_sdk::{
     ic_auction::{
         api::Auction,
         error::AuctionError,
         state::{AuctionInfo, AuctionState},
     },
-    ic_canister::{self, init, post_upgrade, pre_upgrade, query, Canister, PreUpdate},
-    ic_helpers::{
-        candid_header::{candid_header, CandidHeader},
-        tokens::Tokens128,
-    },
+    ic_canister::{self, init, post_upgrade, pre_upgrade, Canister, PreUpdate},
+    ic_helpers::tokens::Tokens128,
     ic_metrics::{Interval, Metrics, MetricsStorage},
     ic_storage::IcStorage,
 };
 #[cfg(feature = "export-api")]
 use canister_sdk::{ic_cdk, ic_cdk_macros::inspect_message};
+use ic_exports::Principal;
 use std::{cell::RefCell, rc::Rc};
 use token_api::{
     account::AccountInternal,
-    canister::{DummyState, TokenCanisterAPI, DEFAULT_AUCTION_PERIOD_SECONDS},
+    canister::{TokenCanisterAPI, DEFAULT_AUCTION_PERIOD_SECONDS},
     state::{
         balances::{Balances, StableBalances},
         config::{Metadata, TokenConfig},
@@ -67,11 +64,6 @@ impl TokenCanister {
     fn post_upgrade(&self) {
         // All required canister state stored in stable memory, so no need to save/load anything.
     }
-
-    #[query]
-    pub fn state_check(&self) -> CandidHeader {
-        candid_header::<DummyState>()
-    }
 }
 
 #[cfg(feature = "export-api")]
@@ -101,11 +93,7 @@ impl PreUpdate for TokenCanister {
     }
 }
 
-impl TokenCanisterAPI for TokenCanister {
-    fn state(&self) -> Rc<RefCell<DummyState>> {
-        DummyState::get()
-    }
-}
+impl TokenCanisterAPI for TokenCanister {}
 
 impl Auction for TokenCanister {
     fn auction_state(&self) -> Rc<RefCell<AuctionState>> {

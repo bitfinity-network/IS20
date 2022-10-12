@@ -3,11 +3,7 @@ pub mod canister;
 
 pub fn idl() -> String {
     use crate::canister::TokenCanister;
-    use canister_sdk::{
-        ic_auction::api::Auction,
-        ic_canister::Idl,
-        ic_helpers::{candid_header::CandidHeader, tokens::Tokens128},
-    };
+    use canister_sdk::{ic_auction::api::Auction, ic_canister::Idl, ic_helpers::tokens::Tokens128};
     use token_api::canister::TokenCanisterAPI;
     use token_api::state::config::Metadata;
 

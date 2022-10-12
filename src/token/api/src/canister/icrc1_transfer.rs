@@ -967,7 +967,7 @@ mod tests {
 
 #[cfg(test)]
 mod proptests {
-    use candid::Principal;
+    use ic_exports::Principal;
     use canister_sdk::ic_canister::Canister;
     use canister_sdk::ic_helpers::tokens::Tokens128;
     use canister_sdk::ic_kit::MockContext;

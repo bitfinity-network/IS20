@@ -1,6 +1,6 @@
 use std::{cell::RefCell, rc::Rc};
 
-use candid::Principal;
+use ic_exports::Principal;
 #[cfg(feature = "auction")]
 use canister_sdk::ic_auction::{
     api::Auction,
@@ -16,7 +16,7 @@ use canister_sdk::{
 
 use crate::{
     account::AccountInternal,
-    canister::{DummyState, TokenCanisterAPI},
+    canister::{TokenCanisterAPI},
     state::{
         balances::{Balances, StableBalances},
         config::{Metadata, TokenConfig},
@@ -72,9 +72,4 @@ impl Auction for TokenCanisterMock {
     }
 }
 
-impl TokenCanisterAPI for TokenCanisterMock {
-    #[cfg_attr(coverage_nightly, no_coverage)]
-    fn state(&self) -> Rc<RefCell<DummyState>> {
-        Rc::new(RefCell::new(DummyState))
-    }
-}
+impl TokenCanisterAPI for TokenCanisterMock {}

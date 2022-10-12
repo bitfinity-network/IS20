@@ -1,7 +1,7 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use candid::{CandidType, Deserialize};
+use candid::Principal;
 #[cfg(feature = "auction")]
 use canister_sdk::ic_auction::{
     api::Auction,
@@ -10,13 +10,10 @@ use canister_sdk::ic_auction::{
 };
 
 use canister_sdk::{
-    ic_canister::{
-        generate_exports, generate_idl, query, state_getter, update, Canister, Idl, PreUpdate,
-    },
-    ic_cdk::export::candid::Principal,
+    ic_canister::{generate_exports, generate_idl, query, update, Canister, Idl, PreUpdate},
     ic_helpers::tokens::Tokens128,
     ic_kit::ic,
-    ic_storage::{self, stable::Versioned, IcStorage},
+    ic_storage::IcStorage,
 };
 
 pub use inspect::AcceptReason;
@@ -74,9 +71,6 @@ pub trait AuctionCanister: Auction {}
 impl<T: TokenCanisterAPI> AuctionCanister for T {}
 
 pub trait TokenCanisterAPI: Canister + Sized + AuctionCanister {
-    #[state_getter]
-    fn state(&self) -> Rc<RefCell<DummyState>>;
-
     /// The `inspect_message()` call is not exported by default. Add your custom #[inspect_message]
     /// function and use this method there to export the `inspect_message()` call.
     fn inspect_message(method: &str, caller: Principal) -> Result<AcceptReason, &'static str> {
@@ -391,25 +385,6 @@ pub trait TokenCanisterAPI: Canister + Sized + AuctionCanister {
 
         #[cfg(not(feature = "auction"))]
         0.0
-    }
-}
-
-/// The `generate_exports!` macro require canister with state.
-/// This struct has been prodided to met that requirement.
-#[derive(CandidType, Deserialize, Default, IcStorage)]
-pub struct DummyState;
-
-impl DummyState {
-    pub fn get() -> Rc<RefCell<Self>> {
-        Rc::new(RefCell::new(Self))
-    }
-}
-
-impl Versioned for DummyState {
-    type Previous = Self;
-
-    fn upgrade(_: Self::Previous) -> Self {
-        Self
     }
 }
 

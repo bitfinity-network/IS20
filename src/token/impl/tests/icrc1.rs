@@ -1,4 +1,4 @@
-use candid::Principal;
+use ic_exports::Principal;
 use canister_sdk::{
     ic_canister::Canister,
     ic_helpers::tokens::Tokens128,

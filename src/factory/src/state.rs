@@ -1,5 +1,5 @@
 use canister_sdk::{
-    candid::Principal,
+    ic_exports::Principal,
     ic_cdk::export::candid::CandidType,
     ic_factory::{v1::FactoryStateV1, FactoryState},
     ic_storage::{stable::Versioned, IcStorage},

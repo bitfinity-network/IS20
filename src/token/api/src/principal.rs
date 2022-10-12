@@ -1,4 +1,4 @@
-use candid::Principal;
+use ic_exports::Principal;
 
 use crate::{error::TxError, state::config::TokenConfig};
 use canister_sdk::ic_kit::ic;
