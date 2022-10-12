@@ -127,7 +127,7 @@ mod tests {
         };
 
         assert!(
-            !canister.icrc1_transfer(transfer).is_ok(),
+            canister.icrc1_transfer(transfer).is_err(),
             "minting with non zero fee must fail!"
         );
     }
@@ -149,7 +149,7 @@ mod tests {
         };
 
         assert!(
-            !canister.icrc1_transfer(transfer).is_ok(),
+            canister.icrc1_transfer(transfer).is_err(),
             "burning with non zero fee must fail!"
         );
     }
