@@ -1,6 +1,5 @@
 use std::{cell::RefCell, rc::Rc};
 
-use ic_exports::Principal;
 #[cfg(feature = "auction")]
 use canister_sdk::ic_auction::{
     api::Auction,
@@ -13,10 +12,11 @@ use canister_sdk::{
     ic_metrics::Interval,
     ic_storage::IcStorage,
 };
+use ic_exports::Principal;
 
 use crate::{
     account::AccountInternal,
-    canister::{TokenCanisterAPI},
+    canister::TokenCanisterAPI,
     state::{
         balances::{Balances, StableBalances},
         config::{Metadata, TokenConfig},

@@ -1,7 +1,7 @@
-use ic_exports::Principal;
 #[cfg(feature = "claim")]
 use canister_sdk::ledger_canister::{AccountIdentifier, Subaccount as SubaccountIdentifier};
 use canister_sdk::{ic_helpers::tokens::Tokens128, ic_kit::ic};
+use ic_exports::Principal;
 
 use crate::{
     account::{AccountInternal, CheckedAccount, Subaccount, WithRecipient},

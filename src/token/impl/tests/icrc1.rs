@@ -1,4 +1,3 @@
-use ic_exports::Principal;
 use canister_sdk::{
     ic_canister::Canister,
     ic_helpers::tokens::Tokens128,
@@ -7,6 +6,7 @@ use canister_sdk::{
         MockContext,
     },
 };
+use ic_exports::Principal;
 use is20_token_canister::canister::TokenCanister;
 use token_api::{
     account::Account,

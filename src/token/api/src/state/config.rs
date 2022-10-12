@@ -1,9 +1,9 @@
 use std::{borrow::Cow, cell::RefCell};
 
 use canister_sdk::ic_helpers::tokens::Tokens128;
-use ic_stable_structures::{memory_manager::MemoryId, Storable};
 use ic_exports::candid::{CandidType, Decode, Deserialize, Encode, Int, Nat};
 use ic_exports::Principal;
+use ic_stable_structures::{memory_manager::MemoryId, Storable};
 
 use crate::storage::{self, StableCell};
 

@@ -1,6 +1,5 @@
 //! This module contains APIs from IS20 standard providing cycle auction related functionality.
 
-use ic_exports::Principal;
 use canister_sdk::{
     ic_auction::{
         error::AuctionError,
@@ -9,6 +8,7 @@ use canister_sdk::{
     ic_helpers::tokens::Tokens128,
     ic_kit::ic,
 };
+use ic_exports::Principal;
 
 use crate::state::ledger::{BatchTransferArgs, LedgerData};
 use crate::{

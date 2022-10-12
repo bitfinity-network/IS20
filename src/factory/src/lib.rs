@@ -7,7 +7,6 @@ pub use state::State;
 
 pub fn idl() -> String {
     use crate::error::TokenFactoryError;
-    use ic_exports::Principal;
     use canister_sdk::{
         ic_canister::{generate_idl, Idl},
         ic_factory::{
@@ -16,6 +15,7 @@ pub fn idl() -> String {
         },
         ic_helpers::{candid_header::CandidHeader, tokens::Tokens128},
     };
+    use ic_exports::Principal;
     use std::collections::HashMap;
     use token::state::config::Metadata;
 

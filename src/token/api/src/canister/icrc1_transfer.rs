@@ -967,10 +967,10 @@ mod tests {
 
 #[cfg(test)]
 mod proptests {
-    use ic_exports::Principal;
     use canister_sdk::ic_canister::Canister;
     use canister_sdk::ic_helpers::tokens::Tokens128;
     use canister_sdk::ic_kit::MockContext;
+    use ic_exports::Principal;
     use proptest::collection::vec;
     use proptest::prelude::*;
     use proptest::sample::Index;
