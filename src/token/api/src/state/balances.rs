@@ -6,7 +6,7 @@ use ic_stable_structures::{memory_manager::MemoryId, Storable};
 
 use crate::{
     account::{AccountInternal, Subaccount},
-    storage::{self, StableBTreeMap},
+    storage::StableBTreeMap,
 };
 
 pub trait Balances {
@@ -37,6 +37,8 @@ pub trait Balances {
 
     /// List subaccounts for the given principal.
     fn get_subaccounts(&self, owner: Principal) -> HashMap<Subaccount, Tokens128> {
+        dbg!(owner);
+        dbg!(self.list_balances(0, usize::MAX));
         self.list_balances(0, usize::MAX)
             .into_iter()
             .filter(|(account, _)| account.owner == owner)
@@ -68,15 +70,6 @@ pub trait Balances {
 pub struct StableBalances;
 
 impl StableBalances {
-    // Clear all balances
-    pub fn clear() {
-        MAP.with(|map| {
-            let memory = storage::get_memory_by_id(BALANCES_MEMORY_ID);
-            *map.borrow_mut() =
-                StableBTreeMap::new(memory, KEY_BYTES_LEN as u32, VALUE_BYTES_LEN as u32);
-        });
-    }
-
     #[cfg(feature = "claim")]
     pub fn get_claimable_amount(holder: Principal, subaccount: Option<Subaccount>) -> Tokens128 {
         use crate::account::DEFAULT_SUBACCOUNT;
@@ -100,11 +93,7 @@ impl StableBalances {
 impl Balances for StableBalances {
     /// Write or re-write amount of tokens for specified account to stable memory.
     fn insert(&mut self, account: AccountInternal, token: Tokens128) {
-        MAP.with(|map| {
-            map.borrow_mut()
-                .insert(account.into(), token.amount)
-                .expect("balance insert failed") // key and value bytes len always less then MAX size
-        });
+        MAP.with(|map| map.borrow_mut().insert(account.into(), token.amount));
     }
 
     /// Get amount of tokens for the specified account from stable memory.
@@ -122,9 +111,8 @@ impl Balances for StableBalances {
     fn list_balances(&self, start: usize, limit: usize) -> Vec<(AccountInternal, Tokens128)> {
         MAP.with(|map| {
             map.borrow()
-                .iter()
-                .skip(start)
-                .take(limit)
+                .list(start, limit)
+                .into_iter()
                 .map(|(key, amount)| (key.into(), Tokens128::from(amount)))
                 .collect()
         })
@@ -238,9 +226,6 @@ impl Storable for Key {
 }
 
 thread_local! {
-    static MAP: RefCell<StableBTreeMap<Key, u128>> = {
-            let memory = storage::get_memory_by_id(BALANCES_MEMORY_ID);
-            let map = StableBTreeMap::init(memory, KEY_BYTES_LEN as u32, VALUE_BYTES_LEN as u32);
-            RefCell::new(map)
-    }
+    static MAP: RefCell<StableBTreeMap<Key, u128>> =
+        RefCell::new(StableBTreeMap::new(BALANCES_MEMORY_ID, KEY_BYTES_LEN as _, VALUE_BYTES_LEN as _));
 }

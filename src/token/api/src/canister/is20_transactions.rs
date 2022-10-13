@@ -354,6 +354,7 @@ mod tests {
         ic_auction::api::Auction,
         ic_canister::Canister,
         ic_kit::{
+            inject::get_context,
             mock_principals::{alice, bob, john, xtc},
             MockContext,
         },
@@ -773,7 +774,8 @@ mod tests {
         let caller = CheckedAccount::with_recipient(bob().into(), None).unwrap();
         is20_transfer(caller, &transfer, canister.bidding_info().fee_ratio).unwrap();
 
-        let context = MockContext::new().with_caller(alice()).inject();
+        let context = get_context();
+        context.update_caller(alice());
         context.add_time(61_000_000_000);
 
         let caller = CheckedAccount::with_recipient(bob().into(), None).unwrap();

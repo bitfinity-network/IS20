@@ -413,6 +413,7 @@ mod tests {
     use canister_sdk::{
         ic_canister::canister_call,
         ic_kit::{
+            inject::get_context,
             mock_principals::{alice, bob, john},
             MockContext,
         },
@@ -823,6 +824,7 @@ mod tests {
             })
             .unwrap();
 
+        get_context().update_id(alice());
         let list = canister_call!(canister.list_subaccounts(), std::collections::HashMap<Subaccount, Tokens128>).await.unwrap();
         assert_eq!(list.len(), 2);
         assert_eq!(list[&DEFAULT_SUBACCOUNT], 900.into());

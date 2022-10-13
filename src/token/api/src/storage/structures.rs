@@ -47,36 +47,57 @@ impl<T: Storable> StableCell<T> {
     }
 }
 
-// pub struct StableBTreeMap<K: Storable, V: Storable> {
-//     data: HashMap<Principal, btreemap::BTreeMap<Memory, K, V>>,
-//     memory_id: MemoryId,
-// }
+pub struct StableBTreeMap<K: Storable, V: Storable> {
+    data: HashMap<Principal, btreemap::BTreeMap<Memory, K, V>>,
+    memory_id: MemoryId,
+    max_key_size: u32,
+    max_value_size: u32,
+}
 
-// impl<K: Storable + Clone, V: Storable + Clone> StableBTreeMap<K, V> {
-//     fn get(&mut self) -> T {
-//         let canister_id = ic::id();
-//         self.data
-//             .entry(canister_id)
-//             .or_insert_with(|| {
-//                 let memory = super::get_memory_by_id(self.memory_id);
-//                 cell::Cell::init(memory, self.default.clone()).expect("cell initialization error")
-//             })
-//             .get()
-//             .clone()
-//     }
+impl<K: Storable, V: Storable> StableBTreeMap<K, V> {
+    pub fn new(memory_id: MemoryId, max_key_size: u32, max_value_size: u32) -> Self {
+        Self {
+            data: HashMap::default(),
+            memory_id,
+            max_key_size,
+            max_value_size,
+        }
+    }
 
-//     fn set(&mut self, value: T) {
-//         let canister_id = ic::id();
-//         self.data
-//             .entry(canister_id)
-//             .or_insert_with(|| {
-//                 let memory = super::get_memory_by_id(self.memory_id);
-//                 cell::Cell::init(memory, self.default.clone()).expect("cell initialization error")
-//             })
-//             .set(value)
-//             .expect("failed to set value to stable cell");
-//     }
-// }
+    pub fn get(&self, key: &K) -> Option<V> {
+        let canister_id = ic::id();
+        let storage = self.data.get(&canister_id);
+        storage.and_then(|m| m.get(key))
+    }
 
-pub type StableBTreeMap<K, V> = btreemap::BTreeMap<Memory, K, V>;
+    pub fn insert(&mut self, key: K, value: V) {
+        let canister_id = ic::id();
+        self.data
+            .entry(canister_id)
+            .or_insert_with(|| {
+                let memory = super::get_memory_by_id(self.memory_id);
+                btreemap::BTreeMap::init(memory, self.max_key_size, self.max_value_size)
+            })
+            .insert(key, value)
+            .expect("failed to insert value to stable btree map");
+    }
+
+    pub fn remove(&mut self, key: &K) -> Option<V> {
+        let canister_id = ic::id();
+        self.data.get_mut(&canister_id)?.remove(key)
+    }
+
+    pub fn list(&self, start: usize, limit: usize) -> Vec<(K, V)> {
+        let canister_id = ic::id();
+        let storage = self.data.get(&canister_id);
+        storage
+            .iter()
+            .flat_map(|s| s.iter())
+            .skip(start)
+            .take(limit)
+            .collect()
+    }
+}
+
+// pub type StableBTreeMap<K, V> = btreemap::BTreeMap<Memory, K, V>;
 pub type StableLog = log::Log<Memory, Memory>;

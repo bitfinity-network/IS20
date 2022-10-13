@@ -6,7 +6,5 @@ pub mod ledger;
 ///
 /// May be useful to refresh global state between tests, for example.
 pub fn clear() {
-    balances::StableBalances::clear();
-    config::TokenConfig::set_stable(config::TokenConfig::default());
     ledger::LedgerData::clear();
 }

@@ -35,6 +35,7 @@ mod tests {
     use canister_sdk::ic_auction::api::Auction;
     use canister_sdk::ic_canister::Canister;
     use canister_sdk::ic_helpers::tokens::Tokens128;
+    use canister_sdk::ic_kit::inject::get_context;
     use canister_sdk::ic_kit::mock_principals::{alice, bob, john, xtc};
     use canister_sdk::ic_kit::MockContext;
     use rand::prelude::*;
@@ -378,7 +379,8 @@ mod tests {
     #[test]
     fn transfer_wrong_caller() {
         let canister = test_canister();
-        MockContext::new().with_caller(bob()).inject();
+        get_context().update_caller(bob());
+
         let transfer1 = TransferArgs {
             from_subaccount: None,
             to: Account::from(bob()),
@@ -460,7 +462,7 @@ mod tests {
         let alice_sub = gen_subaccount();
 
         let canister = test_canister();
-        MockContext::new().with_caller(bob()).inject();
+        get_context().update_caller(bob());
         assert_eq!(
             canister.mint(alice(), None, Tokens128::from(100)),
             Err(TxError::Unauthorized)
@@ -590,8 +592,8 @@ mod tests {
     #[test]
     fn burn_by_wrong_user() {
         let canister = test_canister();
-        let context = MockContext::new().with_caller(bob()).inject();
-        context.update_caller(bob());
+
+        get_context().update_caller(bob());
         let balance = canister.icrc1_balance_of(Account::new(bob(), None));
         assert_eq!(
             canister.burn(None, None, Tokens128::from(100)),
@@ -641,8 +643,8 @@ mod tests {
     #[test]
     fn burn_from_unauthorized() {
         let canister = test_canister();
-        let context = MockContext::new().with_caller(bob()).inject();
-        context.update_caller(bob());
+
+        get_context().update_caller(bob());
         assert_eq!(
             canister.burn(Some(alice()), None, Tokens128::from(100)),
             Err(TxError::Unauthorized)
