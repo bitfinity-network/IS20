@@ -37,8 +37,6 @@ pub trait Balances {
 
     /// List subaccounts for the given principal.
     fn get_subaccounts(&self, owner: Principal) -> HashMap<Subaccount, Tokens128> {
-        dbg!(owner);
-        dbg!(self.list_balances(0, usize::MAX));
         self.list_balances(0, usize::MAX)
             .into_iter()
             .filter(|(account, _)| account.owner == owner)

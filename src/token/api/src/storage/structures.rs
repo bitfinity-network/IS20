@@ -99,5 +99,4 @@ impl<K: Storable, V: Storable> StableBTreeMap<K, V> {
     }
 }
 
-// pub type StableBTreeMap<K, V> = btreemap::BTreeMap<Memory, K, V>;
 pub type StableLog = log::Log<Memory, Memory>;
