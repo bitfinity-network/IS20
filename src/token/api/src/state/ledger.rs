@@ -1,4 +1,5 @@
 use std::cell::RefCell;
+use std::collections::HashMap;
 
 use candid::{CandidType, Deserialize, Principal};
 use canister_sdk::ic_helpers::tokens::Tokens128;
@@ -13,22 +14,22 @@ const MAX_HISTORY_LENGTH: usize = 1_000_000;
 const HISTORY_REMOVAL_BATCH_SIZE: usize = 10_000;
 
 thread_local! {
-    static LEDGER: RefCell<Ledger> = RefCell::default();
+    static LEDGER: RefCell<HashMap<Principal, Ledger>> = RefCell::default();
 }
 
 pub struct LedgerData;
 
 impl LedgerData {
     pub fn is_empty() -> bool {
-        LEDGER.with(|ledger| ledger.borrow().is_empty())
+        Self::with_ledger(|ledger| ledger.is_empty())
     }
 
     pub fn len() -> u64 {
-        LEDGER.with(|ledger| ledger.borrow().len())
+        Self::with_ledger(|ledger| ledger.len())
     }
 
     pub fn get(id: TxId) -> Option<TxRecord> {
-        LEDGER.with(|ledger| ledger.borrow().get(id))
+        Self::with_ledger(|ledger| ledger.get(id))
     }
 
     pub fn get_transactions(
@@ -36,15 +37,15 @@ impl LedgerData {
         count: usize,
         transaction_id: Option<TxId>,
     ) -> PaginatedResult {
-        LEDGER.with(|ledger| ledger.borrow().get_transactions(who, count, transaction_id))
+        Self::with_ledger(|ledger| ledger.get_transactions(who, count, transaction_id))
     }
 
     pub fn list_transactions() -> Vec<TxRecord> {
-        LEDGER.with(|ledger| ledger.borrow().iter().cloned().collect())
+        Self::with_ledger(|ledger| ledger.iter().cloned().collect())
     }
 
     pub fn get_len_user_history(user: Principal) -> usize {
-        LEDGER.with(|ledger| ledger.borrow().get_len_user_history(user))
+        Self::with_ledger(|ledger| ledger.get_len_user_history(user))
     }
 
     pub fn transfer(
@@ -55,11 +56,7 @@ impl LedgerData {
         memo: Option<Memo>,
         created_at_time: Timestamp,
     ) -> TxId {
-        LEDGER.with(|ledger| {
-            ledger
-                .borrow_mut()
-                .transfer(from, to, amount, fee, memo, created_at_time)
-        })
+        Self::with_ledger(|ledger| ledger.transfer(from, to, amount, fee, memo, created_at_time))
     }
 
     pub fn batch_transfer(
@@ -67,27 +64,36 @@ impl LedgerData {
         transfers: Vec<BatchTransferArgs>,
         fee: Tokens128,
     ) -> Vec<TxId> {
-        LEDGER.with(|ledger| ledger.borrow_mut().batch_transfer(from, transfers, fee))
+        Self::with_ledger(|ledger| ledger.batch_transfer(from, transfers, fee))
     }
 
     pub fn mint(from: AccountInternal, to: AccountInternal, amount: Tokens128) -> TxId {
-        LEDGER.with(|ledger| ledger.borrow_mut().mint(from, to, amount))
+        Self::with_ledger(|ledger| ledger.mint(from, to, amount))
     }
 
     pub fn burn(caller: AccountInternal, from: AccountInternal, amount: Tokens128) -> TxId {
-        LEDGER.with(|ledger| ledger.borrow_mut().burn(caller, from, amount))
+        Self::with_ledger(|ledger| ledger.burn(caller, from, amount))
     }
 
     pub fn record_auction(to: Principal, amount: Tokens128) {
-        LEDGER.with(|ledger| ledger.borrow_mut().record_auction(to, amount))
+        Self::with_ledger(|ledger| ledger.record_auction(to, amount))
     }
 
     pub fn claim(claim_account: AccountInternal, to: AccountInternal, amount: Tokens128) -> TxId {
-        LEDGER.with(|ledger| ledger.borrow_mut().claim(claim_account, to, amount))
+        Self::with_ledger(|ledger| ledger.claim(claim_account, to, amount))
     }
 
-    pub fn clear() {
-        LEDGER.with(|ledger| ledger.borrow_mut().clear())
+    fn with_ledger<F, R>(f: F) -> R
+    where
+        F: FnOnce(&mut Ledger) -> R,
+    {
+        LEDGER.with(|ledgers| {
+            let canister_id = ic::id();
+            println!("canis id: {canister_id}");
+            let mut borrowed = ledgers.borrow_mut();
+            let ledger = borrowed.entry(canister_id).or_default();
+            f(ledger)
+        })
     }
 }
 

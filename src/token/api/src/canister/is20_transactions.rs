@@ -220,6 +220,7 @@ pub fn burn(caller: Principal, from: AccountInternal, amount: Tokens128) -> TxRe
 
 pub fn burn_own_tokens(from_subaccount: Option<Subaccount>, amount: Tokens128) -> TxReceipt {
     let caller = ic::caller();
+    println!("caller: {caller}");
     burn(
         caller,
         AccountInternal::new(caller, from_subaccount),

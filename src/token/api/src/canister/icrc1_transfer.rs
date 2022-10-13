@@ -668,9 +668,9 @@ mod tests {
         let history_size_before = canister.history_size();
 
         ctx.update_caller(john());
-        canister
-            .burn(None, None, Tokens128::from(1001))
-            .unwrap_err();
+        println!("john: {}", john());
+        println!("alice: {}", alice());
+        dbg!(canister.burn(None, None, Tokens128::from(1001))).unwrap_err();
         assert_eq!(canister.history_size(), history_size_before);
 
         const COUNT: u64 = 5;
