@@ -363,7 +363,7 @@ mod tests {
         account::{Account, DEFAULT_SUBACCOUNT},
         canister::TokenCanisterAPI,
         mock::TokenCanisterMock,
-        state::{self, config::Metadata},
+        state::config::Metadata,
     };
 
     use super::*;
@@ -371,12 +371,14 @@ mod tests {
     use coverage_helper::test;
 
     fn test_canister() -> TokenCanisterMock {
-        // Refresh global stable memory.
-        state::clear();
-
-        MockContext::new().with_caller(alice()).inject();
+        let context = MockContext::new().with_caller(alice()).inject();
 
         let canister = TokenCanisterMock::init_instance();
+
+        // Due to this update, init() code will get actual
+        // principal of the canister from ic::id().
+        context.update_id(canister.principal());
+
         canister.init(
             Metadata {
                 logo: "".to_string(),
@@ -828,9 +830,6 @@ mod tests {
     #[cfg(feature = "claim")]
     #[test]
     fn zero_claim_returns_error() {
-        // Refresh global stable memory.
-        state::clear();
-
         MockContext::new().with_caller(john()).inject();
 
         let res = claim(alice(), None);

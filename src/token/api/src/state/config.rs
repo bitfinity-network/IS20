@@ -5,7 +5,7 @@ use ic_exports::candid::{CandidType, Decode, Deserialize, Encode, Int, Nat};
 use ic_exports::Principal;
 use ic_stable_structures::{memory_manager::MemoryId, Storable};
 
-use crate::storage::{self, StableCell};
+use crate::storage::StableCell;
 
 #[derive(Deserialize, CandidType, Clone, Debug)]
 pub struct TokenConfig {
@@ -29,11 +29,7 @@ impl TokenConfig {
 
     /// Store config data in stable memory.
     pub fn set_stable(config: TokenConfig) {
-        CELL.with(|c| {
-            c.borrow_mut()
-                .set(config)
-                .expect("failed to set config data to stable memory");
-        })
+        CELL.with(|c| c.borrow_mut().set(config))
     }
 
     pub fn fee_info(&self) -> (Tokens128, Principal) {
@@ -214,9 +210,6 @@ const CONFIG_MEMORY_ID: MemoryId = MemoryId::new(0);
 
 thread_local! {
     static CELL: RefCell<StableCell<TokenConfig>> = {
-            let memory = storage::get_memory_by_id(CONFIG_MEMORY_ID);
-            let default_data = TokenConfig::default();
-            let cell = StableCell::init(memory, default_data).expect("config cell initialization failed");
-            RefCell::new(cell)
+            RefCell::new(StableCell::new(CONFIG_MEMORY_ID, TokenConfig::default()))
     }
 }

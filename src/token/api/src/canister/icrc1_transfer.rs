@@ -42,9 +42,9 @@ mod tests {
     use crate::account::{Account, Subaccount};
     use crate::canister::{auction_account, TokenCanisterAPI};
     use crate::error::{TransferError, TxError};
+    use crate::mock::*;
     use crate::state::config::{Metadata, DEFAULT_MIN_CYCLES};
     use crate::state::ledger::{Operation, TransactionStatus};
-    use crate::{mock::*, state};
 
     use super::*;
 
@@ -60,12 +60,14 @@ mod tests {
 
     #[cfg_attr(coverage_nightly, no_coverage)]
     fn test_context() -> (&'static MockContext, TokenCanisterMock) {
-        // Refresh global stable memory.
-        state::clear();
-
         let context = MockContext::new().with_caller(john()).inject();
 
         let canister = TokenCanisterMock::init_instance();
+
+        // Due to this update, init() code will get actual
+        // principal of the canister from ic::id().
+        context.update_id(canister.principal());
+
         canister.init(
             Metadata {
                 logo: "".to_string(),

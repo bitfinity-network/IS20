@@ -93,19 +93,21 @@ mod tests {
         ic_metrics::Interval,
     };
 
+    use crate::mock::*;
     use crate::state::config::Metadata;
-    use crate::{mock::*, state};
 
     use super::*;
 
     #[cfg_attr(coverage_nightly, no_coverage)]
     fn test_context() -> (&'static mut MockContext, TokenCanisterMock) {
-        // Refresh global stable memory.
-        state::clear();
-
         let context = MockContext::new().with_caller(alice()).inject();
 
         let canister = TokenCanisterMock::init_instance();
+
+        // Due to this update, init() code will get actual
+        // principal of the canister from ic::id().
+        context.update_id(canister.principal());
+
         canister.init(
             Metadata {
                 logo: "".to_string(),

@@ -12,19 +12,17 @@ use token_api::{
     account::Account,
     canister::TokenCanisterAPI,
     error::TransferError,
+    state::config::{Metadata, StandardRecord, Value},
     state::ledger::TransferArgs,
-    state::{
-        self,
-        config::{Metadata, StandardRecord, Value},
-    },
 };
 
 fn init() -> (Metadata, TokenCanister, &'static mut MockContext) {
-    // Refresh global stable memory.
-    state::clear();
-
-    let ctx = canister_sdk::ic_kit::MockContext::new().inject();
+    let context = canister_sdk::ic_kit::MockContext::new().inject();
     let canister = TokenCanister::init_instance();
+
+    // Due to this update, init() code will get actual
+    // principal of the canister from ic::id().
+    context.update_id(canister.principal());
 
     let meta = Metadata {
         decimals: 11,
@@ -37,7 +35,7 @@ fn init() -> (Metadata, TokenCanister, &'static mut MockContext) {
         is_test_token: None,
     };
     canister.init(meta.clone(), 1_000_000_000.into());
-    (meta, canister, ctx)
+    (meta, canister, context)
 }
 
 #[test]

@@ -1,21 +1,40 @@
-use ic_stable_structures::memory_manager::{MemoryId, MemoryManager, VirtualMemory};
-use ic_stable_structures::{btreemap, cell, log, DefaultMemoryImpl};
+use std::cell::RefCell;
+use std::collections::HashMap;
+
+use candid::Principal;
+use canister_sdk::ic_kit::ic;
+use ic_stable_structures::memory_manager::{self, MemoryId, VirtualMemory};
+use ic_stable_structures::DefaultMemoryImpl;
+
+pub use structures::{StableBTreeMap, StableCell, StableLog};
+
+pub mod structures;
 
 pub type Memory = VirtualMemory<DefaultMemoryImpl>;
 
-pub type StableCell<T> = cell::Cell<T, Memory>;
-pub type StableBTreeMap<K, V> = btreemap::BTreeMap<Memory, K, V>;
-pub type StableLog = log::Log<Memory, Memory>;
+type MemoryManager = memory_manager::MemoryManager<DefaultMemoryImpl>;
+
+#[derive(Default)]
+struct Manager(HashMap<Principal, MemoryManager>);
+
+impl Manager {
+    pub fn get(&mut self, memory_id: MemoryId) -> Memory {
+        let canister_id = ic::id();
+        self.0
+            .entry(canister_id)
+            .or_insert_with(|| MemoryManager::init(DefaultMemoryImpl::default()))
+            .get(memory_id)
+    }
+}
 
 thread_local! {
     // The memory manager is used for simulating multiple memories. Given a `MemoryId` it can
     // return a memory that can be used by stable structures.
-    static MEMORY_MANAGER: MemoryManager<DefaultMemoryImpl> =
-        MemoryManager::init(DefaultMemoryImpl::default());
+    static MANAGER: RefCell<Manager> = RefCell::default();
 }
 
 // Return memory by `MemoryId`.
 // Each instance of stable structures must have unique `MemoryId`;
 pub fn get_memory_by_id(id: MemoryId) -> Memory {
-    MEMORY_MANAGER.with(|mng| mng.get(id))
+    MANAGER.with(|mng| mng.borrow_mut().get(id))
 }
