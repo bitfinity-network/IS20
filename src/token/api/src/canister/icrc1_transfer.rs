@@ -1,4 +1,5 @@
 use crate::account::{AccountInternal, CheckedAccount, WithRecipient};
+use crate::error::TxError;
 use crate::state::config::TokenConfig;
 use crate::state::ledger::{TransferArgs, TxReceipt};
 
@@ -15,13 +16,29 @@ pub fn icrc1_transfer(
     auction_fee_ratio: f64,
 ) -> TxReceipt {
     let amount = transfer.amount;
-    let owner = TokenConfig::get_stable().owner;
-    let minter = AccountInternal::new(owner, None);
+    let minter = AccountInternal::new(TokenConfig::get_stable().owner, None);
+
+    // Checks and returns error if the fee is not zero
+    let check_zero_fee = || {
+        if let Some(t) = transfer.fee {
+            if !t.is_zero() {
+                return Err(TxError::BadFee {
+                    expected_fee: 0.into(),
+                });
+            }
+        }
+        Ok(())
+    };
+
     if caller.inner() == minter {
+        // Minting transfers must have zero fees.
+        check_zero_fee()?;
         return mint(caller.inner().owner, transfer.to.into(), amount);
     }
 
     if caller.recipient() == minter {
+        // Burning transfers must have zero fees.
+        check_zero_fee()?;
         return burn(caller.recipient().owner, caller.inner(), amount);
     }
 
@@ -101,6 +118,50 @@ mod tests {
     fn test_canister() -> TokenCanisterMock {
         let (_, canister) = test_context();
         canister
+    }
+
+    #[test]
+    fn minting_with_nonzero_fee() {
+        let (_ctx, canister) = test_context();
+
+        let minter = AccountInternal::new(TokenConfig::get_stable().owner, None);
+        let to = Account::from(bob());
+
+        let transfer = TransferArgs {
+            from_subaccount: Some(minter.subaccount),
+            to,
+            amount: Tokens128::from(100),
+            fee: Some(1.into()),
+            memo: None,
+            created_at_time: None,
+        };
+
+        assert!(
+            canister.icrc1_transfer(transfer).is_err(),
+            "minting with non zero fee must fail!"
+        );
+    }
+
+    #[test]
+    fn burning_with_nonzero_fee() {
+        let (_ctx, canister) = test_context();
+
+        let to = Account::from(TokenConfig::get_stable().owner);
+        let from_subaccount = Account::from(bob()).subaccount;
+
+        let transfer = TransferArgs {
+            from_subaccount,
+            to,
+            amount: Tokens128::from(100),
+            fee: Some(1.into()),
+            memo: None,
+            created_at_time: None,
+        };
+
+        assert!(
+            canister.icrc1_transfer(transfer).is_err(),
+            "burning with non zero fee must fail!"
+        );
     }
 
     #[test]
