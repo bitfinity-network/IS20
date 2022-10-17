@@ -4,8 +4,9 @@ use candid::Principal;
 use canister_sdk::ic_kit::ic;
 use ic_stable_structures::{btreemap, cell, log, memory_manager::MemoryId, Storable};
 
-use super::Memory;
+use super::{error::StorageError, Memory};
 
+/// Stores value in stable memory, providing `get()/set()` API.
 pub struct StableCell<T: Storable> {
     data: HashMap<Principal, cell::Cell<T, Memory>>,
     default_value: T,
@@ -30,23 +31,21 @@ impl<T: Storable> StableCell<T> {
     }
 
     /// Updates value in stable memory.
-    pub fn set(&mut self, value: T) {
+    pub fn set(&mut self, value: T) -> Result<(), StorageError> {
         let canister_id = ic::id();
         match self.data.entry(canister_id) {
             Entry::Occupied(mut entry) => {
-                entry
-                    .get_mut()
-                    .set(value)
-                    .expect("failed to set value to stable cell");
+                entry.get_mut().set(value)?;
             }
             Entry::Vacant(entry) => {
                 let memory = super::get_memory_by_id(self.memory_id);
-                entry.insert(cell::Cell::init(memory, value).expect("failed to init stable cell"));
+                entry.insert(cell::Cell::init(memory, value)?);
             }
         };
+        Ok(())
     }
 }
-
+/// Stores key-value data in stable memory.
 pub struct StableBTreeMap<K: Storable, V: Storable> {
     data: HashMap<Principal, btreemap::BTreeMap<Memory, K, V>>,
     memory_id: MemoryId,
@@ -70,7 +69,7 @@ impl<K: Storable, V: Storable> StableBTreeMap<K, V> {
         storage.and_then(|m| m.get(key))
     }
 
-    pub fn insert(&mut self, key: K, value: V) {
+    pub fn insert(&mut self, key: K, value: V) -> Result<(), StorageError> {
         let canister_id = ic::id();
         self.data
             .entry(canister_id)
@@ -78,8 +77,8 @@ impl<K: Storable, V: Storable> StableBTreeMap<K, V> {
                 let memory = super::get_memory_by_id(self.memory_id);
                 btreemap::BTreeMap::init(memory, self.max_key_size, self.max_value_size)
             })
-            .insert(key, value)
-            .expect("failed to insert value to stable btree map");
+            .insert(key, value)?;
+        Ok(())
     }
 
     pub fn remove(&mut self, key: &K) -> Option<V> {

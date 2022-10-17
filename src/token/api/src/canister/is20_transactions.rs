@@ -69,15 +69,12 @@ pub(crate) fn transfer_internal(
 
     // We use `updates` structure because sometimes from or to can be equal to fee_to or even to
     // auction_account, so we must take a carefull approach.
-    let mut updates = LocalBalances::from_iter(
-        [
-            (from, balances.balance_of(&from)),
-            (to, balances.balance_of(&to)),
-            (fee_to, balances.balance_of(&fee_to)),
-            (auction_account(), balances.balance_of(&auction_account())),
-        ]
-        .into_iter(),
-    );
+    let mut updates = LocalBalances::from_iter([
+        (from, balances.balance_of(&from)),
+        (to, balances.balance_of(&to)),
+        (fee_to, balances.balance_of(&fee_to)),
+        (auction_account(), balances.balance_of(&auction_account())),
+    ]);
 
     // If `amount + fee` overflows max `Tokens128` value, the balance cannot be larger than this
     // value, so we can safely return `InsufficientFunds` error.
@@ -106,7 +103,7 @@ pub(crate) fn transfer_internal(
 
     // At this point all the checks are done and no further errors are possible, so we modify the
     // canister state only at this point.
-    balances.apply_updates(updates.list_balances(0, usize::MAX).into_iter());
+    balances.apply_updates(updates.list_balances(0, usize::MAX));
 
     Ok(())
 }
@@ -220,7 +217,6 @@ pub fn burn(caller: Principal, from: AccountInternal, amount: Tokens128) -> TxRe
 
 pub fn burn_own_tokens(from_subaccount: Option<Subaccount>, amount: Tokens128) -> TxReceipt {
     let caller = ic::caller();
-    println!("caller: {caller}");
     burn(
         caller,
         AccountInternal::new(caller, from_subaccount),
@@ -312,14 +308,11 @@ pub(crate) fn batch_transfer_internal(
     let fee_to = AccountInternal::new(fee_to, None);
     let auction_acc = auction_account();
 
-    let mut updates = LocalBalances::from_iter(
-        [
-            (from, balances.balance_of(&from)),
-            (fee_to, balances.balance_of(&fee_to)),
-            (auction_acc, balances.balance_of(&auction_acc)),
-        ]
-        .into_iter(),
-    );
+    let mut updates = LocalBalances::from_iter([
+        (from, balances.balance_of(&from)),
+        (fee_to, balances.balance_of(&fee_to)),
+        (auction_acc, balances.balance_of(&auction_acc)),
+    ]);
 
     for transfer in transfers {
         let receiver = transfer.receiver.into();
@@ -345,7 +338,7 @@ pub(crate) fn batch_transfer_internal(
         })?;
     }
 
-    balances.apply_updates(updates.list_balances(0, usize::MAX).into_iter());
+    balances.apply_updates(updates.list_balances(0, usize::MAX));
     Ok(())
 }
 

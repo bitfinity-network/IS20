@@ -729,9 +729,6 @@ mod tests {
         let history_size_before = canister.history_size();
 
         ctx.update_caller(john());
-        println!("john: {}", john());
-        println!("alice: {}", alice());
-        dbg!(canister.burn(None, None, Tokens128::from(1001))).unwrap_err();
         assert_eq!(canister.history_size(), history_size_before);
 
         const COUNT: u64 = 5;
@@ -1163,10 +1160,10 @@ mod proptests {
             // endpoint call, it affects `BiddingInfo.fee_ratio` that is
             // used for charging fees in `approve` endpoint.
 
-        let mut stats = TokenConfig::get_stable();
+            let mut stats = TokenConfig::get_stable();
             stats.min_cycles = 0;
-        TokenConfig::set_stable(stats);
 
+            TokenConfig::set_stable(stats);
             (canister, principals)
         }
     }

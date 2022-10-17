@@ -89,7 +89,6 @@ impl LedgerData {
     {
         LEDGER.with(|ledgers| {
             let canister_id = ic::id();
-            println!("canis id: {canister_id}");
             let mut borrowed = ledgers.borrow_mut();
             let ledger = borrowed.entry(canister_id).or_default();
             f(ledger)

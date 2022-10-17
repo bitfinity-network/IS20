@@ -8,6 +8,7 @@ use ic_stable_structures::DefaultMemoryImpl;
 
 pub use structures::{StableBTreeMap, StableCell, StableLog};
 
+pub mod error;
 pub mod structures;
 
 pub type Memory = VirtualMemory<DefaultMemoryImpl>;

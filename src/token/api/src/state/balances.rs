@@ -29,7 +29,7 @@ pub trait Balances {
     }
 
     /// Update balances according to `updates` iterator.
-    fn apply_updates(&mut self, updates: impl Iterator<Item = (AccountInternal, Tokens128)>) {
+    fn apply_updates(&mut self, updates: impl IntoIterator<Item = (AccountInternal, Tokens128)>) {
         for (account, amount) in updates {
             self.insert(account, amount);
         }
@@ -48,7 +48,9 @@ pub trait Balances {
     fn total_supply(&self) -> Tokens128 {
         self.list_balances(0, usize::MAX)
             .into_iter()
-            .fold(Tokens128::ZERO, |a, b| (a + b.1).unwrap_or(Tokens128::ZERO))
+            .fold(Tokens128::ZERO, |a, b| {
+                (a + b.1).expect("total supply integer overflow") // Checked at mint
+            })
     }
 
     /// Get balances map: holder -> subaccount -> tokens.
@@ -91,7 +93,9 @@ impl StableBalances {
 impl Balances for StableBalances {
     /// Write or re-write amount of tokens for specified account to stable memory.
     fn insert(&mut self, account: AccountInternal, token: Tokens128) {
-        MAP.with(|map| map.borrow_mut().insert(account.into(), token.amount));
+        MAP.with(|map| map.borrow_mut().insert(account.into(), token.amount))
+            .expect("unable to insert new balance to stable storage");
+        // Key and value have fixed byte size, so the only possible error is OOM.
     }
 
     /// Get amount of tokens for the specified account from stable memory.
@@ -159,14 +163,16 @@ impl Balances for LocalBalances {
     }
 
     fn total_supply(&self) -> Tokens128 {
-        self.0
-            .iter()
-            .fold(Tokens128::ZERO, |a, b| (a + b.1).unwrap_or(Tokens128::ZERO))
+        self.0.iter().fold(
+            Tokens128::ZERO,
+            |a, b| (a + b.1).expect("total supply integer overflow"), // Checked at mint
+        )
     }
 }
 
 const BALANCES_MEMORY_ID: MemoryId = MemoryId::new(1);
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 struct Key {
     pub principal: Principal,
     pub subaccount: Subaccount,
@@ -226,4 +232,23 @@ impl Storable for Key {
 thread_local! {
     static MAP: RefCell<StableBTreeMap<Key, u128>> =
         RefCell::new(StableBTreeMap::new(BALANCES_MEMORY_ID, KEY_BYTES_LEN as _, VALUE_BYTES_LEN as _));
+}
+
+#[cfg(test)]
+mod tests {
+    use candid::Principal;
+    use ic_stable_structures::Storable;
+
+    use super::Key;
+
+    #[test]
+    fn serialization_deserialization() {
+        let key = Key {
+            principal: Principal::anonymous(),
+            subaccount: [42; 32],
+        };
+
+        let desirialized = Key::from_bytes(key.to_bytes().into_owned());
+        assert_eq!(desirialized, key);
+    }
 }

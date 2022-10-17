@@ -30,6 +30,7 @@ impl TokenConfig {
     /// Store config data in stable memory.
     pub fn set_stable(config: TokenConfig) {
         CELL.with(|c| c.borrow_mut().set(config))
+            .expect("unable to set token config to stable memory")
     }
 
     pub fn fee_info(&self) -> (Tokens128, Principal) {
