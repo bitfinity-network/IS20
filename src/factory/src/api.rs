@@ -112,9 +112,23 @@ impl TokenFactoryCanister {
 
     #[update]
     pub async fn set_token_bytecode(&self, bytecode: Vec<u8>) -> Result<u32, FactoryError> {
-        let state_header = candid_header::<()>();
+        use candid::{Deserialize, CandidType};
+        use canister_sdk::ic_storage::stable::Versioned;
+        // requred to pass state check
+        #[derive(Debug, Deserialize, CandidType)]
+        pub struct EmptyState;
+
+        impl Versioned for EmptyState {
+            type Previous = ();
+
+            fn upgrade(_: Self::Previous) -> Self {
+                Self
+            }            
+        }
+
+        let state_header = candid_header::<EmptyState>();
         self.state.borrow_mut().token_wasm = Some(bytecode.clone());
-        self.set_canister_code::<()>(bytecode, state_header)
+        self.set_canister_code::<EmptyState>(bytecode, state_header)
     }
 
     /// Creates a new token.
