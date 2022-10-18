@@ -3,9 +3,7 @@ use std::{borrow::Cow, cell::RefCell};
 use canister_sdk::ic_helpers::tokens::Tokens128;
 use ic_exports::candid::{CandidType, Decode, Deserialize, Encode, Int, Nat};
 use ic_exports::Principal;
-use ic_stable_structures::{memory_manager::MemoryId, Storable};
-
-use crate::storage::StableCell;
+use ic_stable_structures::{MemoryId, StableCell, Storable};
 
 #[derive(Deserialize, CandidType, Clone, Debug)]
 pub struct TokenConfig {

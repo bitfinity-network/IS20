@@ -2,12 +2,9 @@ use std::{borrow::Cow, cell::RefCell, collections::HashMap};
 
 use candid::{CandidType, Deserialize, Principal};
 use canister_sdk::ic_helpers::tokens::Tokens128;
-use ic_stable_structures::{memory_manager::MemoryId, Storable};
+use ic_stable_structures::{MemoryId, StableBTreeMap, Storable};
 
-use crate::{
-    account::{AccountInternal, Subaccount},
-    storage::StableBTreeMap,
-};
+use crate::account::{AccountInternal, Subaccount};
 
 pub trait Balances {
     /// Write or re-write amount of tokens for specified account.

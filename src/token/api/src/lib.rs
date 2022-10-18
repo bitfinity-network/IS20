@@ -4,7 +4,6 @@ pub mod account;
 pub mod canister;
 pub mod principal;
 pub mod state;
-pub mod storage;
 
 pub mod error;
 #[cfg(test)]
