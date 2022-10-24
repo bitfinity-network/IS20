@@ -2,7 +2,7 @@ use std::{borrow::Cow, cell::RefCell, collections::HashMap};
 
 use candid::{CandidType, Deserialize, Principal};
 use canister_sdk::ic_helpers::tokens::Tokens128;
-use ic_stable_structures::{MemoryId, StableBTreeMap, Storable};
+use ic_stable_structures::{MemoryId, StableMultimap, Storable};
 
 use crate::account::{AccountInternal, Subaccount};
 
@@ -90,29 +90,56 @@ impl StableBalances {
 impl Balances for StableBalances {
     /// Write or re-write amount of tokens for specified account to stable memory.
     fn insert(&mut self, account: AccountInternal, token: Tokens128) {
-        MAP.with(|map| map.borrow_mut().insert(account.into(), token.amount))
-            .expect("unable to insert new balance to stable storage");
+        let principal_key = PrincipalKey(account.owner);
+        let subaccount_key = SubaccountKey(account.subaccount);
+        MAP.with(|map| {
+            map.borrow_mut()
+                .insert(&principal_key, &subaccount_key, token.amount)
+        })
+        .expect("unable to insert new balance to stable storage");
         // Key and value have fixed byte size, so the only possible error is OOM.
     }
 
     /// Get amount of tokens for the specified account from stable memory.
     fn get(&self, account: &AccountInternal) -> Option<Tokens128> {
-        let amount = MAP.with(|map| map.borrow_mut().get(&(*account).into()));
+        let principal_key = PrincipalKey(account.owner);
+        let subaccount_key = SubaccountKey(account.subaccount);
+        let amount = MAP.with(|map| map.borrow_mut().get(&principal_key, &subaccount_key));
         amount.map(Tokens128::from)
     }
 
     /// Remove specified account balance from the stable memory.
     fn remove(&mut self, account: &AccountInternal) -> Option<Tokens128> {
-        let amount = MAP.with(|map| map.borrow_mut().remove(&(*account).into()));
+        let principal_key = PrincipalKey(account.owner);
+        let subaccount_key = SubaccountKey(account.subaccount);
+        let amount = MAP
+            .with(|map| map.borrow_mut().remove(&principal_key, &subaccount_key))
+            .expect("balance keys serialization failed");
         amount.map(Tokens128::from)
+    }
+
+    fn get_subaccounts(&self, owner: Principal) -> HashMap<Subaccount, Tokens128> {
+        MAP.with(|map| {
+            map.borrow()
+                .range(&PrincipalKey(owner))
+                .expect("principal serialization for stable storage failed")
+                .map(|(subaccount, amount)| (subaccount.0, Tokens128::from(amount)))
+                .collect()
+        })
     }
 
     fn list_balances(&self, start: usize, limit: usize) -> Vec<(AccountInternal, Tokens128)> {
         MAP.with(|map| {
             map.borrow()
-                .list(start, limit)
-                .into_iter()
-                .map(|(key, amount)| (key.into(), Tokens128::from(amount)))
+                .iter()
+                .skip(start)
+                .take(limit)
+                .map(|(principal, subaccount, amount)| {
+                    (
+                        AccountInternal::new(principal.0, Some(subaccount.0)),
+                        Tokens128::from(amount),
+                    )
+                })
                 .collect()
         })
     }
@@ -168,84 +195,42 @@ impl Balances for LocalBalances {
 }
 
 const BALANCES_MEMORY_ID: MemoryId = MemoryId::new(1);
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-struct Key {
-    pub principal: Principal,
-    pub subaccount: Subaccount,
-}
-
-impl From<AccountInternal> for Key {
-    fn from(account: AccountInternal) -> Self {
-        Self {
-            principal: account.owner,
-            subaccount: account.subaccount,
-        }
-    }
-}
-
-impl From<Key> for AccountInternal {
-    fn from(key: Key) -> Self {
-        Self {
-            owner: key.principal,
-            subaccount: key.subaccount,
-        }
-    }
-}
-
-const SUBACCOUNT_LEN: usize = 32;
-const SUBACCOUNT_OFFSET: usize = 32;
-
-const KEY_BYTES_LEN: usize = 64;
+const PRINCIPAL_MAX_LENGTH_IN_BYTES: usize = 29;
+const SUBACCOUNT_MAX_LENGTH_IN_BYTES: usize = 32;
 const VALUE_BYTES_LEN: usize = 16;
 
-impl Storable for Key {
-    /// Memory layout:
-    /// | principal len (1 byte) | principal data (31 byte) | subaccount (32 bytes) |
-    /// Principal data maximum len is 29;
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct PrincipalKey(Principal);
+
+impl Storable for PrincipalKey {
     fn to_bytes(&self) -> Cow<[u8]> {
-        let mut buffer = vec![0u8; KEY_BYTES_LEN];
-        let principal_bytes = self.principal.as_slice();
-
-        buffer[0] = principal_bytes.len() as u8;
-        buffer[1..principal_bytes.len() + 1].copy_from_slice(principal_bytes);
-        buffer[SUBACCOUNT_OFFSET..].copy_from_slice(&self.subaccount);
-
-        Cow::Owned(buffer)
+        self.0.as_slice().to_vec().into()
     }
 
     fn from_bytes(bytes: Vec<u8>) -> Self {
-        let principal_len = bytes[0] as usize;
-        let account = Principal::from_slice(&bytes[1..principal_len + 1]);
-        let mut subaccount = [0u8; SUBACCOUNT_LEN];
-        subaccount.copy_from_slice(&bytes[SUBACCOUNT_OFFSET..]);
-        Self {
-            principal: account,
-            subaccount,
-        }
+        PrincipalKey(Principal::from_slice(&bytes))
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct SubaccountKey(Subaccount);
+
+impl Storable for SubaccountKey {
+    fn to_bytes(&self) -> Cow<[u8]> {
+        self.0.to_vec().into()
+    }
+
+    fn from_bytes(bytes: Vec<u8>) -> Self {
+        let mut buf = [0u8; SUBACCOUNT_MAX_LENGTH_IN_BYTES];
+        buf.copy_from_slice(&bytes);
+        Self(buf)
     }
 }
 
 thread_local! {
-    static MAP: RefCell<StableBTreeMap<Key, u128>> =
-        RefCell::new(StableBTreeMap::new(BALANCES_MEMORY_ID, KEY_BYTES_LEN as _, VALUE_BYTES_LEN as _));
-}
-
-#[cfg(test)]
-mod tests {
-    use candid::Principal;
-    use ic_stable_structures::Storable;
-
-    use super::Key;
-
-    #[test]
-    fn serialization_deserialization() {
-        let key = Key {
-            principal: Principal::anonymous(),
-            subaccount: [42; 32],
-        };
-
-        let desirialized = Key::from_bytes(key.to_bytes().into_owned());
-        assert_eq!(desirialized, key);
-    }
+    static MAP: RefCell<StableMultimap<PrincipalKey, SubaccountKey, u128>> =
+        RefCell::new(StableMultimap::new(BALANCES_MEMORY_ID,
+            PRINCIPAL_MAX_LENGTH_IN_BYTES as _,
+            SUBACCOUNT_MAX_LENGTH_IN_BYTES as _,
+            VALUE_BYTES_LEN as _));
 }

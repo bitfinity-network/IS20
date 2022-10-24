@@ -209,6 +209,7 @@ const CONFIG_MEMORY_ID: MemoryId = MemoryId::new(0);
 
 thread_local! {
     static CELL: RefCell<StableCell<TokenConfig>> = {
-            RefCell::new(StableCell::new(CONFIG_MEMORY_ID, TokenConfig::default()))
+            RefCell::new(StableCell::new(CONFIG_MEMORY_ID, TokenConfig::default())
+                .expect("stable memory token config initialization failed"))
     }
 }

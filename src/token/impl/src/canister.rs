@@ -127,8 +127,8 @@ mod test {
         stats.name = "To Kill a Mockingbird".to_string();
         TokenConfig::set_stable(stats);
 
-        canister.__pre_upgrade();
-        canister.__post_upgrade();
+        canister.pre_upgrade();
+        canister.post_upgrade();
 
         // Upgrade the canister should have the state
         // written before pre_upgrade

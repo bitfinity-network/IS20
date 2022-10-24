@@ -1,6 +1,3 @@
-use std::cell::RefCell;
-use std::rc::Rc;
-
 use candid::Principal;
 #[cfg(feature = "auction")]
 use canister_sdk::ic_auction::{
@@ -13,7 +10,6 @@ use canister_sdk::{
     ic_canister::{generate_exports, generate_idl, query, update, Canister, Idl, PreUpdate},
     ic_helpers::tokens::Tokens128,
     ic_kit::ic,
-    ic_storage::IcStorage,
 };
 
 pub use inspect::AcceptReason;
@@ -391,8 +387,11 @@ pub trait TokenCanisterAPI: Canister + Sized + AuctionCanister {
 generate_exports!(TokenCanisterAPI, TokenCanisterExports);
 
 #[cfg(feature = "auction")]
+use canister_sdk::ic_storage::IcStorage;
+
+#[cfg(feature = "auction")]
 impl Auction for TokenCanisterExports {
-    fn auction_state(&self) -> Rc<RefCell<AuctionState>> {
+    fn auction_state(&self) -> std::rc::Rc<std::cell::RefCell<AuctionState>> {
         AuctionState::get()
     }
 
