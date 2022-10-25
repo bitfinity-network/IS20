@@ -1,4 +1,4 @@
-name: "Bump version & tag"
+name: "Bump cargo version & git tag"
 
 on:
   push:

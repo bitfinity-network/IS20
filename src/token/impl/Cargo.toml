@@ -1,5 +1,7 @@
 [package]
 name = "is20-token-canister"
+version.workspace = true
+edition.workspace = true
 
 [features]
 default = []

@@ -1,5 +1,8 @@
 [package]
 name = "token-factory"
+version.workspace = true
+edition.workspace = true
+
 
 [features]
 default = []
