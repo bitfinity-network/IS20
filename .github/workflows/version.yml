@@ -1,0 +1,12 @@
+name: "Bump version & tag"
+
+on:
+  push:
+    branches:    
+      - 'main'  
+
+jobs:
+  version:
+    uses: infinity-swap/ci-wf/.github/workflows/bump-version-tag.yml@main
+    secrets:
+      gh_token: ${{ secrets.GH_PKG_TOKEN }}

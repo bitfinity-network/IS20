@@ -4,3 +4,7 @@ members = [
   "src/token/impl",
   "src/factory",
 ]
+
+[package]
+version = "1.10.0"
+edition = "2021"

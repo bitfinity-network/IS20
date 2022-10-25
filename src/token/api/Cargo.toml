@@ -1,7 +1,5 @@
 [package]
-edition = "2021"
 name = "is20-token"
-version = "0.2.0"
 
 [features]
 default = ["mint_burn", "transfer"]
