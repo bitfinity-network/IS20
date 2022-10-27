@@ -94,7 +94,7 @@ impl Balances for StableBalances {
         let subaccount_key = SubaccountKey(account.subaccount);
         MAP.with(|map| {
             map.borrow_mut()
-                .insert(&principal_key, &subaccount_key, token.amount)
+                .insert(&principal_key, &subaccount_key, &token.amount)
         })
         .expect("unable to insert new balance to stable storage");
         // Key and value have fixed byte size, so the only possible error is OOM.

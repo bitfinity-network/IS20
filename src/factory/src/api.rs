@@ -112,7 +112,7 @@ impl TokenFactoryCanister {
 
     #[update]
     pub async fn set_token_bytecode(&self, bytecode: Vec<u8>) -> Result<u32, FactoryError> {
-        use candid::{Deserialize, CandidType};
+        use candid::{CandidType, Deserialize};
         use canister_sdk::ic_storage::stable::Versioned;
         // requred to pass state check
         #[derive(Debug, Deserialize, CandidType)]
@@ -123,7 +123,7 @@ impl TokenFactoryCanister {
 
             fn upgrade(_: Self::Previous) -> Self {
                 Self
-            }            
+            }
         }
 
         let state_header = candid_header::<EmptyState>();
