@@ -4,8 +4,8 @@ on:
   workflow_dispatch:
     # Just run it
   push:
-    branches:    
-      - 'main'  
+    tags:
+      - "v*"
 
 jobs:
   cargo-docs:

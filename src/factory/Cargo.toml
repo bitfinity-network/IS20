@@ -1,7 +1,8 @@
 [package]
-edition = "2021"
 name = "token-factory"
-version = "0.24.0"
+version.workspace = true
+edition.workspace = true
+
 
 [features]
 default = []
