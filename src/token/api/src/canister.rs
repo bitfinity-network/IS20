@@ -44,7 +44,8 @@ pub mod icrc1_transfer;
 pub mod is20_auction;
 pub mod is20_transactions;
 
-pub(crate) const MAX_TRANSACTION_QUERY_LEN: usize = 1000;
+pub(crate) const MAX_TRANSACTION_REQUEST: usize = 2000;
+pub(crate) const MAX_ACCOUNT_TRANSACTION_REQUEST: usize = 1000;
 // 1 day in seconds.
 pub const DEFAULT_AUCTION_PERIOD_SECONDS: Timestamp = 60 * 60 * 24;
 
@@ -228,7 +229,11 @@ pub trait TokenCanisterAPI: Canister + Sized + AuctionCanister {
         count: usize,
         transaction_id: Option<TxId>,
     ) -> PaginatedResult {
-        LedgerData::get_transactions(who, count.min(MAX_TRANSACTION_QUERY_LEN), transaction_id)
+        let count = who
+            .map_or(MAX_TRANSACTION_REQUEST, |_| MAX_ACCOUNT_TRANSACTION_REQUEST)
+            .min(count);
+
+        LedgerData::get_transactions(who, count, transaction_id)
     }
 
     /// Returns the total number of transactions related to the user `who`.
