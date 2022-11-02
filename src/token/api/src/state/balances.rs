@@ -66,7 +66,7 @@ pub trait Balances {
     fn clear(&mut self) {
         for (account, _) in self.list_balances(0, usize::MAX) {
             self.remove(&account);
-        } 
+        }
     }
 }
 

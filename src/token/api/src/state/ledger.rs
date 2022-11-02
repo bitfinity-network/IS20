@@ -88,7 +88,7 @@ impl LedgerData {
         Self::with_ledger(|ledger| ledger.claim(claim_account, to, amount))
     }
 
-    pub fn clear()  {
+    pub fn clear() {
         Self::with_ledger(|ledger| ledger.clear())
     }
 

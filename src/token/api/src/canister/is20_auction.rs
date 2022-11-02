@@ -111,7 +111,6 @@ mod tests {
         StableBalances.clear();
         LedgerData::clear();
 
-
         canister.init(
             Metadata {
                 logo: "".to_string(),

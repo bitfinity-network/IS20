@@ -1036,8 +1036,8 @@ mod tests {
 mod proptests {
     use canister_sdk::ic_canister::Canister;
     use canister_sdk::ic_helpers::tokens::Tokens128;
-    use canister_sdk::ic_kit::MockContext;
     use canister_sdk::ic_kit::inject::get_context;
+    use canister_sdk::ic_kit::MockContext;
     use ic_exports::Principal;
     use proptest::collection::vec;
     use proptest::prelude::*;
@@ -1165,7 +1165,7 @@ mod proptests {
             let principal = Principal::from_text("mfufu-x6j4c-gomzb-geilq").unwrap();
             let canister = TokenCanisterMock::from_principal(principal);
             get_context().update_id(canister.principal());
-            
+
             // Refresh canister's state.
             TokenConfig::set_stable(TokenConfig::default());
             StableBalances.clear();
