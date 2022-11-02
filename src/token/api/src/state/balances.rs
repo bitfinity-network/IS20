@@ -61,6 +61,13 @@ pub trait Balances {
         }
         holders
     }
+
+    /// Remove all balances.
+    fn clear(&mut self) {
+        for (account, _) in self.list_balances(0, usize::MAX) {
+            self.remove(&account);
+        } 
+    }
 }
 
 /// Store balances in stable memory.
@@ -191,6 +198,10 @@ impl Balances for LocalBalances {
             Tokens128::ZERO,
             |a, b| (a + b.1).expect("total supply integer overflow"), // Checked at mint
         )
+    }
+
+    fn clear(&mut self) {
+        self.0.clear()
     }
 }
 

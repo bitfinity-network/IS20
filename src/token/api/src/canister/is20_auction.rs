@@ -102,11 +102,15 @@ mod tests {
     fn test_context() -> (&'static mut MockContext, TokenCanisterMock) {
         let context = MockContext::new().with_caller(alice()).inject();
 
-        let canister = TokenCanisterMock::init_instance();
-
-        // Due to this update, init() code will get actual
-        // principal of the canister from ic::id().
+        let principal = Principal::from_text("mfufu-x6j4c-gomzb-geilq").unwrap();
+        let canister = TokenCanisterMock::from_principal(principal);
         context.update_id(canister.principal());
+
+        // Refresh canister's state.
+        TokenConfig::set_stable(TokenConfig::default());
+        StableBalances.clear();
+        LedgerData::clear();
+
 
         canister.init(
             Metadata {

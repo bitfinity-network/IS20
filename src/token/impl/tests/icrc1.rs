@@ -13,16 +13,24 @@ use token_api::{
     canister::TokenCanisterAPI,
     error::TransferError,
     state::config::{Metadata, StandardRecord, Value},
-    state::ledger::TransferArgs,
+    state::{
+        balances::{Balances, StableBalances},
+        config::TokenConfig,
+        ledger::{LedgerData, TransferArgs},
+    },
 };
 
 fn init() -> (Metadata, TokenCanister, &'static mut MockContext) {
     let context = canister_sdk::ic_kit::MockContext::new().inject();
-    let canister = TokenCanister::init_instance();
 
-    // Due to this update, init() code will get actual
-    // principal of the canister from ic::id().
+    let principal = Principal::from_text("mfufu-x6j4c-gomzb-geilq").unwrap();
+    let canister = TokenCanister::from_principal(principal);
     context.update_id(canister.principal());
+
+    // Refresh canister's state.
+    TokenConfig::set_stable(TokenConfig::default());
+    StableBalances.clear();
+    LedgerData::clear();
 
     let meta = Metadata {
         decimals: 11,

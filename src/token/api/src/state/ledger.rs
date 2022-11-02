@@ -88,6 +88,10 @@ impl LedgerData {
         Self::with_ledger(|ledger| ledger.claim(claim_account, to, amount))
     }
 
+    pub fn clear()  {
+        Self::with_ledger(|ledger| ledger.clear())
+    }
+
     fn with_ledger<F, R>(f: F) -> R
     where
         F: FnOnce(&mut Ledger) -> R,

@@ -49,6 +49,7 @@ pub fn icrc1_transfer(
 mod tests {
     use std::time::UNIX_EPOCH;
 
+    use candid::Principal;
     use canister_sdk::ic_auction::api::Auction;
     use canister_sdk::ic_canister::Canister;
     use canister_sdk::ic_helpers::tokens::Tokens128;
@@ -61,8 +62,9 @@ mod tests {
     use crate::canister::{auction_account, TokenCanisterAPI};
     use crate::error::{TransferError, TxError};
     use crate::mock::*;
+    use crate::state::balances::{Balances, StableBalances};
     use crate::state::config::{Metadata, DEFAULT_MIN_CYCLES};
-    use crate::state::ledger::{Operation, TransactionStatus};
+    use crate::state::ledger::{LedgerData, Operation, TransactionStatus};
 
     use super::*;
 
@@ -80,11 +82,14 @@ mod tests {
     fn test_context() -> (&'static MockContext, TokenCanisterMock) {
         let context = MockContext::new().with_caller(john()).inject();
 
-        let canister = TokenCanisterMock::init_instance();
-
-        // Due to this update, init() code will get actual
-        // principal of the canister from ic::id().
+        let principal = Principal::from_text("mfufu-x6j4c-gomzb-geilq").unwrap();
+        let canister = TokenCanisterMock::from_principal(principal);
         context.update_id(canister.principal());
+
+        // Refresh canister's state.
+        TokenConfig::set_stable(TokenConfig::default());
+        StableBalances.clear();
+        LedgerData::clear();
 
         canister.init(
             Metadata {
@@ -1032,6 +1037,7 @@ mod proptests {
     use canister_sdk::ic_canister::Canister;
     use canister_sdk::ic_helpers::tokens::Tokens128;
     use canister_sdk::ic_kit::MockContext;
+    use canister_sdk::ic_kit::inject::get_context;
     use ic_exports::Principal;
     use proptest::collection::vec;
     use proptest::prelude::*;
@@ -1041,7 +1047,9 @@ mod proptests {
     use crate::canister::TokenCanisterAPI;
     use crate::error::{TransferError, TxError};
     use crate::mock::*;
+    use crate::state::balances::{Balances, StableBalances};
     use crate::state::config::Metadata;
+    use crate::state::ledger::LedgerData;
 
     use super::*;
 
@@ -1153,7 +1161,16 @@ mod proptests {
                 fee_to,
                 is_test_token: None,
             };
-            let canister = TokenCanisterMock::init_instance();
+
+            let principal = Principal::from_text("mfufu-x6j4c-gomzb-geilq").unwrap();
+            let canister = TokenCanisterMock::from_principal(principal);
+            get_context().update_id(canister.principal());
+            
+            // Refresh canister's state.
+            TokenConfig::set_stable(TokenConfig::default());
+            StableBalances.clear();
+            LedgerData::clear();
+
             canister.init(meta,total_supply);
             // This is to make tests that don't rely on auction state
             // pass, because since we are running auction state on each
@@ -1185,7 +1202,7 @@ mod proptests {
                 use Action::*;
                 match action {
                     Mint { minter, recipient, amount } => {
-                        MockContext::new().with_caller(minter).inject();
+                        get_context().update_caller(minter);
                         let original = canister.icrc1_total_supply();
                         let res = canister.mint(recipient, None,amount);
                         let expected = if minter == canister.owner() {
@@ -1199,7 +1216,7 @@ mod proptests {
                         assert_eq!(expected, canister.icrc1_total_supply());
                     },
                     Burn(amount, burner) => {
-                        MockContext::new().with_caller(burner).inject();
+                        get_context().update_caller(burner);
                         let original = canister.icrc1_total_supply();
                         let balance = canister.icrc1_balance_of(Account::new(burner, None));
                         let res = canister.burn(Some(burner), None, amount);
@@ -1220,7 +1237,7 @@ mod proptests {
                             return Ok(());
                         }
 
-                        MockContext::new().with_caller(from).inject();
+                        get_context().update_caller(from);
                         let from_balance = canister.icrc1_balance_of(Account::new(from, None));
                         let to_balance = canister.icrc1_balance_of(Account::new(to, None));
                         let (fee , fee_to) = TokenConfig::get_stable().fee_info();
