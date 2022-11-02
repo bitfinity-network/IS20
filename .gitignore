@@ -9,5 +9,3 @@ token.wasm
 /proptest-regressions
 
 /.DS_Store
-
-Cargo.lock

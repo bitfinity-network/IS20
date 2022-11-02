@@ -13,12 +13,12 @@ use crate::tx_record::{TxId, TxRecord};
 
 const MAX_HISTORY_LENGTH: usize = 1_000_000;
 const HISTORY_REMOVAL_BATCH_SIZE: usize = 10_000;
-const INDEX_OFFEST_MEMORY_ID: MemoryId = MemoryId::new(2);
+const TOTAL_TX_COUNT_MEMORY_ID: MemoryId = MemoryId::new(2);
 
 thread_local! {
     static LEDGER: RefCell<HashMap<Principal, Ledger>> = RefCell::default();
-    static INDEX_OFFEST: RefCell<StableCell<u64>> =
-        RefCell::new(StableCell::new(INDEX_OFFEST_MEMORY_ID, 0)
+    static TOTAL_TX_COUNT: RefCell<StableCell<u64>> =
+        RefCell::new(StableCell::new(TOTAL_TX_COUNT_MEMORY_ID, 0)
             .expect("unable to initialize index offset for ledger"));
 }
 
@@ -112,11 +112,11 @@ impl Ledger {
     }
 
     pub fn len(&self) -> u64 {
-        Self::read_vec_offset() + self.history.len() as u64
+        Self::read_total_tx_count()
     }
 
     fn next_id(&self) -> TxId {
-        Self::read_vec_offset() + self.history.len() as u64
+        Self::read_total_tx_count()
     }
 
     pub fn get(&self, id: TxId) -> Option<TxRecord> {
@@ -157,10 +157,11 @@ impl Ledger {
     }
 
     fn get_index(&self, id: TxId) -> Option<usize> {
-        if id < Self::read_vec_offset() || id > usize::MAX as TxId {
+        let first_stored_tx_id = Self::read_total_tx_count() - self.history.len() as u64; // Always >= 0
+        if id < first_stored_tx_id || id > usize::MAX as TxId {
             None
         } else {
-            Some((id - Self::read_vec_offset()) as usize)
+            Some((id - first_stored_tx_id) as usize)
         }
     }
 
@@ -229,7 +230,7 @@ impl Ledger {
 
     fn push(&mut self, record: TxRecord) {
         self.history.push(record);
-
+        Self::increase_total_tx_count();
         if self.history.len() > MAX_HISTORY_LENGTH + HISTORY_REMOVAL_BATCH_SIZE {
             // We remove first `HISTORY_REMOVAL_BATCH_SIZE` from the history at one go, to prevent
             // often relocation of the history vec.
@@ -237,7 +238,6 @@ impl Ledger {
             // storage.
 
             self.history = self.history[HISTORY_REMOVAL_BATCH_SIZE..].into();
-            Self::write_vec_offset(Self::read_vec_offset() + HISTORY_REMOVAL_BATCH_SIZE as u64);
         }
     }
 
@@ -255,20 +255,26 @@ impl Ledger {
 
     pub fn clear(&mut self) {
         self.history.clear();
-        Self::write_vec_offset(0);
-    }
-
-    fn write_vec_offset(new_offset: u64) {
-        INDEX_OFFEST.with(|offset| {
-            offset
+        TOTAL_TX_COUNT.with(|count| {
+            count
                 .borrow_mut()
-                .set(new_offset)
-                .expect("fail to write vec offset")
+                .set(0)
+                .expect("fail to write total tx count")
         });
     }
 
-    fn read_vec_offset() -> u64 {
-        INDEX_OFFEST.with(|offset| *offset.borrow().get())
+    fn increase_total_tx_count() {
+        TOTAL_TX_COUNT.with(|count| {
+            let mut count_mut = count.borrow_mut();
+            let prev_count = *count_mut.get();
+            count_mut
+                .set(prev_count + 1)
+                .expect("fail to write total tx count")
+        });
+    }
+
+    fn read_total_tx_count() -> u64 {
+        TOTAL_TX_COUNT.with(|offset| *offset.borrow().get())
     }
 }
 
