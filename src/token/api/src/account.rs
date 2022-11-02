@@ -21,7 +21,7 @@ impl Account {
 
 // We use internal type separately from `Account` to make it semantically more correct. This
 // simplifies, for example comparison of accounts with default subaccount.
-#[derive(Debug, Clone, CandidType, Deserialize, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, CandidType, Deserialize, Copy, PartialEq, Eq, Hash)]
 pub struct AccountInternal {
     pub owner: Principal,
     pub subaccount: Subaccount,

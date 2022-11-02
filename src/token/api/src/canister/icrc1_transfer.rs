@@ -1,23 +1,23 @@
 use crate::account::{AccountInternal, CheckedAccount, WithRecipient};
 use crate::error::TxError;
-use crate::types::{TransferArgs, TxReceipt};
+use crate::state::config::TokenConfig;
+use crate::state::ledger::{TransferArgs, TxReceipt};
 
 use super::is20_transactions::burn;
 use super::is20_transactions::is20_transfer;
 use super::is20_transactions::mint;
-use crate::state::CanisterState;
 
 pub const TX_WINDOW: u64 = 60_000_000_000;
 pub const PERMITTED_DRIFT: u64 = 2 * 60_000_000_000;
 
 pub fn icrc1_transfer(
-    state: &mut CanisterState,
     caller: CheckedAccount<WithRecipient>,
     transfer: &TransferArgs,
     auction_fee_ratio: f64,
 ) -> TxReceipt {
     let amount = transfer.amount;
-    let minter = AccountInternal::new(state.stats.owner, None);
+    let minter = AccountInternal::new(TokenConfig::get_stable().owner, None);
+
     // Checks and returns error if the fee is not zero
     let check_zero_fee = || {
         if let Some(t) = transfer.fee {
@@ -29,28 +29,31 @@ pub fn icrc1_transfer(
         }
         Ok(())
     };
+
     if caller.inner() == minter {
         // Minting transfers must have zero fees.
         check_zero_fee()?;
-        return mint(state, caller.inner().owner, transfer.to.into(), amount);
+        return mint(caller.inner().owner, transfer.to.into(), amount);
     }
 
     if caller.recipient() == minter {
         // Burning transfers must have zero fees.
         check_zero_fee()?;
-        return burn(state, caller.recipient().owner, caller.inner(), amount);
+        return burn(caller.recipient().owner, caller.inner(), amount);
     }
 
-    is20_transfer(state, caller, transfer, auction_fee_ratio)
+    is20_transfer(caller, transfer, auction_fee_ratio)
 }
 
 #[cfg(test)]
 mod tests {
     use std::time::UNIX_EPOCH;
 
+    use candid::Principal;
     use canister_sdk::ic_auction::api::Auction;
     use canister_sdk::ic_canister::Canister;
     use canister_sdk::ic_helpers::tokens::Tokens128;
+    use canister_sdk::ic_kit::inject::get_context;
     use canister_sdk::ic_kit::mock_principals::{alice, bob, john, xtc};
     use canister_sdk::ic_kit::MockContext;
     use rand::prelude::*;
@@ -59,7 +62,9 @@ mod tests {
     use crate::canister::{auction_account, TokenCanisterAPI};
     use crate::error::{TransferError, TxError};
     use crate::mock::*;
-    use crate::types::{Metadata, Operation, TransactionStatus};
+    use crate::state::balances::{Balances, StableBalances};
+    use crate::state::config::{Metadata, DEFAULT_MIN_CYCLES};
+    use crate::state::ledger::{LedgerData, Operation, TransactionStatus};
 
     use super::*;
 
@@ -77,7 +82,15 @@ mod tests {
     fn test_context() -> (&'static MockContext, TokenCanisterMock) {
         let context = MockContext::new().with_caller(john()).inject();
 
-        let canister = TokenCanisterMock::init_instance();
+        let principal = Principal::from_text("mfufu-x6j4c-gomzb-geilq").unwrap();
+        let canister = TokenCanisterMock::from_principal(principal);
+        context.update_id(canister.principal());
+
+        // Refresh canister's state.
+        TokenConfig::set_stable(TokenConfig::default());
+        StableBalances.clear();
+        LedgerData::clear();
+
         canister.init(
             Metadata {
                 logo: "".to_string(),
@@ -96,7 +109,9 @@ mod tests {
         // pass, because since we are running auction state on each
         // endpoint call, it affects `BiddingInfo.fee_ratio` that is
         // used for charging fees in `approve` endpoint.
-        canister.state.borrow_mut().stats.min_cycles = 0;
+        let mut stats = TokenConfig::get_stable();
+        stats.min_cycles = 0;
+        TokenConfig::set_stable(stats);
 
         canister.mint(alice(), None, 1000.into()).unwrap();
         context.update_caller(alice());
@@ -114,7 +129,7 @@ mod tests {
     fn minting_with_nonzero_fee() {
         let (_ctx, canister) = test_context();
 
-        let minter = AccountInternal::new(canister.state.borrow_mut().stats.owner, None);
+        let minter = AccountInternal::new(TokenConfig::get_stable().owner, None);
         let to = Account::from(bob());
 
         let transfer = TransferArgs {
@@ -136,7 +151,7 @@ mod tests {
     fn burning_with_nonzero_fee() {
         let (_ctx, canister) = test_context();
 
-        let to = Account::from(canister.state.borrow_mut().stats.owner);
+        let to = Account::from(TokenConfig::get_stable().owner);
         let from_subaccount = Account::from(bob()).subaccount;
 
         let transfer = TransferArgs {
@@ -215,8 +230,11 @@ mod tests {
         let (ctx, canister) = test_context();
         let alice_sub = gen_subaccount();
         let bob_sub = gen_subaccount();
-        canister.state().borrow_mut().stats.fee = Tokens128::from(100);
-        canister.state().borrow_mut().stats.fee_to = john();
+
+        let mut stats = TokenConfig::get_stable();
+        stats.fee = Tokens128::from(100);
+        stats.fee_to = john();
+        TokenConfig::set_stable(stats);
 
         let transfer1 = TransferArgs {
             from_subaccount: None,
@@ -271,8 +289,11 @@ mod tests {
     #[test]
     fn transfer_fee_exceeded() {
         let canister = test_canister();
-        canister.state().borrow_mut().stats.fee = Tokens128::from(100);
-        canister.state().borrow_mut().stats.fee_to = john();
+
+        let mut stats = TokenConfig::get_stable();
+        stats.fee = Tokens128::from(100);
+        stats.fee_to = john();
+        TokenConfig::set_stable(stats);
 
         let transfer1 = TransferArgs {
             from_subaccount: None,
@@ -319,9 +340,13 @@ mod tests {
     #[test]
     fn fees_with_auction_enabled() {
         let canister = test_canister();
-        canister.state().borrow_mut().stats.fee = Tokens128::from(50);
-        canister.state().borrow_mut().stats.fee_to = john();
-        canister.state().borrow_mut().stats.min_cycles = crate::types::DEFAULT_MIN_CYCLES;
+
+        let mut stats = TokenConfig::get_stable();
+        stats.fee = Tokens128::from(50);
+        stats.fee_to = john();
+        stats.min_cycles = DEFAULT_MIN_CYCLES;
+        TokenConfig::set_stable(stats);
+
         canister
             .auction_state()
             .borrow_mut()
@@ -386,8 +411,11 @@ mod tests {
     #[test]
     fn transfer_with_fee_insufficient_balance() {
         let canister = test_canister();
-        canister.state().borrow_mut().stats.fee = Tokens128::from(100);
-        canister.state().borrow_mut().stats.fee_to = john();
+
+        let mut stats = TokenConfig::get_stable();
+        stats.fee = Tokens128::from(100);
+        stats.fee_to = john();
+        TokenConfig::set_stable(stats);
 
         let transfer1 = TransferArgs {
             from_subaccount: None,
@@ -417,7 +445,8 @@ mod tests {
     #[test]
     fn transfer_wrong_caller() {
         let canister = test_canister();
-        MockContext::new().with_caller(bob()).inject();
+        get_context().update_caller(bob());
+
         let transfer1 = TransferArgs {
             from_subaccount: None,
             to: Account::from(bob()),
@@ -448,7 +477,11 @@ mod tests {
     #[test]
     fn transfer_saved_into_history() {
         let (ctx, canister) = test_context();
-        canister.state().borrow_mut().stats.fee = Tokens128::from(10);
+
+        let mut stats = TokenConfig::get_stable();
+        stats.fee = Tokens128::from(10);
+        TokenConfig::set_stable(stats);
+
         let before_history_size = canister.history_size();
 
         let transfer1 = TransferArgs {
@@ -495,13 +528,15 @@ mod tests {
         let alice_sub = gen_subaccount();
 
         let canister = test_canister();
-        MockContext::new().with_caller(bob()).inject();
+        get_context().update_caller(bob());
         assert_eq!(
             canister.mint(alice(), None, Tokens128::from(100)),
             Err(TxError::Unauthorized)
         );
 
-        canister.state().borrow_mut().stats.is_test_token = true;
+        let mut stats = TokenConfig::get_stable();
+        stats.is_test_token = true;
+        TokenConfig::set_stable(stats);
 
         assert!(canister.mint(alice(), None, Tokens128::from(2000)).is_ok());
         assert!(canister.mint(bob(), None, Tokens128::from(5000)).is_ok());
@@ -563,7 +598,11 @@ mod tests {
     #[test]
     fn mint_saved_into_history() {
         let (ctx, canister) = test_context();
-        canister.state().borrow_mut().stats.fee = Tokens128::from(10);
+
+        let mut stats = TokenConfig::get_stable();
+        stats.fee = Tokens128::from(10);
+        TokenConfig::set_stable(stats);
+
         ctx.update_caller(john());
 
         assert_eq!(canister.history_size(), 2);
@@ -619,8 +658,8 @@ mod tests {
     #[test]
     fn burn_by_wrong_user() {
         let canister = test_canister();
-        let context = MockContext::new().with_caller(bob()).inject();
-        context.update_caller(bob());
+
+        get_context().update_caller(bob());
         let balance = canister.icrc1_balance_of(Account::new(bob(), None));
         assert_eq!(
             canister.burn(None, None, Tokens128::from(100)),
@@ -670,8 +709,8 @@ mod tests {
     #[test]
     fn burn_from_unauthorized() {
         let canister = test_canister();
-        let context = MockContext::new().with_caller(bob()).inject();
-        context.update_caller(bob());
+
+        get_context().update_caller(bob());
         assert_eq!(
             canister.burn(Some(alice()), None, Tokens128::from(100)),
             Err(TxError::Unauthorized)
@@ -687,13 +726,14 @@ mod tests {
     #[test]
     fn burn_saved_into_history() {
         let (ctx, canister) = test_context();
-        canister.state().borrow_mut().stats.fee = Tokens128::from(10);
+
+        let mut stats = TokenConfig::get_stable();
+        stats.fee = Tokens128::from(10);
+        TokenConfig::set_stable(stats);
+
         let history_size_before = canister.history_size();
 
         ctx.update_caller(john());
-        canister
-            .burn(None, None, Tokens128::from(1001))
-            .unwrap_err();
         assert_eq!(canister.history_size(), history_size_before);
 
         const COUNT: u64 = 5;
@@ -994,10 +1034,11 @@ mod tests {
 
 #[cfg(test)]
 mod proptests {
-    use candid::Principal;
     use canister_sdk::ic_canister::Canister;
     use canister_sdk::ic_helpers::tokens::Tokens128;
+    use canister_sdk::ic_kit::inject::get_context;
     use canister_sdk::ic_kit::MockContext;
+    use ic_exports::Principal;
     use proptest::collection::vec;
     use proptest::prelude::*;
     use proptest::sample::Index;
@@ -1006,7 +1047,9 @@ mod proptests {
     use crate::canister::TokenCanisterAPI;
     use crate::error::{TransferError, TxError};
     use crate::mock::*;
-    use crate::types::Metadata;
+    use crate::state::balances::{Balances, StableBalances};
+    use crate::state::config::Metadata;
+    use crate::state::ledger::LedgerData;
 
     use super::*;
 
@@ -1118,13 +1161,26 @@ mod proptests {
                 fee_to,
                 is_test_token: None,
             };
-            let canister = TokenCanisterMock::init_instance();
+
+            let principal = Principal::from_text("mfufu-x6j4c-gomzb-geilq").unwrap();
+            let canister = TokenCanisterMock::from_principal(principal);
+            get_context().update_id(canister.principal());
+
+            // Refresh canister's state.
+            TokenConfig::set_stable(TokenConfig::default());
+            StableBalances.clear();
+            LedgerData::clear();
+
             canister.init(meta,total_supply);
             // This is to make tests that don't rely on auction state
             // pass, because since we are running auction state on each
             // endpoint call, it affects `BiddingInfo.fee_ratio` that is
             // used for charging fees in `approve` endpoint.
-            canister.state.borrow_mut().stats.min_cycles = 0;
+
+            let mut stats = TokenConfig::get_stable();
+            stats.min_cycles = 0;
+
+            TokenConfig::set_stable(stats);
             (canister, principals)
         }
     }
@@ -1146,7 +1202,7 @@ mod proptests {
                 use Action::*;
                 match action {
                     Mint { minter, recipient, amount } => {
-                        MockContext::new().with_caller(minter).inject();
+                        get_context().update_caller(minter);
                         let original = canister.icrc1_total_supply();
                         let res = canister.mint(recipient, None,amount);
                         let expected = if minter == canister.owner() {
@@ -1160,7 +1216,7 @@ mod proptests {
                         assert_eq!(expected, canister.icrc1_total_supply());
                     },
                     Burn(amount, burner) => {
-                        MockContext::new().with_caller(burner).inject();
+                        get_context().update_caller(burner);
                         let original = canister.icrc1_total_supply();
                         let balance = canister.icrc1_balance_of(Account::new(burner, None));
                         let res = canister.burn(Some(burner), None, amount);
@@ -1181,10 +1237,10 @@ mod proptests {
                             return Ok(());
                         }
 
-                        MockContext::new().with_caller(from).inject();
+                        get_context().update_caller(from);
                         let from_balance = canister.icrc1_balance_of(Account::new(from, None));
                         let to_balance = canister.icrc1_balance_of(Account::new(to, None));
-                        let (fee , fee_to) = canister.state().borrow().stats.fee_info();
+                        let (fee , fee_to) = TokenConfig::get_stable().fee_info();
                         let amount_with_fee = (amount + fee).unwrap();
                         let transfer1 = TransferArgs {
                             from_subaccount: None,

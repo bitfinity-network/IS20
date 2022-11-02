@@ -1,7 +1,6 @@
-use candid::Principal;
+use ic_exports::Principal;
 
-use crate::error::TxError;
-use crate::types::StatsData;
+use crate::{error::TxError, state::config::TokenConfig};
 use canister_sdk::ic_kit::ic;
 
 /// Canister owner
@@ -20,9 +19,9 @@ impl<T> CheckedPrincipal<T> {
 }
 
 impl CheckedPrincipal<Owner> {
-    pub fn owner(stats: &StatsData) -> Result<Self, TxError> {
+    pub fn owner(config: &TokenConfig) -> Result<Self, TxError> {
         let caller = ic::caller();
-        if caller == stats.owner {
+        if caller == config.owner {
             Ok(Self(caller, Owner))
         } else {
             Err(TxError::Unauthorized)
@@ -31,9 +30,9 @@ impl CheckedPrincipal<Owner> {
 }
 
 impl CheckedPrincipal<TestNet> {
-    pub fn test_user(stats: &StatsData) -> Result<Self, TxError> {
+    pub fn test_user(config: &TokenConfig) -> Result<Self, TxError> {
         let caller = ic::caller();
-        if stats.is_test_token {
+        if config.is_test_token {
             Ok(Self(caller, TestNet))
         } else {
             Err(TxError::Unauthorized)

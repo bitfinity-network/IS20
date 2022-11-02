@@ -8,35 +8,29 @@ use canister_sdk::{
     ic_helpers::tokens::Tokens128,
     ic_kit::ic,
 };
+use ic_exports::Principal;
 
-use crate::canister::auction_account;
-use crate::state::{Balances, CanisterState};
-use crate::types::BatchTransferArgs;
+use crate::state::ledger::{BatchTransferArgs, LedgerData};
+use crate::{
+    account::AccountInternal,
+    state::balances::{Balances, StableBalances},
+};
+use crate::{canister::auction_account, state::config::TokenConfig};
 
 use super::is20_transactions::batch_transfer_internal;
 
-pub fn disburse_rewards(
-    canister_state: &mut CanisterState,
-    auction_state: &AuctionState,
-) -> Result<AuctionInfo, AuctionError> {
-    let CanisterState {
-        ref mut balances,
-        ref mut ledger,
-        ref stats,
-        ..
-    } = *canister_state;
-
+pub fn disburse_rewards(auction_state: &AuctionState) -> Result<AuctionInfo, AuctionError> {
     let AuctionState {
         ref bidding_state,
         ref history,
         ..
     } = *auction_state;
 
-    let total_amount = accumulated_fees(balances);
+    let total_amount = accumulated_fees();
     let mut transferred_amount = Tokens128::from(0u128);
     let total_cycles = bidding_state.cycles_since_auction;
 
-    let first_transaction_id = ledger.len();
+    let first_transaction_id = LedgerData::len();
 
     let mut transfers = vec![];
     for (bidder, cycles) in &bidding_state.bids {
@@ -48,23 +42,27 @@ pub fn disburse_rewards(
             receiver: (*bidder).into(),
             amount,
         });
-        ledger.record_auction(*bidder, amount);
+        LedgerData::record_auction(*bidder, amount);
         transferred_amount = (transferred_amount + amount)
             .ok_or_else(|| ic::trap("Token amount overflow on auction bids distribution."))
             .unwrap();
     }
 
+    let stats = TokenConfig::get_stable();
+    let (fee, fee_to) = stats.fee_info();
+
     if let Err(e) = batch_transfer_internal(
         auction_account(),
         &transfers,
-        balances,
-        stats,
+        &mut StableBalances,
+        fee,
+        fee_to,
         auction_state.bidding_state.fee_ratio,
     ) {
         ic::trap(&format!("Failed to transfer tokens to the bidders: {e}"));
     }
 
-    let last_transaction_id = ledger.len() - 1;
+    let last_transaction_id = LedgerData::len() - 1;
     let result = AuctionInfo {
         auction_id: history.len(),
         auction_time: canister_sdk::ic_kit::ic::time(),
@@ -78,8 +76,9 @@ pub fn disburse_rewards(
     Ok(result)
 }
 
-pub fn accumulated_fees(balances: &Balances) -> Tokens128 {
-    balances.balance_of(auction_account())
+pub fn accumulated_fees() -> Tokens128 {
+    let account = AccountInternal::new(Principal::management_canister(), None);
+    StableBalances.balance_of(&account)
 }
 
 #[cfg(test)]
@@ -94,9 +93,8 @@ mod tests {
         ic_metrics::Interval,
     };
 
-    use crate::canister::TokenCanisterAPI;
     use crate::mock::*;
-    use crate::types::Metadata;
+    use crate::state::config::Metadata;
 
     use super::*;
 
@@ -104,7 +102,15 @@ mod tests {
     fn test_context() -> (&'static mut MockContext, TokenCanisterMock) {
         let context = MockContext::new().with_caller(alice()).inject();
 
-        let canister = TokenCanisterMock::init_instance();
+        let principal = Principal::from_text("mfufu-x6j4c-gomzb-geilq").unwrap();
+        let canister = TokenCanisterMock::from_principal(principal);
+        context.update_id(canister.principal());
+
+        // Refresh canister's state.
+        TokenConfig::set_stable(TokenConfig::default());
+        StableBalances.clear();
+        LedgerData::clear();
+
         canister.init(
             Metadata {
                 logo: "".to_string(),
@@ -174,17 +180,9 @@ mod tests {
         context.update_msg_cycles(4_000_000);
         canister.bid_cycles(bob()).unwrap();
 
-        canister.state().borrow_mut().balances.insert(
-            auction_account().owner,
-            None,
-            Tokens128::from(6000),
-        );
-
-        canister
-            .state()
-            .borrow()
-            .balances
-            .balance_of(auction_account());
+        let auction_account = auction_account();
+        StableBalances.insert(auction_account, Tokens128::from(6000));
+        StableBalances.balance_of(&auction_account);
 
         context.add_time(10u64.pow(9) * 60 * 60 * 300);
 
@@ -195,7 +193,7 @@ mod tests {
         assert_eq!(result.tokens_distributed, Tokens128::from(6_000));
 
         assert_eq!(
-            canister.state().borrow().balances.balance_of(bob().into()),
+            StableBalances.balance_of(&bob().into()),
             Tokens128::from(4_000)
         );
 

@@ -1,7 +1,9 @@
 use candid::{Nat, Principal};
-use canister_sdk::ic_storage::IcStorage;
 
-use crate::state::CanisterState;
+use crate::state::{
+    balances::{Balances, StableBalances},
+    config::TokenConfig,
+};
 
 static OWNER_METHODS: &[&str] = &[
     "set_auction_period",
@@ -29,21 +31,18 @@ pub enum AcceptReason {
 /// calls for anyone, but update calls have different checks to see, if it's reasonable to spend
 /// canister cycles on accepting this call. Check the comments in this method for details on
 /// the checks for different methods.
-pub fn inspect_message(
-    state: &CanisterState,
-    method: &str,
-    caller: Principal,
-) -> Result<AcceptReason, &'static str> {
+pub fn inspect_message(method: &str, caller: Principal) -> Result<AcceptReason, &'static str> {
+    let stats = TokenConfig::get_stable();
     match method {
         // These are query methods, so no checks are needed.
         #[cfg(feature = "mint_burn")]
-        "mint" if state.stats.is_test_token => Ok(AcceptReason::Valid),
+        "mint" if stats.is_test_token => Ok(AcceptReason::Valid),
         #[cfg(feature = "mint_burn")]
-        "mint" if caller == state.stats.owner => Ok(AcceptReason::Valid),
+        "mint" if caller == stats.owner => Ok(AcceptReason::Valid),
         #[cfg(feature = "mint_burn")]
         "mint" => Err("Only the owner can mint"),
         // Owner
-        m if OWNER_METHODS.contains(&m) && caller == state.stats.owner => Ok(AcceptReason::Valid),
+        m if OWNER_METHODS.contains(&m) && caller == stats.owner => Ok(AcceptReason::Valid),
         // Not owner
         m if OWNER_METHODS.contains(&m) => {
             Err("Owner method is called not by an owner. Rejecting.")
@@ -51,15 +50,13 @@ pub fn inspect_message(
         #[cfg(any(feature = "transfer", feature = "mint_burn"))]
         m if TRANSACTION_METHODS.contains(&m) => {
             // These methods requires that the caller have tokens.
-            let state = CanisterState::get();
-            let state = state.borrow();
-            let balances = &state.balances;
-            if !balances.0.contains_key(&caller) {
+
+            if StableBalances.get_subaccounts(caller).is_empty() {
                 return Err("Transaction method is not called by a stakeholder. Rejecting.");
             }
 
             // Anything but the `burn` method
-            if caller == state.stats.owner || m != "burn" {
+            if caller == stats.owner || m != "burn" {
                 return Ok(AcceptReason::Valid);
             }
 

@@ -1,4 +1,3 @@
-use candid::Principal;
 use canister_sdk::{
     ic_canister::Canister,
     ic_helpers::tokens::Tokens128,
@@ -7,19 +6,32 @@ use canister_sdk::{
         MockContext,
     },
 };
+use ic_exports::Principal;
 use is20_token_canister::canister::TokenCanister;
 use token_api::{
     account::Account,
     canister::TokenCanisterAPI,
     error::TransferError,
-    state::CanisterState,
-    types::{Metadata, StandardRecord, TransferArgs, Value},
+    state::config::{Metadata, StandardRecord, Value},
+    state::{
+        balances::{Balances, StableBalances},
+        config::TokenConfig,
+        ledger::{LedgerData, TransferArgs},
+    },
 };
 
 fn init() -> (Metadata, TokenCanister, &'static mut MockContext) {
-    let ctx = canister_sdk::ic_kit::MockContext::new().inject();
-    let canister = TokenCanister::init_instance();
-    canister.state().replace(CanisterState::default());
+    let context = canister_sdk::ic_kit::MockContext::new().inject();
+
+    let principal = Principal::from_text("mfufu-x6j4c-gomzb-geilq").unwrap();
+    let canister = TokenCanister::from_principal(principal);
+    context.update_id(canister.principal());
+
+    // Refresh canister's state.
+    TokenConfig::set_stable(TokenConfig::default());
+    StableBalances.clear();
+    LedgerData::clear();
+
     let meta = Metadata {
         decimals: 11,
         fee: 127.into(),
@@ -31,7 +43,7 @@ fn init() -> (Metadata, TokenCanister, &'static mut MockContext) {
         is_test_token: None,
     };
     canister.init(meta.clone(), 1_000_000_000.into());
-    (meta, canister, ctx)
+    (meta, canister, context)
 }
 
 #[test]

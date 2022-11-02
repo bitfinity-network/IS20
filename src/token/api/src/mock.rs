@@ -1,6 +1,5 @@
 use std::{cell::RefCell, rc::Rc};
 
-use candid::Principal;
 #[cfg(feature = "auction")]
 use canister_sdk::ic_auction::{
     api::Auction,
@@ -11,34 +10,35 @@ use canister_sdk::{
     ic_canister::{self, Canister, PreUpdate},
     ic_helpers::tokens::Tokens128,
     ic_metrics::Interval,
-    ic_storage::{self, IcStorage},
+    ic_storage::IcStorage,
 };
+use ic_exports::Principal;
 
-use crate::{canister::TokenCanisterAPI, state::CanisterState, types::Metadata};
+use crate::{
+    account::AccountInternal,
+    canister::TokenCanisterAPI,
+    state::{
+        balances::{Balances, StableBalances},
+        config::{Metadata, TokenConfig},
+        ledger::LedgerData,
+    },
+};
 
 #[derive(Debug, Clone, Canister)]
 pub struct TokenCanisterMock {
     #[id]
     principal: Principal,
-
-    #[state]
-    pub(crate) state: Rc<RefCell<CanisterState>>,
 }
 
 impl TokenCanisterMock {
     #[cfg_attr(coverage_nightly, no_coverage)]
     pub fn init(&self, metadata: Metadata, amount: Tokens128) {
-        self.state
-            .borrow_mut()
-            .balances
-            .insert(metadata.owner, None, amount);
+        let owner_account = AccountInternal::new(metadata.owner, None);
+        StableBalances.insert(owner_account, amount);
 
-        self.state
-            .borrow_mut()
-            .ledger
-            .mint(metadata.owner.into(), metadata.owner.into(), amount);
+        LedgerData::mint(metadata.owner.into(), metadata.owner.into(), amount);
 
-        self.state.borrow_mut().stats = metadata.into();
+        TokenConfig::set_stable(metadata.into());
 
         #[cfg(feature = "auction")]
         {
@@ -68,16 +68,8 @@ impl Auction for TokenCanisterMock {
     }
 
     fn disburse_rewards(&self) -> Result<AuctionInfo, AuctionError> {
-        crate::canister::is20_auction::disburse_rewards(
-            &mut self.state().borrow_mut(),
-            &self.auction_state().borrow(),
-        )
+        crate::canister::is20_auction::disburse_rewards(&self.auction_state().borrow())
     }
 }
 
-impl TokenCanisterAPI for TokenCanisterMock {
-    #[cfg_attr(coverage_nightly, no_coverage)]
-    fn state(&self) -> Rc<RefCell<CanisterState>> {
-        self.state.clone()
-    }
-}
+impl TokenCanisterAPI for TokenCanisterMock {}

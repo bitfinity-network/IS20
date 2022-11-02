@@ -4,7 +4,8 @@ use canister_sdk::ic_kit::ic;
 
 use crate::{
     account::{Account, AccountInternal},
-    types::{Memo, Operation, Timestamp, TransactionStatus},
+    state::config::Timestamp,
+    state::ledger::{Memo, Operation, TransactionStatus},
 };
 
 pub type TxId = u64;
