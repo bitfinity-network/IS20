@@ -47,6 +47,23 @@ jobs:
       gh_login: ${{ secrets.GH_PKG_LOGIN }}
 
 
+  codecov:
+    needs: [build-test]
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: "Getting artifact"
+      uses: actions/download-artifact@v3
+      with:
+        name: artifact-is20
+        path: ./.artifact
+    - uses: codecov/codecov-action@v3
+      with:
+        token: ${{ secrets.CODECOV_TOKEN }}
+        files: .artifact/lcov.info
+        verbose: true
+
+
   release:
     if: ${{github.ref_type == 'tag'}}
     needs: [build-test]
