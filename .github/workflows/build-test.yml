@@ -77,6 +77,7 @@ jobs:
         path: ./.artifact
     - name: "Compress"
       run: |
+        rm -f .artifact/lcov.info
         cd .artifact
         tar -czf ../is20-${{ github.ref_name }}.tar.gz --owner=0 --group=0 --no-same-owner --no-same-permissions .
     - name: Release
