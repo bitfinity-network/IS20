@@ -1,5 +1,7 @@
 ![IS20 banner](https://user-images.githubusercontent.com/6412426/146728389-42384977-0ed3-43a6-83d3-ce16db609c09.png)
 
+[![codecov](https://codecov.io/github/infinity-swap/IS20/branch/main/graph/badge.svg?token=SL2P26VSL7)](https://codecov.io/github/infinity-swap/IS20)
+
 # IS20 - Introduction
 
 IS20 is an Internet Computer token standard proposed by Infinity Swap.

@@ -29,9 +29,7 @@ jobs:
       git-fetch-depth: "0"
       test-script: |
         ./scripts/build.sh
-        cargo llvm-cov -v -p token-factory --features export-api
-        cargo llvm-cov -v -p is20-token --features auction --features export-api
-        cargo llvm-cov -v -p is20-token-canister --features export-api
+        cargo llvm-cov --all-features --workspace --lcov --output-path .artifact/lcov.info
 
       output-artifact: artifact-is20
       artifact-script: |
@@ -47,6 +45,24 @@ jobs:
     secrets:
       gh_token: ${{ secrets.GH_PKG_TOKEN }}
       gh_login: ${{ secrets.GH_PKG_LOGIN }}
+
+
+  codecov:
+    needs: [build-test]
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v3
+    - name: "Getting artifact"
+      uses: actions/download-artifact@v3
+      with:
+        name: artifact-is20
+        path: ./.artifact
+    - uses: codecov/codecov-action@v3
+      with:
+        token: ${{ secrets.CODECOV_TOKEN }}
+        files: .artifact/lcov.info
+        verbose: true
 
 
   release:
