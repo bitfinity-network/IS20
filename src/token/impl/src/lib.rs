@@ -1,6 +1,10 @@
 #![cfg_attr(coverage_nightly, feature(no_coverage))]
 pub mod canister;
 
+/// This is a marker added to the token wasm to distinguish it from other canisters
+#[no_mangle]
+pub static CANISTER_MARKER: &str = "IS20_TOKEN_CANISTER";
+
 pub fn idl() -> String {
     use crate::canister::TokenCanister;
     use canister_sdk::{ic_auction::api::Auction, ic_canister::Idl, ic_helpers::tokens::Tokens128};
