@@ -24,6 +24,7 @@ jobs:
     uses: infinity-swap/ci-wf/.github/workflows/build-n-test.yml@main
     with:
       container-image: ghcr.io/infinity-swap/ic-dev-full:rust1.64-dfx0.11-rc-2022-09-30
+      enable-target-cache: true
       audit-allow-warnings: true
       git-fetch-depth: "0"
       test-script: |
@@ -77,6 +78,7 @@ jobs:
         path: ./.artifact
     - name: "Compress"
       run: |
+        rm -f .artifact/lcov.info
         cd .artifact
         tar -czf ../is20-${{ github.ref_name }}.tar.gz --owner=0 --group=0 --no-same-owner --no-same-permissions .
     - name: Release
