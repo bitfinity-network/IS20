@@ -2,8 +2,9 @@
 pub mod canister;
 
 /// This is a marker added to the token wasm to distinguish it from other canisters
+#[cfg(feature = "export_api")]
 #[no_mangle]
-pub static CANISTER_MARKER: &str = "IS20_TOKEN_CANISTER";
+pub static TOKEN_CANISTER_MARKER: &str = "IS20_TOKEN_CANISTER";
 
 pub fn idl() -> String {
     use crate::canister::TokenCanister;

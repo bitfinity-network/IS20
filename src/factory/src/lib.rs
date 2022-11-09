@@ -6,8 +6,9 @@ pub use self::api::*;
 pub use state::State;
 
 /// This is a marker added to the wasm to distinguish it from other canisters
+#[cfg(feature = "export_api")]
 #[no_mangle]
-pub static CANISTER_MARKER: &str = "IS20_FACTORY_CANISTER";
+pub static TOKEN_FACTORY_CANISTER_MARKER: &str = "IS20_FACTORY_CANISTER";
 
 pub fn idl() -> String {
     use crate::error::TokenFactoryError;
