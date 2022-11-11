@@ -23,7 +23,7 @@ jobs:
   build-test:
     uses: infinity-swap/ci-wf/.github/workflows/build-n-test.yml@main
     with:
-      container-image: ghcr.io/infinity-swap/ic-dev-full:rust1.64-dfx0.11-rc-2022-09-30
+      container-image: ghcr.io/infinity-swap/ic-dev-full:rust1.65-dfx0.11-rc-2022-09-30
       enable-target-cache: true
       audit-allow-warnings: true
       git-fetch-depth: "0"
