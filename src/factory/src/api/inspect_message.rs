@@ -16,7 +16,7 @@ fn inspect_message() {
         }
 
         ic_cdk::trap(&format!(
-            "the caller {} is not a factory controller {}",
+            "The caller {} is not a factory controller {}.",
             canister_sdk::ic_kit::ic::caller(),
             factory.controller()
         ));
