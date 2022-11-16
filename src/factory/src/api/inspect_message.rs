@@ -24,6 +24,6 @@ fn inspect_message() {
 
     match state.token_wasm {
         Some(_) => ic_cdk::api::call::accept_message(),
-        None => ic_cdk::trap("the factory hasn't been completely intialized yet"),
+        None => ic_cdk::trap("The factory hasn't been completely intialized yet."),
     }
 }
