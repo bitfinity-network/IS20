@@ -7,7 +7,6 @@ use ic_stable_structures::{MemoryId, StableCell, Storable};
 
 #[derive(Deserialize, CandidType, Clone, Debug)]
 pub struct TokenConfig {
-    pub logo: String,
     pub name: String,
     pub symbol: String,
     pub decimals: u8,
@@ -62,7 +61,6 @@ impl TokenConfig {
 
     pub fn get_metadata(&self) -> Metadata {
         Metadata {
-            logo: self.logo.clone(),
             name: self.name.clone(),
             symbol: self.symbol.clone(),
             decimals: self.decimals,
@@ -77,7 +75,6 @@ impl TokenConfig {
 impl Default for TokenConfig {
     fn default() -> Self {
         TokenConfig {
-            logo: "".to_string(),
             name: "".to_string(),
             symbol: "".to_string(),
             decimals: 0u8,
@@ -116,7 +113,6 @@ impl StandardRecord {
 #[allow(non_snake_case)]
 #[derive(Deserialize, CandidType, Clone, Debug)]
 pub struct Metadata {
-    pub logo: String,
     pub name: String,
     pub symbol: String,
     pub decimals: u8,
@@ -133,7 +129,6 @@ pub const DEFAULT_MIN_CYCLES: u64 = 10_000_000_000_000;
 impl From<Metadata> for TokenConfig {
     fn from(md: Metadata) -> Self {
         Self {
-            logo: md.logo,
             name: md.name,
             symbol: md.symbol,
             decimals: md.decimals,

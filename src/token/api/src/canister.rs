@@ -52,7 +52,6 @@ pub const DEFAULT_AUCTION_PERIOD_SECONDS: Timestamp = 60 * 60 * 24;
 pub enum CanisterUpdate {
     Name(String),
     Symbol(String),
-    Logo(String),
     Fee(Tokens128),
     FeeTo(Principal),
     Owner(Principal),
@@ -79,11 +78,6 @@ pub trait TokenCanisterAPI: Canister + Sized + AuctionCanister {
     #[query(trait = true)]
     fn is_test_token(&self) -> bool {
         TokenConfig::get_stable().is_test_token
-    }
-
-    #[query(trait = true)]
-    fn logo(&self) -> String {
-        TokenConfig::get_stable().logo
     }
 
     #[query(trait = true)]
@@ -124,13 +118,6 @@ pub trait TokenCanisterAPI: Canister + Sized + AuctionCanister {
     fn set_symbol(&self, symbol: String) -> Result<(), TxError> {
         let caller = CheckedPrincipal::owner(&TokenConfig::get_stable())?;
         self.update_stats(caller, CanisterUpdate::Symbol(symbol));
-        Ok(())
-    }
-
-    #[update(trait = true)]
-    fn set_logo(&self, logo: String) -> Result<(), TxError> {
-        let caller = CheckedPrincipal::owner(&TokenConfig::get_stable())?;
-        self.update_stats(caller, CanisterUpdate::Logo(logo));
         Ok(())
     }
 
@@ -371,7 +358,6 @@ pub trait TokenCanisterAPI: Canister + Sized + AuctionCanister {
         match update {
             Name(name) => stats.name = name,
             Symbol(symbol) => stats.symbol = symbol,
-            Logo(logo) => stats.logo = logo,
             Fee(fee) => stats.fee = fee,
             FeeTo(fee_to) => stats.fee_to = fee_to,
             Owner(owner) => stats.owner = owner,
@@ -457,7 +443,6 @@ mod tests {
 
         canister.init(
             Metadata {
-                logo: "".to_string(),
                 name: "".to_string(),
                 symbol: "".to_string(),
                 decimals: 8,
@@ -498,7 +483,6 @@ mod tests {
 
         canister.init(
             Metadata {
-                logo: "".to_string(),
                 name: "".to_string(),
                 symbol: "".to_string(),
                 decimals: 8,
@@ -693,37 +677,6 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(symbol, "MAX".to_string());
-    }
-
-    #[tokio::test]
-    #[cfg_attr(coverage_nightly, no_coverage)]
-    async fn set_logo() {
-        let (ctx, canister) = test_context();
-        ctx.update_id(john());
-        canister_call!(canister.set_logo("1".to_string()), Result<(), TxError>)
-            .await
-            .unwrap()
-            .unwrap();
-        let info = canister_call!(canister.get_token_info(), TokenInfo)
-            .await
-            .unwrap();
-
-        assert_eq!(info.metadata.logo, "1".to_string());
-
-        ctx.update_id(bob());
-        let res = canister_call!(canister.set_logo("2".to_string()), Result<(), TxError>)
-            .await
-            .unwrap();
-
-        assert_eq!(res, Err(TxError::Unauthorized));
-        let info = canister_call!(canister.get_token_info(), TokenInfo)
-            .await
-            .unwrap();
-
-        assert_eq!(info.metadata.logo, "1".to_string());
-
-        let logo = canister_call!(canister.logo(), String).await.unwrap();
-        assert_eq!(logo, "1".to_string());
     }
 
     #[tokio::test]
