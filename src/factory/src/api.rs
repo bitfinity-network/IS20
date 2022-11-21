@@ -58,8 +58,8 @@ impl PreUpdate for TokenFactoryCanister {
 #[allow(dead_code)]
 impl TokenFactoryCanister {
     #[query]
-    fn git_tag(&self) -> &'static str {
-        option_env!("GIT_TAG").unwrap_or("NOT_FOUND")
+    fn pkg_version(&self) -> &'static str {
+        option_env!("CARGO_PKG_VERSION").unwrap_or("NOT_FOUND")
     }
 
     #[pre_upgrade]
