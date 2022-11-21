@@ -9,8 +9,9 @@ IS20 is an Internet Computer token standard proposed by Infinity Swap.
 You can find the standard spec at [spec/IS20.md](spec/IS20.md) and the default implementation in the `src` directory.
 
 This repository contains two canisters:
-* `factory` is responsible for creating and deploying  new token canisters
-* `token` is the default implementation of the IS20 token
+
+- `factory` is responsible for creating and deploying new token canisters
+- `token` is the default implementation of the IS20 token
 
 # Usage
 
@@ -54,7 +55,6 @@ The minimum amount of cycles required by the factory to create a canister is `10
 // Use the user principal above to set the owner
 dfx canister --wallet yjeau-xiaaa-aaaaa-aabsa-cai call --with-cycles 1000000000000 token_factory create_token \
   '(record {
-  logo = "";
   name = "y";
   symbol = "y";
   decimals = 8;

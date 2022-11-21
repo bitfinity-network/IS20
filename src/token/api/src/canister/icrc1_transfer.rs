@@ -93,7 +93,6 @@ mod tests {
 
         canister.init(
             Metadata {
-                logo: "".to_string(),
                 name: "".to_string(),
                 symbol: "".to_string(),
                 decimals: 8,
@@ -1137,7 +1136,6 @@ mod proptests {
     }
     prop_compose! {
         fn make_canister() (
-            logo in any::<String>(),
             name in any::<String>(),
             symbol in any::<String>(),
             decimals in any::<u8>(),
@@ -1152,7 +1150,6 @@ mod proptests {
             let fee_to = principals[fee_to_idx.index(principals.len())];
             MockContext::new().with_caller(owner).inject();
             let meta = Metadata {
-                logo,
                 name,
                 symbol,
                 decimals,

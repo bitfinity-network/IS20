@@ -379,7 +379,6 @@ mod tests {
 
         canister.init(
             Metadata {
-                logo: "".to_string(),
                 name: "".to_string(),
                 symbol: "".to_string(),
                 decimals: 8,

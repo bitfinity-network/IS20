@@ -36,7 +36,6 @@ fn init() -> (Metadata, TokenCanister, &'static mut MockContext) {
         decimals: 11,
         fee: 127.into(),
         fee_to: alice(),
-        logo: "TST_logo".into(),
         name: "Testo".into(),
         symbol: "TST".into(),
         owner: alice(),
