@@ -833,4 +833,14 @@ mod tests {
         let res = claim(alice(), None);
         assert_eq!(res, Err(TxError::NothingToClaim));
     }
+
+    #[test]
+    fn burn_removes_empty_entry() {
+        let _ = test_canister();
+        mint(alice(), bob().into(), Tokens128::from(1_000_000)).unwrap();
+        assert_ne!(StableBalances.get(&bob().into()), None);
+
+        burn(alice(), bob().into(), Tokens128::from(1_000_000)).unwrap();
+        assert_eq!(StableBalances.get(&bob().into()), None);
+    }
 }
