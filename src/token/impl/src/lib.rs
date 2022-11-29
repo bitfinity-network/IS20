@@ -2,7 +2,7 @@
 pub mod canister;
 
 /// This is a marker added to the token wasm to distinguish it from other canisters
-#[cfg(feature = "export_api")]
+#[cfg(feature = "export-api")]
 #[no_mangle]
 pub static TOKEN_CANISTER_MARKER: &str = "IS20_TOKEN_CANISTER";
 
