@@ -4,6 +4,8 @@ on:
   push:
     tags:
       - "v*"
+    branches:    
+      - 'main'  
     paths-ignore:
       - "**/README.md"
 
@@ -26,7 +28,7 @@ jobs:
       container-image: ghcr.io/infinity-swap/ic-dev-full:rust1.65-dfx0.11-rc-2022-09-30
       enable-target-cache: true
       audit-allow-warnings: true
-      git-fetch-depth: "0"
+      skip-test: ${{ github.ref_type == 'tag' }}
       test-script: |
         ./scripts/build.sh
         cargo llvm-cov --all-features --workspace --lcov --output-path .artifact/lcov.info
@@ -48,6 +50,7 @@ jobs:
 
 
   codecov:
+    if: ${{ github.ref_type != 'tag' }}
     needs: [build-test]
     runs-on: ubuntu-latest
 
