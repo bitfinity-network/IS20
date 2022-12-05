@@ -188,7 +188,7 @@ impl TokenFactoryCanister {
 
     #[update]
     pub async fn upgrade(&mut self) -> Result<HashMap<Principal, UpgradeResult>, FactoryError> {
-        self.upgrade_canister::<()>().await
+        self.upgrade_canister().await
     }
 }
 
