@@ -20,10 +20,7 @@ use canister_sdk::{
         error::FactoryError,
         FactoryConfiguration, FactoryState,
     },
-    ic_helpers::{
-        candid_header::{candid_header, CandidHeader},
-        tokens::Tokens128,
-    },
+    ic_helpers::tokens::Tokens128,
     ic_kit::ic,
     ic_storage,
 };
@@ -112,23 +109,8 @@ impl TokenFactoryCanister {
 
     #[update]
     pub async fn set_token_bytecode(&self, bytecode: Vec<u8>) -> Result<u32, FactoryError> {
-        use candid::{CandidType, Deserialize};
-        use canister_sdk::ic_storage::stable::Versioned;
-        // requred to pass state check
-        #[derive(Debug, Deserialize, CandidType)]
-        pub struct EmptyState;
-
-        impl Versioned for EmptyState {
-            type Previous = ();
-
-            fn upgrade(_: Self::Previous) -> Self {
-                Self
-            }
-        }
-
-        let state_header = candid_header::<EmptyState>();
         self.state.borrow_mut().token_wasm = Some(bytecode.clone());
-        self.set_canister_code::<EmptyState>(bytecode, state_header)
+        self.set_canister_code(bytecode)
     }
 
     /// Creates a new token.
@@ -207,11 +189,6 @@ impl TokenFactoryCanister {
     #[update]
     pub async fn upgrade(&mut self) -> Result<HashMap<Principal, UpgradeResult>, FactoryError> {
         self.upgrade_canister::<()>().await
-    }
-
-    #[query]
-    pub fn state_header(&self) -> CandidHeader {
-        candid_header::<StableState>()
     }
 }
 
