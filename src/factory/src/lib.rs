@@ -18,7 +18,7 @@ pub fn idl() -> String {
             api::{FactoryCanister, UpgradeResult},
             error::FactoryError,
         },
-        ic_helpers::{candid_header::CandidHeader, tokens::Tokens128},
+        ic_helpers::tokens::Tokens128,
     };
     use ic_exports::Principal;
     use std::collections::HashMap;
