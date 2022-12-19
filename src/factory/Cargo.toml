@@ -12,7 +12,7 @@ export-api = ["canister-sdk/factory-api", "canister-sdk/metrics-api"]
 candid = "0.8"
 serde = "1.0"
 thiserror = "1.0"
-canister-sdk = { git = "https://github.com/infinity-swap/canister-sdk", package = "canister-sdk", tag = "v0.3.31", features = ["factory"] }
-ic-exports = { git = "https://github.com/infinity-swap/canister-sdk", package = "ic-exports", tag = "v0.3.31" }
+canister-sdk = { git = "https://github.com/infinity-swap/canister-sdk", package = "canister-sdk", tag = "v0.3.34-dev", features = ["factory"] }
+ic-exports = { git = "https://github.com/infinity-swap/canister-sdk", package = "ic-exports", tag = "v0.3.34-dev" }
 
 token = { path = "../token/api", package = "is20-token" }
