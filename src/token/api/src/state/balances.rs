@@ -2,7 +2,7 @@ use std::{borrow::Cow, cell::RefCell, collections::HashMap};
 
 use candid::{CandidType, Deserialize, Principal};
 use canister_sdk::ic_helpers::tokens::Tokens128;
-use ic_stable_structures::{MemoryId, StableMultimap, Storable};
+use ic_stable_structures::{BoundedStorable, MemoryId, StableMultimap, Storable};
 
 use crate::account::{AccountInternal, Subaccount};
 
@@ -208,7 +208,6 @@ impl Balances for LocalBalances {
 const BALANCES_MEMORY_ID: MemoryId = MemoryId::new(1);
 const PRINCIPAL_MAX_LENGTH_IN_BYTES: usize = 29;
 const SUBACCOUNT_MAX_LENGTH_IN_BYTES: usize = 32;
-const VALUE_BYTES_LEN: usize = 16;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 struct PrincipalKey(Principal);
@@ -220,6 +219,12 @@ impl Storable for PrincipalKey {
 
     fn from_bytes(bytes: Vec<u8>) -> Self {
         PrincipalKey(Principal::from_slice(&bytes))
+    }
+}
+
+impl BoundedStorable for PrincipalKey {
+    fn max_size() -> u32 {
+        PRINCIPAL_MAX_LENGTH_IN_BYTES as u32
     }
 }
 
@@ -238,10 +243,13 @@ impl Storable for SubaccountKey {
     }
 }
 
+impl BoundedStorable for SubaccountKey {
+    fn max_size() -> u32 {
+        SUBACCOUNT_MAX_LENGTH_IN_BYTES as u32
+    }
+}
+
 thread_local! {
     static MAP: RefCell<StableMultimap<PrincipalKey, SubaccountKey, u128>> =
-        RefCell::new(StableMultimap::new(BALANCES_MEMORY_ID,
-            PRINCIPAL_MAX_LENGTH_IN_BYTES as _,
-            SUBACCOUNT_MAX_LENGTH_IN_BYTES as _,
-            VALUE_BYTES_LEN as _));
+        RefCell::new(StableMultimap::new(BALANCES_MEMORY_ID));
 }
