@@ -6,8 +6,7 @@ use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
 
-use crate::state::StableState;
-use crate::{error::TokenFactoryError, state::State};
+use crate::{error::TokenFactoryError, state};
 use candid::Principal;
 use canister_sdk::ic_factory::DEFAULT_ICP_FEE;
 use canister_sdk::ic_metrics::{Metrics, MetricsStorage};
@@ -21,7 +20,6 @@ use canister_sdk::{
         FactoryConfiguration, FactoryState,
     },
     ic_helpers::tokens::Tokens128,
-    ic_kit::ic,
     ic_storage,
 };
 use token::state::config::Metadata;
@@ -36,9 +34,6 @@ mod inspect_message;
 pub struct TokenFactoryCanister {
     #[id]
     principal: Principal,
-
-    #[state]
-    pub state: Rc<RefCell<State>>,
 }
 
 impl Metrics for TokenFactoryCanister {
@@ -61,33 +56,12 @@ impl TokenFactoryCanister {
 
     #[pre_upgrade]
     fn pre_upgrade(&self) {
-        let token_factory_state = self.state.replace(State::default());
-        let base_factory_state = self.factory_state().replace(FactoryState::default());
-
-        if let Err(err) = ic_storage::stable::write(&StableState {
-            token_factory_state,
-            base_factory_state,
-        }) {
-            ic::trap(&format!(
-                "Error while serializing state to the stable storage: {err}"
-            ));
-        }
+        // All state is stored in stable storage, so nothing to do here
     }
 
     #[post_upgrade]
     fn post_upgrade(&self) {
-        let stable_state = ic_storage::stable::read::<StableState>().unwrap_or_else(|err| {
-            ic::trap(&format!(
-                "Error while deserializing state from the stable storage: {err}",
-            ));
-        });
-        let StableState {
-            token_factory_state,
-            base_factory_state,
-        } = stable_state;
-
-        self.state.replace(token_factory_state);
-        self.factory_state().replace(base_factory_state);
+        // All state is stored in stable storage, so nothing to do here
     }
 
     #[init]
@@ -97,19 +71,18 @@ impl TokenFactoryCanister {
         let factory_configuration =
             FactoryConfiguration::new(ledger, DEFAULT_ICP_FEE, controller, controller);
 
-        self.factory_state()
-            .replace(FactoryState::new(factory_configuration));
+        FactoryState::default().reset(factory_configuration)
     }
 
     /// Returns the token, or None if it does not exist.
     #[query]
     pub async fn get_token(&self, name: String) -> Option<Principal> {
-        self.state.borrow().tokens.get(&name).copied()
+        state::get_state().get_token(name)
     }
 
     #[update]
     pub async fn set_token_bytecode(&self, bytecode: Vec<u8>) -> Result<u32, FactoryError> {
-        self.state.borrow_mut().token_wasm = Some(bytecode.clone());
+        state::get_state().set_token_wasm(Some(bytecode.clone()));
         self.set_canister_code(bytecode)
     }
 
@@ -152,6 +125,13 @@ impl TokenFactoryCanister {
             ));
         }
 
+        if info.name.as_bytes().len() > 1024 {
+            return Err(TokenFactoryError::InvalidConfiguration(
+                "name",
+                "should be less then 1024 bytes",
+            ));
+        }
+
         if info.symbol.is_empty() {
             return Err(TokenFactoryError::InvalidConfiguration(
                 "symbol",
@@ -160,7 +140,7 @@ impl TokenFactoryCanister {
         }
 
         let key = info.name.clone();
-        if self.state.borrow().tokens.contains_key(&key) {
+        if state::get_state().get_token(key.clone()).is_some() {
             return Err(TokenFactoryError::AlreadyExists);
         }
 
@@ -168,7 +148,7 @@ impl TokenFactoryCanister {
         let principal = self
             .create_canister((info, amount), controller, Some(caller))
             .await?;
-        self.state.borrow_mut().tokens.insert(key, principal);
+        state::get_state().insert_token(key, principal);
 
         Ok(principal)
     }
@@ -181,7 +161,7 @@ impl TokenFactoryCanister {
             .ok_or(TokenFactoryError::FactoryError(FactoryError::NotFound))?;
 
         self.drop_canister(canister_id, None).await?;
-        self.state.borrow_mut().tokens.remove(&name);
+        state::get_state().remove_token(name);
 
         Ok(())
     }
@@ -192,12 +172,7 @@ impl TokenFactoryCanister {
     }
 }
 
-impl FactoryCanister for TokenFactoryCanister {
-    fn factory_state(&self) -> Rc<RefCell<FactoryState>> {
-        use canister_sdk::ic_storage::IcStorage;
-        FactoryState::get()
-    }
-}
+impl FactoryCanister for TokenFactoryCanister {}
 
 #[cfg(test)]
 mod tests {
