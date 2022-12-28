@@ -71,7 +71,8 @@ impl TokenFactoryCanister {
         let factory_configuration =
             FactoryConfiguration::new(ledger, DEFAULT_ICP_FEE, controller, controller);
 
-        FactoryState::default().reset(factory_configuration)
+        FactoryState::default().reset(factory_configuration);
+        state::get_state().reset();
     }
 
     /// Returns the token, or None if it does not exist.

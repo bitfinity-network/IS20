@@ -8,6 +8,15 @@ use serde::Deserialize;
 pub struct State {}
 
 impl State {
+    pub fn reset(&mut self) {
+        TOKENS_MAP.with(|map| map.borrow_mut().clear());
+        WASM_CELL.with(|cell| {
+            cell.borrow_mut()
+                .set(StorableWasm::default())
+                .expect("failed to reset token wasm in stable memory")
+        });
+    }
+
     pub fn get_token(&self, name: String) -> Option<Principal> {
         Self::check_name(&name).then_some(())?;
 
