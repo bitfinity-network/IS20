@@ -136,8 +136,8 @@ mod tests {
     use canister_sdk::ic_kit::MockContext;
     use ic_stable_structures::Storable;
 
-    use crate::State;
     use crate::state::{PrincipalValue, StorableWasm};
+    use crate::State;
 
     use super::StringKey;
 
@@ -197,10 +197,16 @@ mod tests {
         state.insert_token("mng".into(), Principal::management_canister());
 
         assert_eq!(state.get_token("anon".into()), Some(Principal::anonymous()));
-        assert_eq!(state.get_token("mng".into()), Some(Principal::management_canister()));
+        assert_eq!(
+            state.get_token("mng".into()),
+            Some(Principal::management_canister())
+        );
         assert_eq!(state.get_token("other".into()), None);
 
-        assert_eq!(state.remove_token("mng".into()), Some(Principal::management_canister()));
+        assert_eq!(
+            state.remove_token("mng".into()),
+            Some(Principal::management_canister())
+        );
         assert_eq!(state.get_token("anon".into()), Some(Principal::anonymous()));
         assert_eq!(state.get_token("mng".into()), None);
     }
