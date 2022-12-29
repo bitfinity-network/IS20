@@ -14,5 +14,6 @@ serde = "1.0"
 thiserror = "1.0"
 canister-sdk = { workspace = true, features = ["factory"] }
 ic-exports = { workspace = true }
+ic-stable-structures = { workspace = true  }
 
 token = { path = "../token/api", package = "is20-token" }
