@@ -36,6 +36,7 @@ impl TokenCanister {
         let owner = metadata.owner;
         let owner_account = AccountInternal::new(owner, None);
 
+        StableBalances.clear();
         StableBalances.insert(owner_account, amount);
 
         LedgerData::mint(
