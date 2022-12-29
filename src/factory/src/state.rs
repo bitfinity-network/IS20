@@ -33,7 +33,7 @@ impl State {
             .map(|principal| principal.0)
     }
 
-    pub fn insert_token(&self, name: String, principal: Principal) {
+    pub fn insert_token(&mut self, name: String, principal: Principal) {
         TOKENS_MAP.with(|map| {
             map.borrow_mut()
                 .insert(StringKey(name), PrincipalValue(principal))
@@ -45,7 +45,7 @@ impl State {
         WASM_CELL.with(|cell| cell.borrow().get().0.clone())
     }
 
-    pub fn set_token_wasm(&self, wasm: Option<Vec<u8>>) {
+    pub fn set_token_wasm(&mut self, wasm: Option<Vec<u8>>) {
         WASM_CELL.with(|cell| {
             cell.borrow_mut()
                 .set(StorableWasm(wasm))
@@ -128,4 +128,94 @@ thread_local! {
 
 pub fn get_state() -> State {
     State::default()
+}
+
+#[cfg(test)]
+mod tests {
+    use candid::Principal;
+    use canister_sdk::ic_kit::MockContext;
+    use ic_stable_structures::Storable;
+
+    use crate::State;
+    use crate::state::{PrincipalValue, StorableWasm};
+
+    use super::StringKey;
+
+    #[test]
+    fn string_key_serialization() {
+        let key = StringKey("".into());
+        let deserialized = StringKey::from_bytes(key.to_bytes().into());
+        assert_eq!(key.0, deserialized.0);
+
+        let key = StringKey("TEST_KEY".into());
+        let deserialized = StringKey::from_bytes(key.to_bytes().into());
+        assert_eq!(key.0, deserialized.0);
+
+        let long_key = StringKey(String::from_iter(std::iter::once('c').cycle().take(512)));
+        let deserialized = StringKey::from_bytes(long_key.to_bytes().into());
+        assert_eq!(long_key.0, deserialized.0);
+    }
+
+    #[test]
+    fn principal_value_serialization() {
+        let val = PrincipalValue(Principal::anonymous());
+        let deserialized = PrincipalValue::from_bytes(val.to_bytes().into());
+        assert_eq!(val.0, deserialized.0);
+
+        let val = PrincipalValue(Principal::management_canister());
+        let deserialized = PrincipalValue::from_bytes(val.to_bytes().into());
+        assert_eq!(val.0, deserialized.0);
+    }
+
+    #[test]
+    fn storable_wasm_serialization() {
+        let val = StorableWasm(None);
+        let deserialized = StorableWasm::from_bytes(val.to_bytes().into());
+        assert_eq!(val.0, deserialized.0);
+
+        let val = StorableWasm(Some(vec![]));
+        let deserialized = StorableWasm::from_bytes(val.to_bytes().into());
+        assert_eq!(val.0, deserialized.0);
+
+        let val = StorableWasm(Some((1..255).collect()));
+        let deserialized = StorableWasm::from_bytes(val.to_bytes().into());
+        assert_eq!(val.0, deserialized.0);
+    }
+
+    fn init_state() -> State {
+        MockContext::new().inject();
+        let mut state = State::default();
+        state.reset();
+        state
+    }
+
+    #[test]
+    fn insert_get_remove_tokens() {
+        let mut state = init_state();
+
+        state.insert_token("anon".into(), Principal::anonymous());
+        state.insert_token("mng".into(), Principal::management_canister());
+
+        assert_eq!(state.get_token("anon".into()), Some(Principal::anonymous()));
+        assert_eq!(state.get_token("mng".into()), Some(Principal::management_canister()));
+        assert_eq!(state.get_token("other".into()), None);
+
+        assert_eq!(state.remove_token("mng".into()), Some(Principal::management_canister()));
+        assert_eq!(state.get_token("anon".into()), Some(Principal::anonymous()));
+        assert_eq!(state.get_token("mng".into()), None);
+    }
+
+    #[test]
+    fn set_get_token_wasm() {
+        let mut state = init_state();
+
+        state.set_token_wasm(None);
+        assert_eq!(state.get_token_wasm(), None);
+
+        state.set_token_wasm(Some(vec![]));
+        assert_eq!(state.get_token_wasm(), Some(vec![]));
+
+        state.set_token_wasm(Some(vec![123; 2048]));
+        assert_eq!(state.get_token_wasm(), Some(vec![123; 2048]));
+    }
 }
