@@ -222,12 +222,6 @@ impl Storable for PrincipalKey {
     }
 }
 
-impl BoundedStorable for PrincipalKey {
-    fn max_size() -> u32 {
-        PRINCIPAL_MAX_LENGTH_IN_BYTES as u32
-    }
-}
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 struct SubaccountKey(Subaccount);
 
