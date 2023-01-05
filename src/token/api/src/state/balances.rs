@@ -243,9 +243,15 @@ impl Storable for SubaccountKey {
     }
 }
 
+impl BoundedStorable for PrincipalKey {
+    fn max_size() -> u32 {
+        PRINCIPAL_MAX_LENGTH_IN_BYTES as _
+    }
+}
+
 impl BoundedStorable for SubaccountKey {
     fn max_size() -> u32 {
-        SUBACCOUNT_MAX_LENGTH_IN_BYTES as u32
+        SUBACCOUNT_MAX_LENGTH_IN_BYTES as _
     }
 }
 

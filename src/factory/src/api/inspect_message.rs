@@ -1,14 +1,10 @@
-use crate::state::State;
-use canister_sdk::{
-    ic_cdk, ic_cdk_macros::inspect_message, ic_factory::FactoryState, ic_storage::IcStorage,
-};
+use crate::state;
+use canister_sdk::{ic_cdk, ic_cdk_macros::inspect_message, ic_factory::FactoryState};
 
 #[inspect_message]
 fn inspect_message() {
-    let state = State::get();
-    let state = state.borrow();
-    let factory = FactoryState::get();
-    let factory = factory.borrow();
+    let state = state::get_state();
+    let factory = FactoryState::default();
 
     if ic_cdk::api::call::method_name() == "set_token_bytecode" {
         if factory.controller() == canister_sdk::ic_kit::ic::caller() {
@@ -22,7 +18,7 @@ fn inspect_message() {
         ));
     }
 
-    match state.token_wasm {
+    match state.get_token_wasm() {
         Some(_) => ic_cdk::api::call::accept_message(),
         None => ic_cdk::trap("the factory hasn't been completely intialized yet"),
     }
