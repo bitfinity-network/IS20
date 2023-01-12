@@ -93,7 +93,7 @@ impl Storable for TokenConfig {
         Cow::Owned(Encode!(self).unwrap())
     }
 
-    fn from_bytes(bytes: Vec<u8>) -> Self {
+    fn from_bytes(bytes: Cow<[u8]>) -> Self {
         Decode!(&bytes, Self).unwrap()
     }
 }
@@ -169,14 +169,7 @@ pub struct FeeRatio(f64);
 
 impl FeeRatio {
     pub fn new(value: f64) -> Self {
-        let adj_value = if value < 0.0 {
-            0.0
-        } else if value > 1.0 {
-            1.0
-        } else {
-            value
-        };
-
+        let adj_value = value.clamp(0.0, 1.0);
         Self(adj_value)
     }
 

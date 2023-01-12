@@ -217,7 +217,7 @@ impl Storable for PrincipalKey {
         self.0.as_slice().to_vec().into()
     }
 
-    fn from_bytes(bytes: Vec<u8>) -> Self {
+    fn from_bytes(bytes: Cow<[u8]>) -> Self {
         PrincipalKey(Principal::from_slice(&bytes))
     }
 }
@@ -230,7 +230,7 @@ impl Storable for SubaccountKey {
         self.0.to_vec().into()
     }
 
-    fn from_bytes(bytes: Vec<u8>) -> Self {
+    fn from_bytes(bytes: Cow<[u8]>) -> Self {
         let mut buf = [0u8; SUBACCOUNT_MAX_LENGTH_IN_BYTES];
         buf.copy_from_slice(&bytes);
         Self(buf)
@@ -238,15 +238,13 @@ impl Storable for SubaccountKey {
 }
 
 impl BoundedStorable for PrincipalKey {
-    fn max_size() -> u32 {
-        PRINCIPAL_MAX_LENGTH_IN_BYTES as _
-    }
+    const MAX_SIZE: u32 = PRINCIPAL_MAX_LENGTH_IN_BYTES as _;
+    const IS_FIXED_SIZE: bool = false;
 }
 
 impl BoundedStorable for SubaccountKey {
-    fn max_size() -> u32 {
-        SUBACCOUNT_MAX_LENGTH_IN_BYTES as _
-    }
+    const MAX_SIZE: u32 = SUBACCOUNT_MAX_LENGTH_IN_BYTES as _;
+    const IS_FIXED_SIZE: bool = true;
 }
 
 thread_local! {
