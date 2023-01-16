@@ -1,4 +1,6 @@
-use std::{borrow::Cow, cell::RefCell, collections::HashMap};
+use std::borrow::Cow;
+use std::cell::RefCell;
+use std::collections::HashMap;
 
 use candid::{CandidType, Deserialize, Principal};
 use canister_sdk::ic_helpers::tokens::Tokens128;
@@ -76,10 +78,9 @@ pub struct StableBalances;
 impl StableBalances {
     #[cfg(feature = "claim")]
     pub fn get_claimable_amount(holder: Principal, subaccount: Option<Subaccount>) -> Tokens128 {
+        use canister_sdk::ledger::{AccountIdentifier, Subaccount as SubaccountIdentifier};
+
         use crate::account::DEFAULT_SUBACCOUNT;
-        use canister_sdk::ledger_canister::{
-            AccountIdentifier, Subaccount as SubaccountIdentifier,
-        };
 
         let claim_subaccount = AccountIdentifier::new(
             canister_sdk::ic_kit::ic::caller().into(),
