@@ -5,36 +5,28 @@ use canister_sdk::ic_auction::{
     error::AuctionError,
     state::{AuctionInfo, AuctionState},
 };
-
-use canister_sdk::{
-    ic_canister::{generate_exports, generate_idl, query, update, Canister, Idl, PreUpdate},
-    ic_helpers::tokens::Tokens128,
-    ic_kit::ic,
+use canister_sdk::ic_canister::{
+    generate_exports, generate_idl, query, update, Canister, Idl, PreUpdate,
 };
-
+use canister_sdk::ic_helpers::tokens::Tokens128;
+use canister_sdk::ic_kit::ic;
 pub use inspect::AcceptReason;
-
-use crate::{
-    account::{Account, AccountInternal, CheckedAccount, Subaccount},
-    canister::icrc1_transfer::icrc1_transfer,
-    error::{TransferError, TxError},
-    principal::{CheckedPrincipal, Owner},
-    state::ledger::{BatchTransferArgs, PaginatedResult, TransferArgs, TxReceipt},
-    state::{
-        balances::Balances,
-        balances::StableBalances,
-        config::{StandardRecord, Timestamp, TokenConfig, TokenInfo, Value},
-        ledger::LedgerData,
-    },
-    tx_record::{TxId, TxRecord},
-};
 
 use self::is20_transactions::{
     batch_transfer, burn_as_owner, burn_own_tokens, is20_transfer, mint_as_owner, mint_test_token,
 };
-
 #[cfg(feature = "claim")]
 use self::is20_transactions::{claim, get_claim_subaccount};
+use crate::account::{Account, AccountInternal, CheckedAccount, Subaccount};
+use crate::canister::icrc1_transfer::icrc1_transfer;
+use crate::error::{TransferError, TxError};
+use crate::principal::{CheckedPrincipal, Owner};
+use crate::state::balances::{Balances, StableBalances};
+use crate::state::config::{StandardRecord, Timestamp, TokenConfig, TokenInfo, Value};
+use crate::state::ledger::{
+    BatchTransferArgs, LedgerData, PaginatedResult, TransferArgs, TxReceipt,
+};
+use crate::tx_record::{TxId, TxRecord};
 
 mod inspect;
 
@@ -398,21 +390,17 @@ pub fn auction_account() -> AccountInternal {
 
 #[cfg(test)]
 mod tests {
+    use canister_sdk::ic_canister::canister_call;
+    use canister_sdk::ic_kit::inject::get_context;
+    use canister_sdk::ic_kit::mock_principals::{alice, bob, john};
+    use canister_sdk::ic_kit::MockContext;
     #[cfg(feature = "claim")]
-    use canister_sdk::ledger_canister::{AccountIdentifier, Subaccount as SubaccountIdentifier};
-    use canister_sdk::{
-        ic_canister::canister_call,
-        ic_kit::{
-            inject::get_context,
-            mock_principals::{alice, bob, john},
-            MockContext,
-        },
-    };
-
-    use crate::mock::TokenCanisterMock;
-    use crate::{account::DEFAULT_SUBACCOUNT, state::config::Metadata};
+    use canister_sdk::ledger::{AccountIdentifier, Subaccount as SubaccountIdentifier};
 
     use super::*;
+    use crate::account::DEFAULT_SUBACCOUNT;
+    use crate::mock::TokenCanisterMock;
+    use crate::state::config::Metadata;
 
     // Method for generating random Subaccount.
     #[cfg(feature = "claim")]
