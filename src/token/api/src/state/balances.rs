@@ -76,10 +76,9 @@ pub struct StableBalances;
 impl StableBalances {
     #[cfg(feature = "claim")]
     pub fn get_claimable_amount(holder: Principal, subaccount: Option<Subaccount>) -> Tokens128 {
+        use canister_sdk::ledger::{AccountIdentifier, Subaccount as SubaccountIdentifier};
+
         use crate::account::DEFAULT_SUBACCOUNT;
-        use canister_sdk::ledger_canister::{
-            AccountIdentifier, Subaccount as SubaccountIdentifier,
-        };
 
         let claim_subaccount = AccountIdentifier::new(
             canister_sdk::ic_kit::ic::caller().into(),
@@ -102,34 +101,29 @@ impl Balances for StableBalances {
         MAP.with(|map| {
             map.borrow_mut()
                 .insert(&principal_key, &subaccount_key, &token.amount)
-        })
-        .expect("unable to insert new balance to stable storage");
-        // Key and value have fixed byte size, so the only possible error is OOM.
+        });
     }
 
     /// Get amount of tokens for the specified account from stable memory.
     fn get(&self, account: &AccountInternal) -> Option<Tokens128> {
         let principal_key = PrincipalKey(account.owner);
         let subaccount_key = SubaccountKey(account.subaccount);
-        let amount = MAP.with(|map| map.borrow_mut().get(&principal_key, &subaccount_key));
-        amount.map(Tokens128::from)
+        MAP.with(|map| map.borrow_mut().get(&principal_key, &subaccount_key))
+            .map(Tokens128::from)
     }
 
     /// Remove specified account balance from the stable memory.
     fn remove(&mut self, account: &AccountInternal) -> Option<Tokens128> {
         let principal_key = PrincipalKey(account.owner);
         let subaccount_key = SubaccountKey(account.subaccount);
-        let amount = MAP
-            .with(|map| map.borrow_mut().remove(&principal_key, &subaccount_key))
-            .expect("balance keys serialization failed");
-        amount.map(Tokens128::from)
+        MAP.with(|map| map.borrow_mut().remove(&principal_key, &subaccount_key))
+            .map(Tokens128::from)
     }
 
     fn get_subaccounts(&self, owner: Principal) -> HashMap<Subaccount, Tokens128> {
         MAP.with(|map| {
             map.borrow()
                 .range(&PrincipalKey(owner))
-                .expect("principal serialization for stable storage failed")
                 .map(|(subaccount, amount)| (subaccount.0, Tokens128::from(amount)))
                 .collect()
         })

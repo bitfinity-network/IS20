@@ -398,16 +398,12 @@ pub fn auction_account() -> AccountInternal {
 
 #[cfg(test)]
 mod tests {
+    use canister_sdk::ic_canister::canister_call;
+    use canister_sdk::ic_kit::inject::get_context;
+    use canister_sdk::ic_kit::mock_principals::{alice, bob, john};
+    use canister_sdk::ic_kit::MockContext;
     #[cfg(feature = "claim")]
-    use canister_sdk::ledger_canister::{AccountIdentifier, Subaccount as SubaccountIdentifier};
-    use canister_sdk::{
-        ic_canister::canister_call,
-        ic_kit::{
-            inject::get_context,
-            mock_principals::{alice, bob, john},
-            MockContext,
-        },
-    };
+    use canister_sdk::ledger::{AccountIdentifier, Subaccount as SubaccountIdentifier};
 
     use crate::mock::TokenCanisterMock;
     use crate::{account::DEFAULT_SUBACCOUNT, state::config::Metadata};

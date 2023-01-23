@@ -38,7 +38,6 @@ impl State {
         TOKENS_MAP.with(|map| {
             map.borrow_mut()
                 .insert(StringKey(name), PrincipalValue(principal))
-                .expect("failed to insert token canister to stable storage");
         });
     }
 
