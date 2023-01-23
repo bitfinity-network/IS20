@@ -1,25 +1,18 @@
+use canister_sdk::ic_helpers::tokens::Tokens128;
+use canister_sdk::ic_kit::ic;
 #[cfg(feature = "claim")]
 use canister_sdk::ledger::{AccountIdentifier, Subaccount as SubaccountIdentifier};
-use canister_sdk::{ic_helpers::tokens::Tokens128, ic_kit::ic};
 use ic_exports::Principal;
 
-use crate::{
-    account::{AccountInternal, CheckedAccount, Subaccount, WithRecipient},
-    error::TxError,
-    principal::{CheckedPrincipal, Owner, TestNet},
-    state::ledger::{BatchTransferArgs, TransferArgs, TxReceipt},
-    state::{
-        balances::{Balances, LocalBalances, StableBalances},
-        config::{FeeRatio, TokenConfig},
-        ledger::LedgerData,
-    },
-    tx_record::TxId,
-};
-
-use super::{
-    auction_account,
-    icrc1_transfer::{PERMITTED_DRIFT, TX_WINDOW},
-};
+use super::auction_account;
+use super::icrc1_transfer::{PERMITTED_DRIFT, TX_WINDOW};
+use crate::account::{AccountInternal, CheckedAccount, Subaccount, WithRecipient};
+use crate::error::TxError;
+use crate::principal::{CheckedPrincipal, Owner, TestNet};
+use crate::state::balances::{Balances, LocalBalances, StableBalances};
+use crate::state::config::{FeeRatio, TokenConfig};
+use crate::state::ledger::{BatchTransferArgs, LedgerData, TransferArgs, TxReceipt};
+use crate::tx_record::TxId;
 
 pub fn is20_transfer(
     caller: CheckedAccount<WithRecipient>,
@@ -344,26 +337,18 @@ pub(crate) fn batch_transfer_internal(
 
 #[cfg(test)]
 mod tests {
-    use canister_sdk::{
-        ic_auction::api::Auction,
-        ic_canister::Canister,
-        ic_kit::{
-            inject::get_context,
-            mock_principals::{alice, bob, john, xtc},
-            MockContext,
-        },
-    };
-
-    use crate::{
-        account::{Account, DEFAULT_SUBACCOUNT},
-        canister::TokenCanisterAPI,
-        mock::TokenCanisterMock,
-        state::config::Metadata,
-    };
+    use canister_sdk::ic_auction::api::Auction;
+    use canister_sdk::ic_canister::Canister;
+    use canister_sdk::ic_kit::inject::get_context;
+    use canister_sdk::ic_kit::mock_principals::{alice, bob, john, xtc};
+    use canister_sdk::ic_kit::MockContext;
+    use coverage_helper::test;
 
     use super::*;
-
-    use coverage_helper::test;
+    use crate::account::{Account, DEFAULT_SUBACCOUNT};
+    use crate::canister::TokenCanisterAPI;
+    use crate::mock::TokenCanisterMock;
+    use crate::state::config::Metadata;
 
     fn test_canister() -> TokenCanisterMock {
         let context = MockContext::new().with_caller(alice()).inject();

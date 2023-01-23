@@ -5,36 +5,28 @@ use canister_sdk::ic_auction::{
     error::AuctionError,
     state::{AuctionInfo, AuctionState},
 };
-
-use canister_sdk::{
-    ic_canister::{generate_exports, generate_idl, query, update, Canister, Idl, PreUpdate},
-    ic_helpers::tokens::Tokens128,
-    ic_kit::ic,
+use canister_sdk::ic_canister::{
+    generate_exports, generate_idl, query, update, Canister, Idl, PreUpdate,
 };
-
+use canister_sdk::ic_helpers::tokens::Tokens128;
+use canister_sdk::ic_kit::ic;
 pub use inspect::AcceptReason;
-
-use crate::{
-    account::{Account, AccountInternal, CheckedAccount, Subaccount},
-    canister::icrc1_transfer::icrc1_transfer,
-    error::{TransferError, TxError},
-    principal::{CheckedPrincipal, Owner},
-    state::ledger::{BatchTransferArgs, PaginatedResult, TransferArgs, TxReceipt},
-    state::{
-        balances::Balances,
-        balances::StableBalances,
-        config::{StandardRecord, Timestamp, TokenConfig, TokenInfo, Value},
-        ledger::LedgerData,
-    },
-    tx_record::{TxId, TxRecord},
-};
 
 use self::is20_transactions::{
     batch_transfer, burn_as_owner, burn_own_tokens, is20_transfer, mint_as_owner, mint_test_token,
 };
-
 #[cfg(feature = "claim")]
 use self::is20_transactions::{claim, get_claim_subaccount};
+use crate::account::{Account, AccountInternal, CheckedAccount, Subaccount};
+use crate::canister::icrc1_transfer::icrc1_transfer;
+use crate::error::{TransferError, TxError};
+use crate::principal::{CheckedPrincipal, Owner};
+use crate::state::balances::{Balances, StableBalances};
+use crate::state::config::{StandardRecord, Timestamp, TokenConfig, TokenInfo, Value};
+use crate::state::ledger::{
+    BatchTransferArgs, LedgerData, PaginatedResult, TransferArgs, TxReceipt,
+};
+use crate::tx_record::{TxId, TxRecord};
 
 mod inspect;
 
