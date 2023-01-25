@@ -89,12 +89,14 @@ impl Default for TokenConfig {
 }
 
 impl Storable for TokenConfig {
+    // Stable storage expects non-failing serialization/deserialization.
+
     fn to_bytes(&self) -> Cow<'_, [u8]> {
-        Cow::Owned(Encode!(self).unwrap())
+        Cow::Owned(Encode!(self).expect("failed to encode token config"))
     }
 
     fn from_bytes(bytes: Cow<'_, [u8]>) -> Self {
-        Decode!(&bytes, Self).unwrap()
+        Decode!(&bytes, Self).expect("failed to decode token config")
     }
 }
 
