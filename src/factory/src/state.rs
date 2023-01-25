@@ -62,7 +62,7 @@ impl State {
 struct StorableWasm(Option<Vec<u8>>);
 
 impl Storable for StorableWasm {
-    fn to_bytes(&self) -> std::borrow::Cow<'_, [u8]> {
+    fn to_bytes(&self) -> Cow<'_, [u8]> {
         Encode!(self)
             .expect("failed to encode StorableWasm for stable storage")
             .into()
@@ -77,7 +77,7 @@ impl Storable for StorableWasm {
 struct StringKey(String);
 
 impl Storable for StringKey {
-    fn to_bytes(&self) -> std::borrow::Cow<'_, [u8]> {
+    fn to_bytes(&self) -> Cow<'_, [u8]> {
         self.0.as_bytes().into()
     }
 
@@ -97,7 +97,7 @@ impl BoundedStorable for StringKey {
 struct PrincipalValue(Principal);
 
 impl Storable for PrincipalValue {
-    fn to_bytes(&self) -> std::borrow::Cow<'_, [u8]> {
+    fn to_bytes(&self) -> Cow<'_, [u8]> {
         self.0.as_slice().into()
     }
 
