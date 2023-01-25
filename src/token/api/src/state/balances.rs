@@ -210,9 +210,10 @@ struct PrincipalKey(Principal);
 
 impl Storable for PrincipalKey {
     fn to_bytes(&self) -> Cow<'_, [u8]> {
-        self.0.as_slice().to_vec().into()
+        self.0.as_slice().into()
     }
 
+    /// Expected `Principal::from_slice(&bytes)` is a correct operation.
     fn from_bytes(bytes: Cow<'_, [u8]>) -> Self {
         PrincipalKey(Principal::from_slice(&bytes))
     }
@@ -223,9 +224,10 @@ struct SubaccountKey(Subaccount);
 
 impl Storable for SubaccountKey {
     fn to_bytes(&self) -> Cow<'_, [u8]> {
-        self.0.to_vec().into()
+        self.0.as_slice().into()
     }
 
+    /// Expected `bytes.len() == 32`.
     fn from_bytes(bytes: Cow<'_, [u8]>) -> Self {
         let mut buf = [0u8; SUBACCOUNT_MAX_LENGTH_IN_BYTES];
         buf.copy_from_slice(&bytes);
