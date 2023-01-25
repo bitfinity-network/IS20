@@ -7,4 +7,4 @@ cargo clippy
 
 cargo test -p token-factory 
 cargo test -p is20-token --features auction
-cargo test -p is20-token-canister 
+cargo test -p is20-token-canister
