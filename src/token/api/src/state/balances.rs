@@ -209,11 +209,11 @@ const SUBACCOUNT_MAX_LENGTH_IN_BYTES: usize = 32;
 struct PrincipalKey(Principal);
 
 impl Storable for PrincipalKey {
-    fn to_bytes(&self) -> Cow<[u8]> {
+    fn to_bytes(&self) -> Cow<'_, [u8]> {
         self.0.as_slice().to_vec().into()
     }
 
-    fn from_bytes(bytes: Cow<[u8]>) -> Self {
+    fn from_bytes(bytes: Cow<'_, [u8]>) -> Self {
         PrincipalKey(Principal::from_slice(&bytes))
     }
 }
@@ -222,11 +222,11 @@ impl Storable for PrincipalKey {
 struct SubaccountKey(Subaccount);
 
 impl Storable for SubaccountKey {
-    fn to_bytes(&self) -> Cow<[u8]> {
+    fn to_bytes(&self) -> Cow<'_, [u8]> {
         self.0.to_vec().into()
     }
 
-    fn from_bytes(bytes: Cow<[u8]>) -> Self {
+    fn from_bytes(bytes: Cow<'_, [u8]>) -> Self {
         let mut buf = [0u8; SUBACCOUNT_MAX_LENGTH_IN_BYTES];
         buf.copy_from_slice(&bytes);
         Self(buf)

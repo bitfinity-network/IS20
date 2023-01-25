@@ -62,13 +62,13 @@ impl State {
 struct StorableWasm(Option<Vec<u8>>);
 
 impl Storable for StorableWasm {
-    fn to_bytes(&self) -> std::borrow::Cow<[u8]> {
+    fn to_bytes(&self) -> std::borrow::Cow<'_, [u8]> {
         Encode!(self)
             .expect("failed to encode StorableWasm for stable storage")
             .into()
     }
 
-    fn from_bytes(bytes: Cow<[u8]>) -> Self {
+    fn from_bytes(bytes: Cow<'_, [u8]>) -> Self {
         Decode!(&bytes, Self).expect("failed to decode StorableWasm from stable storage")
     }
 }
@@ -81,7 +81,7 @@ impl Storable for StringKey {
         self.0.as_bytes().into()
     }
 
-    fn from_bytes(bytes: Cow<[u8]>) -> Self {
+    fn from_bytes(bytes: Cow<'_, [u8]>) -> Self {
         StringKey(String::from_bytes(bytes))
     }
 }
@@ -101,7 +101,7 @@ impl Storable for PrincipalValue {
         self.0.as_slice().into()
     }
 
-    fn from_bytes(bytes: Cow<[u8]>) -> Self {
+    fn from_bytes(bytes: Cow<'_, [u8]>) -> Self {
         PrincipalValue(Principal::from_slice(&bytes))
     }
 }
