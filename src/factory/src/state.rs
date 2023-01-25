@@ -1,3 +1,4 @@
+use std::borrow::Cow;
 use std::cell::RefCell;
 
 use candid::{CandidType, Decode, Encode, Principal};
@@ -37,7 +38,6 @@ impl State {
         TOKENS_MAP.with(|map| {
             map.borrow_mut()
                 .insert(StringKey(name), PrincipalValue(principal))
-                .expect("failed to insert token canister to stable storage");
         });
     }
 
@@ -62,25 +62,26 @@ impl State {
 struct StorableWasm(Option<Vec<u8>>);
 
 impl Storable for StorableWasm {
-    fn to_bytes(&self) -> std::borrow::Cow<[u8]> {
+    fn to_bytes(&self) -> Cow<'_, [u8]> {
         Encode!(self)
             .expect("failed to encode StorableWasm for stable storage")
             .into()
     }
 
-    fn from_bytes(bytes: Vec<u8>) -> Self {
+    fn from_bytes(bytes: Cow<'_, [u8]>) -> Self {
         Decode!(&bytes, Self).expect("failed to decode StorableWasm from stable storage")
     }
 }
 
+#[derive(Clone, PartialEq, Eq, PartialOrd, Ord)]
 struct StringKey(String);
 
 impl Storable for StringKey {
-    fn to_bytes(&self) -> std::borrow::Cow<'_, [u8]> {
+    fn to_bytes(&self) -> Cow<'_, [u8]> {
         self.0.as_bytes().into()
     }
 
-    fn from_bytes(bytes: Vec<u8>) -> Self {
+    fn from_bytes(bytes: Cow<'_, [u8]>) -> Self {
         StringKey(String::from_bytes(bytes))
     }
 }
@@ -88,28 +89,26 @@ impl Storable for StringKey {
 pub const MAX_TOKEN_LEN_IN_BYTES: usize = 1024;
 
 impl BoundedStorable for StringKey {
-    fn max_size() -> u32 {
-        MAX_TOKEN_LEN_IN_BYTES as _
-    }
+    const MAX_SIZE: u32 = MAX_TOKEN_LEN_IN_BYTES as _;
+
+    const IS_FIXED_SIZE: bool = false;
 }
 
 struct PrincipalValue(Principal);
 
 impl Storable for PrincipalValue {
-    fn to_bytes(&self) -> std::borrow::Cow<'_, [u8]> {
+    fn to_bytes(&self) -> Cow<'_, [u8]> {
         self.0.as_slice().into()
     }
 
-    fn from_bytes(bytes: Vec<u8>) -> Self {
+    fn from_bytes(bytes: Cow<'_, [u8]>) -> Self {
         PrincipalValue(Principal::from_slice(&bytes))
     }
 }
 
 impl BoundedStorable for PrincipalValue {
-    fn max_size() -> u32 {
-        // max bytes count in Principal
-        29
-    }
+    const MAX_SIZE: u32 = 29;
+    const IS_FIXED_SIZE: bool = false;
 }
 
 // starts with 10 because 0..10 reserved for `ic-factory` state.
@@ -144,41 +143,41 @@ mod tests {
     #[test]
     fn string_key_serialization() {
         let key = StringKey("".into());
-        let deserialized = StringKey::from_bytes(key.to_bytes().into());
+        let deserialized = StringKey::from_bytes(key.to_bytes());
         assert_eq!(key.0, deserialized.0);
 
         let key = StringKey("TEST_KEY".into());
-        let deserialized = StringKey::from_bytes(key.to_bytes().into());
+        let deserialized = StringKey::from_bytes(key.to_bytes());
         assert_eq!(key.0, deserialized.0);
 
         let long_key = StringKey(String::from_iter(std::iter::once('c').cycle().take(512)));
-        let deserialized = StringKey::from_bytes(long_key.to_bytes().into());
+        let deserialized = StringKey::from_bytes(long_key.to_bytes());
         assert_eq!(long_key.0, deserialized.0);
     }
 
     #[test]
     fn principal_value_serialization() {
         let val = PrincipalValue(Principal::anonymous());
-        let deserialized = PrincipalValue::from_bytes(val.to_bytes().into());
+        let deserialized = PrincipalValue::from_bytes(val.to_bytes());
         assert_eq!(val.0, deserialized.0);
 
         let val = PrincipalValue(Principal::management_canister());
-        let deserialized = PrincipalValue::from_bytes(val.to_bytes().into());
+        let deserialized = PrincipalValue::from_bytes(val.to_bytes());
         assert_eq!(val.0, deserialized.0);
     }
 
     #[test]
     fn storable_wasm_serialization() {
         let val = StorableWasm(None);
-        let deserialized = StorableWasm::from_bytes(val.to_bytes().into());
+        let deserialized = StorableWasm::from_bytes(val.to_bytes());
         assert_eq!(val.0, deserialized.0);
 
         let val = StorableWasm(Some(vec![]));
-        let deserialized = StorableWasm::from_bytes(val.to_bytes().into());
+        let deserialized = StorableWasm::from_bytes(val.to_bytes());
         assert_eq!(val.0, deserialized.0);
 
         let val = StorableWasm(Some((1..255).collect()));
-        let deserialized = StorableWasm::from_bytes(val.to_bytes().into());
+        let deserialized = StorableWasm::from_bytes(val.to_bytes());
         assert_eq!(val.0, deserialized.0);
     }
 

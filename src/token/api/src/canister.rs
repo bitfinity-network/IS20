@@ -397,10 +397,10 @@ mod tests {
     #[cfg(feature = "claim")]
     use canister_sdk::ledger::{AccountIdentifier, Subaccount as SubaccountIdentifier};
 
-    use super::*;
-    use crate::account::DEFAULT_SUBACCOUNT;
     use crate::mock::TokenCanisterMock;
-    use crate::state::config::Metadata;
+    use crate::{account::DEFAULT_SUBACCOUNT, state::config::Metadata};
+
+    use super::*;
 
     // Method for generating random Subaccount.
     #[cfg(feature = "claim")]

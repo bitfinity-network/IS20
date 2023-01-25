@@ -89,12 +89,14 @@ impl Default for TokenConfig {
 }
 
 impl Storable for TokenConfig {
-    fn to_bytes(&self) -> Cow<[u8]> {
-        Cow::Owned(Encode!(self).unwrap())
+    // Stable storage expects non-failing serialization/deserialization.
+
+    fn to_bytes(&self) -> Cow<'_, [u8]> {
+        Cow::Owned(Encode!(self).expect("failed to encode token config"))
     }
 
-    fn from_bytes(bytes: Vec<u8>) -> Self {
-        Decode!(&bytes, Self).unwrap()
+    fn from_bytes(bytes: Cow<'_, [u8]>) -> Self {
+        Decode!(&bytes, Self).expect("failed to decode token config")
     }
 }
 
@@ -169,14 +171,7 @@ pub struct FeeRatio(f64);
 
 impl FeeRatio {
     pub fn new(value: f64) -> Self {
-        let adj_value = if value < 0.0 {
-            0.0
-        } else if value > 1.0 {
-            1.0
-        } else {
-            value
-        };
-
+        let adj_value = value.clamp(0.0, 1.0);
         Self(adj_value)
     }
 

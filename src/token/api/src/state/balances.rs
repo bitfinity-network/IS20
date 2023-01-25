@@ -103,34 +103,29 @@ impl Balances for StableBalances {
         MAP.with(|map| {
             map.borrow_mut()
                 .insert(&principal_key, &subaccount_key, &token.amount)
-        })
-        .expect("unable to insert new balance to stable storage");
-        // Key and value have fixed byte size, so the only possible error is OOM.
+        });
     }
 
     /// Get amount of tokens for the specified account from stable memory.
     fn get(&self, account: &AccountInternal) -> Option<Tokens128> {
         let principal_key = PrincipalKey(account.owner);
         let subaccount_key = SubaccountKey(account.subaccount);
-        let amount = MAP.with(|map| map.borrow_mut().get(&principal_key, &subaccount_key));
-        amount.map(Tokens128::from)
+        MAP.with(|map| map.borrow_mut().get(&principal_key, &subaccount_key))
+            .map(Tokens128::from)
     }
 
     /// Remove specified account balance from the stable memory.
     fn remove(&mut self, account: &AccountInternal) -> Option<Tokens128> {
         let principal_key = PrincipalKey(account.owner);
         let subaccount_key = SubaccountKey(account.subaccount);
-        let amount = MAP
-            .with(|map| map.borrow_mut().remove(&principal_key, &subaccount_key))
-            .expect("balance keys serialization failed");
-        amount.map(Tokens128::from)
+        MAP.with(|map| map.borrow_mut().remove(&principal_key, &subaccount_key))
+            .map(Tokens128::from)
     }
 
     fn get_subaccounts(&self, owner: Principal) -> HashMap<Subaccount, Tokens128> {
         MAP.with(|map| {
             map.borrow()
                 .range(&PrincipalKey(owner))
-                .expect("principal serialization for stable storage failed")
                 .map(|(subaccount, amount)| (subaccount.0, Tokens128::from(amount)))
                 .collect()
         })
@@ -214,11 +209,12 @@ const SUBACCOUNT_MAX_LENGTH_IN_BYTES: usize = 32;
 struct PrincipalKey(Principal);
 
 impl Storable for PrincipalKey {
-    fn to_bytes(&self) -> Cow<[u8]> {
-        self.0.as_slice().to_vec().into()
+    fn to_bytes(&self) -> Cow<'_, [u8]> {
+        self.0.as_slice().into()
     }
 
-    fn from_bytes(bytes: Vec<u8>) -> Self {
+    /// Expected `Principal::from_slice(&bytes)` is a correct operation.
+    fn from_bytes(bytes: Cow<'_, [u8]>) -> Self {
         PrincipalKey(Principal::from_slice(&bytes))
     }
 }
@@ -227,11 +223,12 @@ impl Storable for PrincipalKey {
 struct SubaccountKey(Subaccount);
 
 impl Storable for SubaccountKey {
-    fn to_bytes(&self) -> Cow<[u8]> {
-        self.0.to_vec().into()
+    fn to_bytes(&self) -> Cow<'_, [u8]> {
+        self.0.as_slice().into()
     }
 
-    fn from_bytes(bytes: Vec<u8>) -> Self {
+    /// Expected `bytes.len() == 32`.
+    fn from_bytes(bytes: Cow<'_, [u8]>) -> Self {
         let mut buf = [0u8; SUBACCOUNT_MAX_LENGTH_IN_BYTES];
         buf.copy_from_slice(&bytes);
         Self(buf)
@@ -239,15 +236,13 @@ impl Storable for SubaccountKey {
 }
 
 impl BoundedStorable for PrincipalKey {
-    fn max_size() -> u32 {
-        PRINCIPAL_MAX_LENGTH_IN_BYTES as _
-    }
+    const MAX_SIZE: u32 = PRINCIPAL_MAX_LENGTH_IN_BYTES as _;
+    const IS_FIXED_SIZE: bool = false;
 }
 
 impl BoundedStorable for SubaccountKey {
-    fn max_size() -> u32 {
-        SUBACCOUNT_MAX_LENGTH_IN_BYTES as _
-    }
+    const MAX_SIZE: u32 = SUBACCOUNT_MAX_LENGTH_IN_BYTES as _;
+    const IS_FIXED_SIZE: bool = true;
 }
 
 thread_local! {

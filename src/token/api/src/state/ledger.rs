@@ -133,7 +133,6 @@ impl Ledger {
         count: usize,
         transaction_id: Option<TxId>,
     ) -> PaginatedResult {
-        let count = count as usize;
         let mut transactions = self
             .history
             .iter()
