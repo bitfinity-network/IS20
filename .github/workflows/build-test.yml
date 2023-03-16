@@ -25,7 +25,7 @@ jobs:
   build-test:
     uses: infinity-swap/ci-wf/.github/workflows/build-n-test.yml@main
     with:
-      runs-on: 4x150g-runner
+      runs-on: ubuntu-latest
       container-image: ghcr.io/infinity-swap/ic-dev-full:rust1.68-dfx0.13-rc-2022-09-30
       enable-target-cache: true
       audit-allow-warnings: true
