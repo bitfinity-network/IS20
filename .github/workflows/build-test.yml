@@ -37,10 +37,10 @@ jobs:
       output-artifact: artifact-is20
       artifact-script: |
         cargo build --target wasm32-unknown-unknown -p is20-token-canister --features export-api --release
-        ic-cdk-optimizer target/wasm32-unknown-unknown/release/is20-token-canister.wasm -o .artifact/is20-token.wasm
+        ic-wasm target/wasm32-unknown-unknown/release/is20-token-canister.wasm -o .artifact/is20-token.wasm
 
         cargo build --target wasm32-unknown-unknown -p token-factory --features export-api --release
-        ic-cdk-optimizer target/wasm32-unknown-unknown/release/token-factory.wasm -o .artifact/is20-factory.wasm
+        ic-wasm target/wasm32-unknown-unknown/release/token-factory.wasm -o .artifact/is20-factory.wasm
 
         cargo run -p is20-token-canister --features export-api > .artifact/is20-token.did
         cargo run -p token-factory --features export-api > .artifact/is20-factory.did
