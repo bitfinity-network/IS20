@@ -6,10 +6,10 @@ members = [
 ]
 
 [workspace.package]
-version = "1.10.28"
+version = "1.10.29"
 edition = "2021"
 
 [workspace.dependencies]
-canister-sdk = { git = "https://github.com/infinity-swap/canister-sdk", package = "canister-sdk", tag = "v0.3.40" }
-ic-exports = { git = "https://github.com/infinity-swap/canister-sdk", package = "ic-exports", tag = "v0.3.40" }
-ic-stable-structures = { git = "https://github.com/infinity-swap/canister-sdk", tag = "v0.3.40" }
+canister-sdk = { git = "https://github.com/infinity-swap/canister-sdk", package = "canister-sdk", tag = "v0.3.41" }
+ic-exports = { git = "https://github.com/infinity-swap/canister-sdk", package = "ic-exports", tag = "v0.3.41" }
+ic-stable-structures = { git = "https://github.com/infinity-swap/canister-sdk", tag = "v0.3.41" }
