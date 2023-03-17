@@ -26,7 +26,7 @@ jobs:
     uses: infinity-swap/ci-wf/.github/workflows/build-n-test.yml@main
     with:
       runs-on: ubuntu-latest
-      container-image: ghcr.io/infinity-swap/ic-dev-full:rust1.65-dfx0.11-rc-2022-09-30
+      container-image: ghcr.io/infinity-swap/ic-dev-full:rust1.68-dfx0.13-rc-2022-09-30
       enable-target-cache: true
       audit-allow-warnings: true
       skip-test: ${{ github.ref_type == 'tag' }}
@@ -37,10 +37,10 @@ jobs:
       output-artifact: artifact-is20
       artifact-script: |
         cargo build --target wasm32-unknown-unknown -p is20-token-canister --features export-api --release
-        ic-cdk-optimizer target/wasm32-unknown-unknown/release/is20-token-canister.wasm -o .artifact/is20-token.wasm
+        ic-wasm target/wasm32-unknown-unknown/release/is20-token-canister.wasm -o .artifact/is20-token.wasm shrink
 
         cargo build --target wasm32-unknown-unknown -p token-factory --features export-api --release
-        ic-cdk-optimizer target/wasm32-unknown-unknown/release/token-factory.wasm -o .artifact/is20-factory.wasm
+        ic-wasm target/wasm32-unknown-unknown/release/token-factory.wasm -o .artifact/is20-factory.wasm shrink
 
         cargo run -p is20-token-canister --features export-api > .artifact/is20-token.did
         cargo run -p token-factory --features export-api > .artifact/is20-factory.did
