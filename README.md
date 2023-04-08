@@ -2,6 +2,8 @@
 
 [![codecov](https://codecov.io/github/infinity-swap/IS20/branch/main/graph/badge.svg?token=SL2P26VSL7)](https://codecov.io/github/infinity-swap/IS20)
 
+#### NOTICE - THIS REPOSITORY IS DEPRECATED IN FAVOUR OF ICRC STANDARD
+
 # IS20 - Introduction
 
 IS20 is an Internet Computer token standard proposed by Infinity Swap.
