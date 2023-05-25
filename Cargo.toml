@@ -2,10 +2,10 @@
 members = ["src/token/api", "src/token/impl", "src/factory"]
 
 [workspace.package]
-version = "1.10.40"
+version = "1.10.41"
 edition = "2021"
 
 [workspace.dependencies]
-canister-sdk = { git = "https://github.com/infinity-swap/canister-sdk", package = "canister-sdk", tag = "v0.3.50" }
-ic-exports = { git = "https://github.com/infinity-swap/canister-sdk", package = "ic-exports", tag = "v0.3.50" }
-ic-stable-structures = { git = "https://github.com/infinity-swap/canister-sdk", tag = "v0.3.50" }
+canister-sdk = { git = "https://github.com/infinity-swap/canister-sdk", package = "canister-sdk", tag = "v0.3.51" }
+ic-exports = { git = "https://github.com/infinity-swap/canister-sdk", package = "ic-exports", tag = "v0.3.51" }
+ic-stable-structures = { git = "https://github.com/infinity-swap/canister-sdk", tag = "v0.3.51" }
