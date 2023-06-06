@@ -2,7 +2,7 @@
 members = ["src/token/api", "src/token/impl", "src/factory"]
 
 [workspace.package]
-version = "1.10.43"
+version = "1.10.44"
 edition = "2021"
 
 [workspace.dependencies]
