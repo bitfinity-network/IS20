@@ -569,7 +569,7 @@ dependencies = [
 [[package]]
 name = "canister-sdk"
 version = "0.3.53"
-source = "git+https://github.com/infinity-swap/canister-sdk?tag=v0.3.54#3fe97e183caa227a553678ad14613ea0b29eec62"
+source = "git+https://github.com/infinity-swap/canister-sdk?tag=v0.3.x#3fe97e183caa227a553678ad14613ea0b29eec62"
 dependencies = [
  "ic-auction",
  "ic-canister",
@@ -1460,7 +1460,7 @@ dependencies = [
 [[package]]
 name = "ic-auction"
 version = "0.3.53"
-source = "git+https://github.com/infinity-swap/canister-sdk?tag=v0.3.54#3fe97e183caa227a553678ad14613ea0b29eec62"
+source = "git+https://github.com/infinity-swap/canister-sdk?tag=v0.3.x#3fe97e183caa227a553678ad14613ea0b29eec62"
 dependencies = [
  "candid",
  "ic-canister",
@@ -1520,7 +1520,7 @@ dependencies = [
 [[package]]
 name = "ic-canister"
 version = "0.3.53"
-source = "git+https://github.com/infinity-swap/canister-sdk?tag=v0.3.54#3fe97e183caa227a553678ad14613ea0b29eec62"
+source = "git+https://github.com/infinity-swap/canister-sdk?tag=v0.3.x#3fe97e183caa227a553678ad14613ea0b29eec62"
 dependencies = [
  "ic-canister-macros",
  "ic-exports",
@@ -1534,7 +1534,7 @@ source = "git+https://github.com/dfinity/ic?rev=07293961dc498062a2fdf5ed69dd0b0f
 [[package]]
 name = "ic-canister-macros"
 version = "0.3.53"
-source = "git+https://github.com/infinity-swap/canister-sdk?tag=v0.3.54#3fe97e183caa227a553678ad14613ea0b29eec62"
+source = "git+https://github.com/infinity-swap/canister-sdk?tag=v0.3.x#3fe97e183caa227a553678ad14613ea0b29eec62"
 dependencies = [
  "lazy_static",
  "proc-macro2",
@@ -1715,7 +1715,7 @@ dependencies = [
 [[package]]
 name = "ic-exports"
 version = "0.3.53"
-source = "git+https://github.com/infinity-swap/canister-sdk?tag=v0.3.54#3fe97e183caa227a553678ad14613ea0b29eec62"
+source = "git+https://github.com/infinity-swap/canister-sdk?tag=v0.3.x#3fe97e183caa227a553678ad14613ea0b29eec62"
 dependencies = [
  "cycles-minting-canister",
  "ic-base-types",
@@ -1739,7 +1739,7 @@ dependencies = [
 [[package]]
 name = "ic-factory"
 version = "0.3.53"
-source = "git+https://github.com/infinity-swap/canister-sdk?tag=v0.3.54#3fe97e183caa227a553678ad14613ea0b29eec62"
+source = "git+https://github.com/infinity-swap/canister-sdk?tag=v0.3.x#3fe97e183caa227a553678ad14613ea0b29eec62"
 dependencies = [
  "candid",
  "getrandom",
@@ -1759,7 +1759,7 @@ dependencies = [
 [[package]]
 name = "ic-helpers"
 version = "0.3.53"
-source = "git+https://github.com/infinity-swap/canister-sdk?tag=v0.3.54#3fe97e183caa227a553678ad14613ea0b29eec62"
+source = "git+https://github.com/infinity-swap/canister-sdk?tag=v0.3.x#3fe97e183caa227a553678ad14613ea0b29eec62"
 dependencies = [
  "async-trait",
  "auto_ops",
@@ -1932,7 +1932,7 @@ dependencies = [
 [[package]]
 name = "ic-metrics"
 version = "0.3.53"
-source = "git+https://github.com/infinity-swap/canister-sdk?tag=v0.3.54#3fe97e183caa227a553678ad14613ea0b29eec62"
+source = "git+https://github.com/infinity-swap/canister-sdk?tag=v0.3.x#3fe97e183caa227a553678ad14613ea0b29eec62"
 dependencies = [
  "candid",
  "ic-canister",
@@ -2060,7 +2060,7 @@ dependencies = [
 [[package]]
 name = "ic-stable-structures"
 version = "0.3.53"
-source = "git+https://github.com/infinity-swap/canister-sdk?tag=v0.3.54#3fe97e183caa227a553678ad14613ea0b29eec62"
+source = "git+https://github.com/infinity-swap/canister-sdk?tag=v0.3.x#3fe97e183caa227a553678ad14613ea0b29eec62"
 dependencies = [
  "ic-exports",
  "thiserror",
@@ -2075,7 +2075,7 @@ checksum = "b4e026318236de13568edafd85534ad29910908bf08cdcf177d4403fd4a5f6c4"
 [[package]]
 name = "ic-storage"
 version = "0.3.53"
-source = "git+https://github.com/infinity-swap/canister-sdk?tag=v0.3.54#3fe97e183caa227a553678ad14613ea0b29eec62"
+source = "git+https://github.com/infinity-swap/canister-sdk?tag=v0.3.x#3fe97e183caa227a553678ad14613ea0b29eec62"
 dependencies = [
  "candid",
  "ic-exports",
@@ -2087,7 +2087,7 @@ dependencies = [
 [[package]]
 name = "ic-storage-derive"
 version = "0.3.53"
-source = "git+https://github.com/infinity-swap/canister-sdk?tag=v0.3.54#3fe97e183caa227a553678ad14613ea0b29eec62"
+source = "git+https://github.com/infinity-swap/canister-sdk?tag=v0.3.x#3fe97e183caa227a553678ad14613ea0b29eec62"
 dependencies = [
  "quote",
  "syn 1.0.109",
@@ -2297,7 +2297,7 @@ dependencies = [
 
 [[package]]
 name = "is20-token"
-version = "1.10.43"
+version = "1.10.45"
 dependencies = [
  "async-std",
  "candid",
@@ -2316,7 +2316,7 @@ dependencies = [
 
 [[package]]
 name = "is20-token-canister"
-version = "1.10.43"
+version = "1.10.45"
 dependencies = [
  "async-std",
  "candid",
@@ -3666,7 +3666,7 @@ checksum = "1f3ccbac311fea05f86f61904b462b55fb3df8837a366dfc601a0161d0532f20"
 
 [[package]]
 name = "token-factory"
-version = "1.10.43"
+version = "1.10.45"
 dependencies = [
  "candid",
  "canister-sdk",
